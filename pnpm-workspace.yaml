@@ -1,0 +1,4 @@
+# Supply-chain hardening for pnpm. See https://pnpm.io/settings
+minimumReleaseAge: 10080 # wait 7 days before installing a newly published version
+blockExoticSubdeps: true # reject transitive git:/file:/tarball deps that skip the registry
+trustPolicy: no-downgrade # reject packages whose provenance/signatures weaken between updates

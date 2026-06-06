@@ -1,0 +1,46 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native builds (managed workflow regenerates these via prebuild)
+/ios/
+/android/
+
+# Metro
+.metro-health-check*
+
+# Environment — keep .env.example, ignore real secrets
+.env
+.env*.local
+
+# Native signing / secrets
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.keystore
+
+# macOS
+.DS_Store
+*.pem
+
+# debug logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# typescript
+*.tsbuildinfo
+
+# testing
+coverage/
+
+# IDE / editor
+*.orig.*
