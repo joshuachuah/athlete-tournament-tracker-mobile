@@ -114,10 +114,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
         setProfile(await loadProfileForEmail(email));
       } catch (profileError) {
         setAuthError((profileError as Error).message);
-      } finally {
-        if (active) {
-          setStatus("ready");
-        }
+      }
+
+      if (active) {
+        setStatus("ready");
       }
     }
 

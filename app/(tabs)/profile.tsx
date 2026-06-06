@@ -29,9 +29,9 @@ export default function ProfileScreen() {
       await saveProfile(values);
     } catch (profileError) {
       setError((profileError as Error).message);
-    } finally {
-      setSaving(false);
     }
+
+    setSaving(false);
   }
 
   async function handleSignOut() {

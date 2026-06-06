@@ -25,9 +25,9 @@ export default function OnboardingScreen() {
       router.replace("/(tabs)/dashboard");
     } catch (profileError) {
       setError((profileError as Error).message);
-    } finally {
-      setSaving(false);
     }
+
+    setSaving(false);
   }
 
   return (
