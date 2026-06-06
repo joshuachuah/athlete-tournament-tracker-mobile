@@ -37,34 +37,35 @@ function sanitize(input: string): string {
  * approach) made it impossible to type a decimal point or clear the field,
  * since "10." re-rendered as "10" and an empty field snapped back to "0".
  */
-export function MoneyInput({ value, onChangeValue, ...rest }: MoneyInputProps) {
-  const [text, setText] = useState(() => moneyToText(value));
-
-  // Resync when the committed value changes from outside (prefill, edit
-  // hydration, auto-calculated totals) and no longer matches what's shown.
-  // Done during render via the previous-value pattern instead of a useEffect:
-  // no extra render/paint, and the React Compiler can optimize it.
-  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
-  const [lastValue, setLastValue] = useState(value);
-  if (value !== lastValue) {
-    setLastValue(value);
-    if (parseMoneyInput(text) !== value) {
-      setText(moneyToText(value));
-    }
-  }
+export function MoneyInput({
+  value,
+  onChangeValue,
+  onFocus,
+  onBlur,
+  ...rest
+}: MoneyInputProps) {
+  const [editingText, setEditingText] = useState<string | null>(null);
 
   function handleChangeText(next: string) {
     const cleaned = sanitize(next);
-    setText(cleaned);
+    setEditingText(cleaned);
     onChangeValue(parseMoneyInput(cleaned));
   }
 
   return (
     <Input
       {...rest}
-      value={text}
+      value={editingText ?? moneyToText(value)}
       keyboardType="numeric"
       onChangeText={handleChangeText}
+      onFocus={(event) => {
+        setEditingText(moneyToText(value));
+        onFocus?.(event);
+      }}
+      onBlur={(event) => {
+        setEditingText(null);
+        onBlur?.(event);
+      }}
     />
   );
 }
