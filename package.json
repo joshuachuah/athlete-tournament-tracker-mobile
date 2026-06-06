@@ -53,5 +53,5 @@
       "<rootDir>/jest.setup.ts"
     ]
   },
-  "packageManager": "pnpm@10.0.0"
+  "packageManager": "pnpm@10.33.0"
 }

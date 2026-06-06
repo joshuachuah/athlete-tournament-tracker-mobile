@@ -34,15 +34,19 @@ export function buildDashboardStats(
     return sum + (realistic?.net_result ?? 0);
   }, 0);
 
-  const losses = tournaments
-    .map((tournament) => getScenario(tournament, "realistic")?.net_result ?? 0)
-    .filter((netResultForTournament) => netResultForTournament < 0)
-    .map((loss) => Math.abs(loss));
+  let totalLosses = 0;
+  let lossCount = 0;
 
-  const averageNetSpend =
-    losses.length > 0
-      ? losses.reduce((sum, loss) => sum + loss, 0) / losses.length
-      : 0;
+  for (const tournament of tournaments) {
+    const result = getScenario(tournament, "realistic")?.net_result ?? 0;
+
+    if (result < 0) {
+      totalLosses += Math.abs(result);
+      lossCount += 1;
+    }
+  }
+
+  const averageNetSpend = lossCount > 0 ? totalLosses / lossCount : 0;
 
   return {
     ytdEarnings,

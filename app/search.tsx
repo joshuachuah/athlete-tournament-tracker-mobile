@@ -34,6 +34,22 @@ function prefillTournament(tournament: KnownTournament) {
   });
 }
 
+function tournamentKey(tournament: KnownTournament): string {
+  if (tournament.id) {
+    return tournament.id;
+  }
+
+  return JSON.stringify([
+    tournament.name,
+    tournament.location,
+    tournament.country,
+    tournament.start_date,
+    tournament.end_date,
+    tournament.tier,
+    tournament.tour_level,
+  ]);
+}
+
 export default function SearchScreen() {
   const { profile, session } = useAuth();
   const [query, setQuery] = useState("");
@@ -86,9 +102,9 @@ export default function SearchScreen() {
       ) : null}
 
       <View style={{ gap: spacing.md }}>
-        {results.data?.map((tournament, index) => (
+        {results.data?.map((tournament) => (
           <Pressable
-            key={`${tournament.id ?? tournament.name}-${index}`}
+            key={tournamentKey(tournament)}
             onPress={() => prefillTournament(tournament)}
           >
             {({ pressed }) => (

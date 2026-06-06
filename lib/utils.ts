@@ -12,6 +12,24 @@ export const roundLabels: Record<keyof PrizeRounds, string> = {
   w: "Win",
 };
 
+const moneyFormatters = new Map<string, Intl.NumberFormat>();
+
+function getMoneyFormatter(currency: string): Intl.NumberFormat {
+  const cached = moneyFormatters.get(currency);
+
+  if (cached) {
+    return cached;
+  }
+
+  const formatter = Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  });
+  moneyFormatters.set(currency, formatter);
+  return formatter;
+}
+
 export function formatMoney(amount: number | null | undefined, currency: string): string {
   const code = currency.toUpperCase();
 
@@ -19,24 +37,13 @@ export function formatMoney(amount: number | null | undefined, currency: string)
     return `-- ${code}`;
   }
 
-  const formatted = new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: code,
-    maximumFractionDigits: 0,
-  }).format(amount);
+  const formatted = getMoneyFormatter(code).format(amount);
 
   return `${formatted} ${code}`;
 }
 
 export function formatDate(date: string | Date): string {
   return format(new Date(date), "MMM d, yyyy");
-}
-
-export function compactNumber(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    notation: "compact",
-    maximumFractionDigits: 1,
-  }).format(value);
 }
 
 export function calculateDurationDays(startDate: string, endDate: string): number {
