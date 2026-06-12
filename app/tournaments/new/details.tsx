@@ -148,7 +148,7 @@ export default function DetailsStep() {
   const { session } = useAuth();
   const params = useLocalSearchParams<DetailsParams>();
   const editId = typeof params.editId === "string" ? params.editId : undefined;
-  const editTournament = useQuery({
+  const { data: editTournament, isLoading: editTournamentLoading } = useQuery({
     queryKey: ["tournament", editId],
     queryFn: () => api.tournaments.get(editId ?? ""),
     enabled: Boolean(editId),
@@ -158,11 +158,11 @@ export default function DetailsStep() {
     return <Redirect href="/login" />;
   }
 
-  const initialDraft = editTournament.data
-    ? tournamentToDraft(editTournament.data)
+  const initialDraft = editTournament
+    ? tournamentToDraft(editTournament)
     : draftFromParams(params);
-  const formKey = editTournament.data
-    ? `edit:${editTournament.data.id}`
+  const formKey = editTournament
+    ? `edit:${editTournament.id}`
     : `prefill:${JSON.stringify([
         params.name,
         params.location,
@@ -184,8 +184,8 @@ export default function DetailsStep() {
       }}
     >
       <WizardShell step="details">
-        {editTournament.isLoading ? <LoadingState label="Loading tournament" /> : null}
-        {!editId || editTournament.data ? (
+        {editTournamentLoading ? <LoadingState label="Loading tournament" /> : null}
+        {!editId || editTournament ? (
           <DetailsForm key={formKey} initialDraft={initialDraft} />
         ) : null}
       </WizardShell>
