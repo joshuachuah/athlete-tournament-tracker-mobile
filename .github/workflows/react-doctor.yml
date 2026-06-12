@@ -44,13 +44,15 @@ jobs:
       - uses: actions/checkout@v5
 
       - uses: millionco/react-doctor@v1
-        # Common configuration knobs — uncomment any to override the default.
+        with:
+          # Keep rule changes explicit instead of allowing `latest` to change
+          # the merge gate without a repository update.
+          version: "0.5.1"
+        # Common configuration knobs — add any below to override the default.
         # Full reference: https://www.react.doctor/ci
-        # with:
         #   non-blocking: true       # Report findings but always exit 0 (won't fail the PR check)
         #   fail-on: warning         # Gate level: "error" (default) | "warning" | "none"
         #   comment: false           # Disable the sticky PR summary comment
         #   annotations: false       # Disable inline GitHub Actions annotations on changed files
-        #   version: "0.2.18"        # Pin to a specific react-doctor version instead of "latest"
         #   directory: apps/web      # Scan a sub-directory (default: ".")
         #   project: "web,admin"     # In a monorepo, scan specific workspace project(s)
