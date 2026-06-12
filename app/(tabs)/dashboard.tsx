@@ -15,7 +15,14 @@ import { formatMoney } from "@/lib/utils";
 
 export default function DashboardScreen() {
   const { profile, session } = useAuth();
-  const tournaments = useQuery({
+  const {
+    data: tournaments = [],
+    error,
+    isError,
+    isLoading,
+    isRefetching,
+    refetch,
+  } = useQuery({
     queryKey: ["tournaments", profile?.id],
     queryFn: () => api.tournaments.list(profile?.id ?? ""),
     enabled: Boolean(profile?.id),
@@ -29,15 +36,14 @@ export default function DashboardScreen() {
     return <Redirect href="/onboarding" />;
   }
 
-  const data = tournaments.data ?? [];
-  const stats = buildDashboardStats(data, profile);
+  const stats = buildDashboardStats(tournaments, profile);
   const currentYear = new Date().getFullYear();
 
   return (
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
       refreshControl={
-        <RefreshControl refreshing={tournaments.isRefetching} onRefresh={tournaments.refetch} />
+        <RefreshControl refreshing={isRefetching} onRefresh={refetch} />
       }
       contentContainerStyle={{
         padding: spacing.lg,
@@ -67,15 +73,15 @@ export default function DashboardScreen() {
         </Text>
       </View>
 
-      {tournaments.isLoading ? <LoadingState label="Loading tournaments" /> : null}
-      {tournaments.isError ? (
+      {isLoading ? <LoadingState label="Loading tournaments" /> : null}
+      {isError ? (
         <ErrorState
-          message={(tournaments.error as Error).message}
-          onRetry={() => tournaments.refetch()}
+          message={(error as Error).message}
+          onRetry={() => refetch()}
         />
       ) : null}
 
-      {!tournaments.isLoading && !tournaments.isError ? (
+      {!isLoading && !isError ? (
         <>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.md }}>
             <StatCard
@@ -116,7 +122,7 @@ export default function DashboardScreen() {
             >
               Tournaments
             </Text>
-            {data.length === 0 ? (
+            {tournaments.length === 0 ? (
               <EmptyState
                 title="No tournaments yet"
                 body="Add a tournament to generate worst, realistic, and best-case projections."
@@ -127,7 +133,7 @@ export default function DashboardScreen() {
                 }
               />
             ) : (
-              data.map((tournament) => (
+              tournaments.map((tournament) => (
                 <TournamentCard key={tournament.id} tournament={tournament} />
               ))
             )}
