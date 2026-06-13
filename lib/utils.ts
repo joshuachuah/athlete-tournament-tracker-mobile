@@ -69,6 +69,10 @@ export function parseMoneyInput(value: string): number {
   return Number.isFinite(next) ? next : 0;
 }
 
+export function roundToCents(amount: number): number {
+  return Math.round(amount * 100) / 100;
+}
+
 export function isoToday(): string {
   return new Date().toISOString().slice(0, 10);
 }
