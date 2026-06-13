@@ -91,7 +91,7 @@ describe("tournamentToDraft", () => {
     ).toBe(false);
   });
 
-  it("rounds nightly rate to whole units (current behavior - see plans/003)", () => {
+  it("rounds nightly rate to whole units (current behavior pending drift fix)", () => {
     const draft = tournamentToDraft(
       tournament({ accommodation_total: 101, duration_days: 3 }),
     );
