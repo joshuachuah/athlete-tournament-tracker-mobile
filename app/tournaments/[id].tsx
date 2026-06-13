@@ -28,7 +28,13 @@ export default function TournamentDetailScreen() {
   const { profile, session } = useAuth();
   const tournamentId = typeof id === "string" ? id : "";
 
-  const tournament = useQuery({
+  const {
+    data,
+    error,
+    isError,
+    isLoading,
+    refetch,
+  } = useQuery({
     queryKey: ["tournament", tournamentId],
     queryFn: () => api.tournaments.get(tournamentId),
     enabled: Boolean(session && tournamentId),
@@ -65,7 +71,6 @@ export default function TournamentDetailScreen() {
     );
   }
 
-  const data = tournament.data;
   const realistic = data ? getScenario(data, "realistic") : undefined;
 
   return (
@@ -77,11 +82,11 @@ export default function TournamentDetailScreen() {
         backgroundColor: colors.background,
       }}
     >
-      {tournament.isLoading ? <LoadingState label="Loading tournament" /> : null}
-      {tournament.isError ? (
+      {isLoading ? <LoadingState label="Loading tournament" /> : null}
+      {isError ? (
         <ErrorState
-          message={(tournament.error as Error).message}
-          onRetry={() => tournament.refetch()}
+          message={(error as Error).message}
+          onRetry={() => refetch()}
         />
       ) : null}
 

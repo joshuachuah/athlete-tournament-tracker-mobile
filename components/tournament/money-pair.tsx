@@ -19,7 +19,7 @@ export function MoneyPair({
   const shouldConvert =
     fromCurrency.toUpperCase() !== toCurrency.toUpperCase() && Number.isFinite(amount);
 
-  const conversion = useQuery({
+  const { data: conversion, isError: conversionFailed } = useQuery({
     queryKey: ["fx", fromCurrency, toCurrency, amount],
     queryFn: () => api.fx.convert(fromCurrency, toCurrency, amount),
     enabled: shouldConvert,
@@ -52,9 +52,9 @@ export function MoneyPair({
           }}
           selectable
         >
-          {conversion.data
-            ? formatMoney(conversion.data.converted, toCurrency)
-            : conversion.isError
+          {conversion
+            ? formatMoney(conversion.converted, toCurrency)
+            : conversionFailed
               ? "FX unavailable"
               : "Converting..."}
         </Text>
