@@ -1,12 +1,14 @@
 import {
+  calculateAccommodationTotal,
   defaultTournamentDraft,
+  deriveAccommodationNightly,
   deriveDraftDates,
   detailsSchema,
   toTournamentPayload,
   tournamentToDraft,
   travelSchema,
 } from "@/lib/tournament-draft";
-import { roundToCents } from "@/lib/utils";
+import { roundCurrencyAmount } from "@/lib/utils";
 import type { TournamentWithPnL } from "@/types";
 
 function tournament(
@@ -109,8 +111,10 @@ describe("tournamentToDraft", () => {
       );
 
       expect(
-        roundToCents(
-          draft.accommodation_nightly * draft.accommodation_nights,
+        calculateAccommodationTotal(
+          draft.accommodation_nightly,
+          draft.accommodation_nights,
+          draft.currency,
         ),
       ).toBe(accommodation_total);
     },
@@ -123,8 +127,31 @@ describe("tournamentToDraft", () => {
 
     expect(draft.accommodation_nightly).toBe(33.33);
     expect(
-      roundToCents(draft.accommodation_nightly * draft.accommodation_nights),
+      calculateAccommodationTotal(
+        draft.accommodation_nightly,
+        draft.accommodation_nights,
+        draft.currency,
+      ),
     ).toBe(99.99);
+  });
+
+  it("preserves three-decimal currency precision", () => {
+    const draft = tournamentToDraft(
+      tournament({
+        accommodation_total: 20.25,
+        currency: "KWD",
+        duration_days: 3,
+      }),
+    );
+
+    expect(draft.accommodation_nightly).toBe(10.125);
+    expect(
+      calculateAccommodationTotal(
+        draft.accommodation_nightly,
+        draft.accommodation_nights,
+        draft.currency,
+      ),
+    ).toBe(20.25);
   });
 
   it("uses the total as the nightly rate for one-day tournaments", () => {
@@ -137,10 +164,30 @@ describe("tournamentToDraft", () => {
   });
 });
 
-describe("roundToCents", () => {
-  it("rounds currency values and removes floating-point noise", () => {
-    expect(roundToCents(50.499999)).toBe(50.5);
-    expect(roundToCents(99.99000000000001)).toBe(99.99);
+describe("accommodation money math", () => {
+  it("uses the production total calculation and removes floating-point noise", () => {
+    expect(calculateAccommodationTotal(33.33, 3, "USD")).toBe(99.99);
+    expect(calculateAccommodationTotal(10.125, 1, "KWD")).toBe(10.125);
+  });
+
+  it("derives nightly rates using the currency's minor units", () => {
+    expect(deriveAccommodationNightly(101, 2, "USD")).toBe(50.5);
+    expect(deriveAccommodationNightly(20.25, 2, "KWD")).toBe(10.125);
+    expect(deriveAccommodationNightly(101, 2, "JPY")).toBe(51);
+    expect(deriveAccommodationNightly(101, 0, "USD")).toBe(101);
+  });
+});
+
+describe("roundCurrencyAmount", () => {
+  it("rounds with currency precision and handles binary floating-point edges", () => {
+    expect(roundCurrencyAmount(1.005, "USD")).toBe(1.01);
+    expect(roundCurrencyAmount(10.1254, "KWD")).toBe(10.125);
+    expect(roundCurrencyAmount(10.5, "JPY")).toBe(11);
+    expect(roundCurrencyAmount(99.99000000000001, "USD")).toBe(99.99);
+  });
+
+  it("falls back to two fraction digits for an invalid in-progress code", () => {
+    expect(roundCurrencyAmount(10.125, "X")).toBe(10.13);
   });
 });
 
