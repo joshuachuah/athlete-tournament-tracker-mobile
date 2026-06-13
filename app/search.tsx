@@ -54,7 +54,7 @@ export default function SearchScreen() {
   const { profile, session } = useAuth();
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebouncedValue(query.trim(), 300);
-  const results = useQuery({
+  const { data: results, isLoading: resultsLoading } = useQuery({
     queryKey: ["tournament-search", debouncedQuery, profile?.sport],
     queryFn: () => api.tournaments.search(debouncedQuery, profile?.sport),
     enabled: debouncedQuery.length >= 2,
@@ -85,7 +85,7 @@ export default function SearchScreen() {
         placeholder="Search by tournament name"
       />
 
-      {results.isLoading ? <LoadingState label="Searching tournaments" /> : null}
+      {resultsLoading ? <LoadingState label="Searching tournaments" /> : null}
 
       {debouncedQuery.length < 2 ? (
         <EmptyState
@@ -94,7 +94,7 @@ export default function SearchScreen() {
         />
       ) : null}
 
-      {results.data?.length === 0 ? (
+      {results?.length === 0 ? (
         <EmptyState
           title="No matches"
           body="Start from scratch if this tournament is not in the server search results."
@@ -102,7 +102,7 @@ export default function SearchScreen() {
       ) : null}
 
       <View style={{ gap: spacing.md }}>
-        {results.data?.map((tournament) => (
+        {results?.map((tournament) => (
           <Pressable
             key={tournamentKey(tournament)}
             onPress={() => prefillTournament(tournament)}
