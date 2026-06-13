@@ -2,7 +2,11 @@ import { addDays } from "date-fns";
 import { z } from "zod";
 
 import type { PrizeRounds, Tournament, TournamentWithPnL } from "@/types";
-import { calculateDurationDays, isoToday, roundToCents } from "@/lib/utils";
+import {
+  calculateDurationDays,
+  isoToday,
+  roundCurrencyAmount,
+} from "@/lib/utils";
 
 export type TournamentDraft = {
   editId?: string;
@@ -114,7 +118,25 @@ export const spendingSchema = z.object({
   misc_cost: money,
 });
 
+export function calculateAccommodationTotal(
+  nightly: number,
+  nights: number,
+  currency: string,
+): number {
+  return roundCurrencyAmount(nightly * nights, currency);
+}
+
+export function deriveAccommodationNightly(
+  total: number,
+  nights: number,
+  currency: string,
+): number {
+  return nights > 0 ? roundCurrencyAmount(total / nights, currency) : total;
+}
+
 export function tournamentToDraft(tournament: TournamentWithPnL): TournamentDraft {
+  const accommodationNights = Math.max(0, tournament.duration_days - 1);
+
   return {
     ...defaultTournamentDraft,
     editId: tournament.id,
@@ -132,13 +154,12 @@ export function tournamentToDraft(tournament: TournamentWithPnL): TournamentDraf
     },
     flight_cost: tournament.flight_cost,
     accommodation_total: tournament.accommodation_total,
-    accommodation_nightly:
-      tournament.duration_days > 1
-        ? roundToCents(
-            tournament.accommodation_total / (tournament.duration_days - 1),
-          )
-        : tournament.accommodation_total,
-    accommodation_nights: Math.max(0, tournament.duration_days - 1),
+    accommodation_nightly: deriveAccommodationNightly(
+      tournament.accommodation_total,
+      accommodationNights,
+      tournament.currency,
+    ),
+    accommodation_nights: accommodationNights,
     daily_spending_cap: tournament.daily_spending_cap,
     coaching_cost: tournament.coaching_cost,
     misc_cost: tournament.misc_cost,

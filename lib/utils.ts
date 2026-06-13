@@ -13,6 +13,7 @@ export const roundLabels: Record<keyof PrizeRounds, string> = {
 };
 
 const moneyFormatters = new Map<string, Intl.NumberFormat>();
+const currencyFractionDigits = new Map<string, number>();
 
 function getMoneyFormatter(currency: string): Intl.NumberFormat {
   const cached = moneyFormatters.get(currency);
@@ -69,8 +70,29 @@ export function parseMoneyInput(value: string): number {
   return Number.isFinite(next) ? next : 0;
 }
 
-export function roundToCents(amount: number): number {
-  return Math.round(amount * 100) / 100;
+function getCurrencyFractionDigits(currency: string): number {
+  const code = currency.toUpperCase();
+  const cached = currencyFractionDigits.get(code);
+
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  try {
+    const digits = Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: code,
+    }).resolvedOptions().maximumFractionDigits ?? 2;
+    currencyFractionDigits.set(code, digits);
+    return digits;
+  } catch {
+    return 2;
+  }
+}
+
+export function roundCurrencyAmount(amount: number, currency: string): number {
+  const factor = 10 ** getCurrencyFractionDigits(currency);
+  return Math.round((amount + Number.EPSILON) * factor) / factor;
 }
 
 export function isoToday(): string {

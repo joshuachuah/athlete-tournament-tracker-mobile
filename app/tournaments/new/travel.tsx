@@ -7,8 +7,10 @@ import { WizardNav, WizardShell } from "@/components/tournament/wizard-shell";
 import { colors, spacing } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
 import { useTournamentDraft } from "@/context/tournament-draft";
-import { travelSchema } from "@/lib/tournament-draft";
-import { roundToCents } from "@/lib/utils";
+import {
+  calculateAccommodationTotal,
+  travelSchema,
+} from "@/lib/tournament-draft";
 import { zodErrorMap } from "@/lib/zod-errors";
 
 export default function TravelStep() {
@@ -32,8 +34,10 @@ export default function TravelStep() {
     updateDraft({
       accommodation_nightly,
       accommodation_nights,
-      accommodation_total: roundToCents(
-        accommodation_nightly * accommodation_nights,
+      accommodation_total: calculateAccommodationTotal(
+        accommodation_nightly,
+        accommodation_nights,
+        draft.currency,
       ),
     });
   }
