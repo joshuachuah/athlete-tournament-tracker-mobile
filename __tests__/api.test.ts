@@ -1,5 +1,6 @@
 import { api, ApiError } from "@/lib/api";
 
+const apiBase = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:5000";
 const originalFetch = globalThis.fetch;
 const fetchMock = jest.fn() as jest.MockedFunction<typeof fetch>;
 
@@ -21,7 +22,7 @@ describe("api client", () => {
 
     await expect(api.health()).resolves.toEqual({ status: "ok" });
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:5000/health",
+      `${apiBase}/health`,
       expect.objectContaining({
         headers: {
           "Content-Type": "application/json",
@@ -91,7 +92,7 @@ describe("api client", () => {
     await api.profile.get("a+b@x.com");
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:5000/api/profile?email=a%2Bb%40x.com",
+      `${apiBase}/api/profile?email=a%2Bb%40x.com`,
       expect.any(Object),
     );
   });
