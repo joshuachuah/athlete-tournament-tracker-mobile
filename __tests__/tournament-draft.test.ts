@@ -1,11 +1,14 @@
 import {
+  calculateAccommodationTotal,
   defaultTournamentDraft,
+  deriveAccommodationNightly,
   deriveDraftDates,
   detailsSchema,
   toTournamentPayload,
   tournamentToDraft,
   travelSchema,
 } from "@/lib/tournament-draft";
+import { roundCurrencyAmount } from "@/lib/utils";
 import type { TournamentWithPnL } from "@/types";
 
 function tournament(
@@ -91,13 +94,64 @@ describe("tournamentToDraft", () => {
     ).toBe(false);
   });
 
-  it("rounds nightly rate to whole units (current behavior pending drift fix)", () => {
+  it("derives the nightly rate at cent precision", () => {
     const draft = tournamentToDraft(
       tournament({ accommodation_total: 101, duration_days: 3 }),
     );
 
-    expect(draft.accommodation_nightly).toBe(51);
+    expect(draft.accommodation_nightly).toBe(50.5);
     expect(draft.accommodation_nights).toBe(2);
+  });
+
+  it.each([101, 250])(
+    "round-trips a %p accommodation total over two nights",
+    (accommodation_total) => {
+      const draft = tournamentToDraft(
+        tournament({ accommodation_total, duration_days: 3 }),
+      );
+
+      expect(
+        calculateAccommodationTotal(
+          draft.accommodation_nightly,
+          draft.accommodation_nights,
+          draft.currency,
+        ),
+      ).toBe(accommodation_total);
+    },
+  );
+
+  it("non-cent-divisible totals still drift by sub-cent amounts when recomputed", () => {
+    const draft = tournamentToDraft(
+      tournament({ accommodation_total: 100, duration_days: 4 }),
+    );
+
+    expect(draft.accommodation_nightly).toBe(33.33);
+    expect(
+      calculateAccommodationTotal(
+        draft.accommodation_nightly,
+        draft.accommodation_nights,
+        draft.currency,
+      ),
+    ).toBe(99.99);
+  });
+
+  it("preserves three-decimal currency precision", () => {
+    const draft = tournamentToDraft(
+      tournament({
+        accommodation_total: 20.25,
+        currency: "KWD",
+        duration_days: 3,
+      }),
+    );
+
+    expect(draft.accommodation_nightly).toBe(10.125);
+    expect(
+      calculateAccommodationTotal(
+        draft.accommodation_nightly,
+        draft.accommodation_nights,
+        draft.currency,
+      ),
+    ).toBe(20.25);
   });
 
   it("uses the total as the nightly rate for one-day tournaments", () => {
@@ -107,6 +161,33 @@ describe("tournamentToDraft", () => {
 
     expect(draft.accommodation_nightly).toBe(101);
     expect(draft.accommodation_nights).toBe(0);
+  });
+});
+
+describe("accommodation money math", () => {
+  it("uses the production total calculation and removes floating-point noise", () => {
+    expect(calculateAccommodationTotal(33.33, 3, "USD")).toBe(99.99);
+    expect(calculateAccommodationTotal(10.125, 1, "KWD")).toBe(10.125);
+  });
+
+  it("derives nightly rates using the currency's minor units", () => {
+    expect(deriveAccommodationNightly(101, 2, "USD")).toBe(50.5);
+    expect(deriveAccommodationNightly(20.25, 2, "KWD")).toBe(10.125);
+    expect(deriveAccommodationNightly(101, 2, "JPY")).toBe(51);
+    expect(deriveAccommodationNightly(101, 0, "USD")).toBe(101);
+  });
+});
+
+describe("roundCurrencyAmount", () => {
+  it("rounds with currency precision and handles binary floating-point edges", () => {
+    expect(roundCurrencyAmount(1.005, "USD")).toBe(1.01);
+    expect(roundCurrencyAmount(10.1254, "KWD")).toBe(10.125);
+    expect(roundCurrencyAmount(10.5, "JPY")).toBe(11);
+    expect(roundCurrencyAmount(99.99000000000001, "USD")).toBe(99.99);
+  });
+
+  it("falls back to two fraction digits for an invalid in-progress code", () => {
+    expect(roundCurrencyAmount(10.125, "X")).toBe(10.13);
   });
 });
 
