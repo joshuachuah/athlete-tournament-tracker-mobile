@@ -6,6 +6,7 @@ import {
   tournamentToDraft,
   travelSchema,
 } from "@/lib/tournament-draft";
+import { roundToCents } from "@/lib/utils";
 import type { TournamentWithPnL } from "@/types";
 
 function tournament(
@@ -91,13 +92,39 @@ describe("tournamentToDraft", () => {
     ).toBe(false);
   });
 
-  it("rounds nightly rate to whole units (current behavior pending drift fix)", () => {
+  it("derives the nightly rate at cent precision", () => {
     const draft = tournamentToDraft(
       tournament({ accommodation_total: 101, duration_days: 3 }),
     );
 
-    expect(draft.accommodation_nightly).toBe(51);
+    expect(draft.accommodation_nightly).toBe(50.5);
     expect(draft.accommodation_nights).toBe(2);
+  });
+
+  it.each([101, 250])(
+    "round-trips a %p accommodation total over two nights",
+    (accommodation_total) => {
+      const draft = tournamentToDraft(
+        tournament({ accommodation_total, duration_days: 3 }),
+      );
+
+      expect(
+        roundToCents(
+          draft.accommodation_nightly * draft.accommodation_nights,
+        ),
+      ).toBe(accommodation_total);
+    },
+  );
+
+  it("non-cent-divisible totals still drift by sub-cent amounts when recomputed", () => {
+    const draft = tournamentToDraft(
+      tournament({ accommodation_total: 100, duration_days: 4 }),
+    );
+
+    expect(draft.accommodation_nightly).toBe(33.33);
+    expect(
+      roundToCents(draft.accommodation_nightly * draft.accommodation_nights),
+    ).toBe(99.99);
   });
 
   it("uses the total as the nightly rate for one-day tournaments", () => {
@@ -107,6 +134,13 @@ describe("tournamentToDraft", () => {
 
     expect(draft.accommodation_nightly).toBe(101);
     expect(draft.accommodation_nights).toBe(0);
+  });
+});
+
+describe("roundToCents", () => {
+  it("rounds currency values and removes floating-point noise", () => {
+    expect(roundToCents(50.499999)).toBe(50.5);
+    expect(roundToCents(99.99000000000001)).toBe(99.99);
   });
 });
 

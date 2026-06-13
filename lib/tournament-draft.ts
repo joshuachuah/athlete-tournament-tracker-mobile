@@ -2,7 +2,7 @@ import { addDays } from "date-fns";
 import { z } from "zod";
 
 import type { PrizeRounds, Tournament, TournamentWithPnL } from "@/types";
-import { calculateDurationDays, isoToday } from "@/lib/utils";
+import { calculateDurationDays, isoToday, roundToCents } from "@/lib/utils";
 
 export type TournamentDraft = {
   editId?: string;
@@ -134,7 +134,9 @@ export function tournamentToDraft(tournament: TournamentWithPnL): TournamentDraf
     accommodation_total: tournament.accommodation_total,
     accommodation_nightly:
       tournament.duration_days > 1
-        ? Math.round(tournament.accommodation_total / (tournament.duration_days - 1))
+        ? roundToCents(
+            tournament.accommodation_total / (tournament.duration_days - 1),
+          )
         : tournament.accommodation_total,
     accommodation_nights: Math.max(0, tournament.duration_days - 1),
     daily_spending_cap: tournament.daily_spending_cap,
