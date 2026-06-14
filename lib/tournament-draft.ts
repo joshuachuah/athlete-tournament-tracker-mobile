@@ -134,6 +134,12 @@ export function deriveAccommodationNightly(
   return nights > 0 ? roundCurrencyAmount(total / nights, currency) : total;
 }
 
+// Abandoned edits must restart from the server record so a stale editId cannot
+// cause a later wizard submission to update the wrong tournament.
+export function resumableDraft(stored: TournamentDraft): TournamentDraft {
+  return stored.editId ? defaultTournamentDraft : stored;
+}
+
 export function tournamentToDraft(tournament: TournamentWithPnL): TournamentDraft {
   const accommodationNights = Math.max(0, tournament.duration_days - 1);
 
