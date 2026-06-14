@@ -1,4 +1,4 @@
-import { Link } from "expo-router";
+import { Link, type Href } from "expo-router";
 import type { ReactNode } from "react";
 import { Text, View } from "react-native";
 
@@ -62,7 +62,7 @@ export function WizardNav({
   onNext,
   loading,
 }: {
-  backHref?: string;
+  backHref?: Href;
   nextLabel?: string;
   onNext: () => void;
   loading?: boolean;

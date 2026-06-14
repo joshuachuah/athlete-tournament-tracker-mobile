@@ -140,6 +140,14 @@ export function resumableDraft(stored: TournamentDraft): TournamentDraft {
   return stored.editId ? defaultTournamentDraft : stored;
 }
 
+export function shouldResumeEdit(
+  stored: TournamentDraft,
+  editId: string | undefined,
+  resumeEdit: string | undefined,
+): boolean {
+  return resumeEdit === "true" && Boolean(editId) && stored.editId === editId;
+}
+
 export function tournamentToDraft(tournament: TournamentWithPnL): TournamentDraft {
   const accommodationNights = Math.max(0, tournament.duration_days - 1);
 
