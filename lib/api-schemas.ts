@@ -97,9 +97,6 @@ export const knownTournamentSchema = z.looseObject({
 });
 
 export const fxConversionSchema = z.looseObject({
-  from: z.string(),
-  to: z.string(),
-  amount: z.number(),
   converted: z.number(),
   rate: z.number(),
 });
