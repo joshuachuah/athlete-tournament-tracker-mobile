@@ -4,6 +4,7 @@ import {
   deriveAccommodationNightly,
   deriveDraftDates,
   detailsSchema,
+  resumableDraft,
   toTournamentPayload,
   tournamentToDraft,
   travelSchema,
@@ -214,6 +215,27 @@ describe("deriveDraftDates", () => {
         end_date: "also-not-a-date",
       }).duration_days,
     ).toBe(1);
+  });
+});
+
+describe("resumableDraft", () => {
+  it("returns a stored new-tournament draft as-is", () => {
+    const stored = {
+      ...defaultTournamentDraft,
+      name: "Open Championship",
+    };
+
+    expect(resumableDraft(stored)).toBe(stored);
+  });
+
+  it("discards a stored draft from an abandoned edit", () => {
+    const stored = {
+      ...defaultTournamentDraft,
+      editId: "tournament-1",
+      name: "Stale edit",
+    };
+
+    expect(resumableDraft(stored)).toBe(defaultTournamentDraft);
   });
 });
 
