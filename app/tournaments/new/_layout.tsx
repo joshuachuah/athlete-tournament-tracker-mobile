@@ -1,11 +1,15 @@
 import { Stack } from "expo-router";
 
 import { colors } from "@/constants/theme";
+import { useAuth } from "@/context/auth";
 import { TournamentDraftProvider } from "@/context/tournament-draft";
 
 export default function NewTournamentLayout() {
+  const { session } = useAuth();
+  const userId = session?.user.id;
+
   return (
-    <TournamentDraftProvider>
+    <TournamentDraftProvider key={userId ?? "signed-out"} userId={userId}>
       <Stack
         screenOptions={{
           contentStyle: { backgroundColor: colors.background },

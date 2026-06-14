@@ -16,6 +16,7 @@ import {
   detailsSchema,
   deriveDraftDates,
   resumableDraft,
+  shouldResumeEdit,
   tournamentToDraft,
   type TournamentDraft,
 } from "@/lib/tournament-draft";
@@ -23,6 +24,7 @@ import { zodErrorMap } from "@/lib/zod-errors";
 
 type DetailsParams = {
   editId?: string;
+  resumeEdit?: string;
   name?: string;
   location?: string;
   country?: string;
@@ -150,10 +152,11 @@ export default function DetailsStep() {
   const { draft } = useTournamentDraft();
   const params = useLocalSearchParams<DetailsParams>();
   const editId = typeof params.editId === "string" ? params.editId : undefined;
+  const resumeEdit = shouldResumeEdit(draft, editId, params.resumeEdit);
   const { data: editTournament, isLoading: editTournamentLoading } = useQuery({
     queryKey: ["tournament", editId],
     queryFn: () => api.tournaments.get(editId ?? ""),
-    enabled: Boolean(editId),
+    enabled: Boolean(editId) && !resumeEdit,
   });
 
   if (!session) {
@@ -170,25 +173,29 @@ export default function DetailsStep() {
     params.duration_days,
     params.prize_rounds,
   ].some(Boolean);
-  const initialDraft = editTournament
-    ? tournamentToDraft(editTournament)
-    : hasPrefill
-      ? draftFromParams(params)
-      : resumableDraft(draft);
-  const formKey = editTournament
-    ? `edit:${editTournament.id}`
-    : hasPrefill
-      ? `prefill:${JSON.stringify([
-          params.name,
-          params.location,
-          params.country,
-          params.currency,
-          params.start_date,
-          params.end_date,
-          params.duration_days,
-          params.prize_rounds,
-        ])}`
-      : "resume";
+  const initialDraft = resumeEdit
+    ? draft
+    : editTournament
+      ? tournamentToDraft(editTournament)
+      : hasPrefill
+        ? draftFromParams(params)
+        : resumableDraft(draft);
+  const formKey = resumeEdit
+    ? `edit-resume:${editId}`
+    : editTournament
+      ? `edit:${editTournament.id}`
+      : hasPrefill
+        ? `prefill:${JSON.stringify([
+            params.name,
+            params.location,
+            params.country,
+            params.currency,
+            params.start_date,
+            params.end_date,
+            params.duration_days,
+            params.prize_rounds,
+          ])}`
+        : "resume";
 
   return (
     <ScrollView
@@ -201,7 +208,7 @@ export default function DetailsStep() {
     >
       <WizardShell step="details">
         {editTournamentLoading ? <LoadingState label="Loading tournament" /> : null}
-        {!editId || editTournament ? (
+        {!editId || resumeEdit || editTournament ? (
           <DetailsForm key={formKey} initialDraft={initialDraft} />
         ) : null}
       </WizardShell>
