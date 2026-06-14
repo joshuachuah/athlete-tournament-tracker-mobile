@@ -150,7 +150,7 @@ export default function SpendingStep() {
           ) : null}
 
           <WizardNav
-            backHref="/tournaments/new/subsidy"
+            showBack
             nextLabel={draft.editId ? "Save changes" : "Generate projection"}
             loading={mutation.isPending}
             onNext={handleSubmit}
