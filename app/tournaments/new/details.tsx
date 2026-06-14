@@ -15,6 +15,7 @@ import {
   defaultTournamentDraft,
   detailsSchema,
   deriveDraftDates,
+  resumableDraft,
   tournamentToDraft,
   type TournamentDraft,
 } from "@/lib/tournament-draft";
@@ -146,6 +147,7 @@ function DetailsForm({ initialDraft }: { initialDraft: TournamentDraft }) {
 
 export default function DetailsStep() {
   const { session } = useAuth();
+  const { draft } = useTournamentDraft();
   const params = useLocalSearchParams<DetailsParams>();
   const editId = typeof params.editId === "string" ? params.editId : undefined;
   const { data: editTournament, isLoading: editTournamentLoading } = useQuery({
@@ -158,21 +160,35 @@ export default function DetailsStep() {
     return <Redirect href="/login" />;
   }
 
+  const hasPrefill = [
+    params.name,
+    params.location,
+    params.country,
+    params.currency,
+    params.start_date,
+    params.end_date,
+    params.duration_days,
+    params.prize_rounds,
+  ].some(Boolean);
   const initialDraft = editTournament
     ? tournamentToDraft(editTournament)
-    : draftFromParams(params);
+    : hasPrefill
+      ? draftFromParams(params)
+      : resumableDraft(draft);
   const formKey = editTournament
     ? `edit:${editTournament.id}`
-    : `prefill:${JSON.stringify([
-        params.name,
-        params.location,
-        params.country,
-        params.currency,
-        params.start_date,
-        params.end_date,
-        params.duration_days,
-        params.prize_rounds,
-      ])}`;
+    : hasPrefill
+      ? `prefill:${JSON.stringify([
+          params.name,
+          params.location,
+          params.country,
+          params.currency,
+          params.start_date,
+          params.end_date,
+          params.duration_days,
+          params.prize_rounds,
+        ])}`
+      : "resume";
 
   return (
     <ScrollView
