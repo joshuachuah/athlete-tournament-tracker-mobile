@@ -103,7 +103,7 @@ export default function TravelStep() {
             Accommodation total: {draft.accommodation_total} {draft.currency}
           </Text>
           <WizardNav
-            backHref="/tournaments/new/prizes"
+            showBack
             onNext={handleNext}
           />
         </View>

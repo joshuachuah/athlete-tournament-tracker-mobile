@@ -5,7 +5,6 @@ import {
   deriveDraftDates,
   detailsSchema,
   resumableDraft,
-  shouldResumeEdit,
   toTournamentPayload,
   tournamentToDraft,
   travelSchema,
@@ -237,22 +236,6 @@ describe("resumableDraft", () => {
     };
 
     expect(resumableDraft(stored)).toBe(defaultTournamentDraft);
-  });
-});
-
-describe("shouldResumeEdit", () => {
-  const editDraft = {
-    ...defaultTournamentDraft,
-    editId: "tournament-1",
-  };
-
-  it("resumes only a matching active edit navigation", () => {
-    expect(shouldResumeEdit(editDraft, "tournament-1", "true")).toBe(true);
-  });
-
-  it("rejects missing markers and mismatched edit ids", () => {
-    expect(shouldResumeEdit(editDraft, "tournament-1", undefined)).toBe(false);
-    expect(shouldResumeEdit(editDraft, "tournament-2", "true")).toBe(false);
   });
 });
 

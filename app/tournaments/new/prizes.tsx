@@ -68,17 +68,7 @@ export default function PrizesStep() {
             />
           ))}
         </View>
-        <WizardNav
-          backHref={
-            draft.editId
-              ? {
-                  pathname: "/tournaments/new/details",
-                  params: { editId: draft.editId, resumeEdit: "true" },
-                }
-              : "/tournaments/new/details"
-          }
-          onNext={handleNext}
-        />
+        <WizardNav showBack onNext={handleNext} />
       </WizardShell>
     </ScrollView>
   );
