@@ -68,10 +68,7 @@ export default function PrizesStep() {
             />
           ))}
         </View>
-        <WizardNav
-          backHref="/tournaments/new/details"
-          onNext={handleNext}
-        />
+        <WizardNav showBack onNext={handleNext} />
       </WizardShell>
     </ScrollView>
   );

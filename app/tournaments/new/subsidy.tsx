@@ -128,7 +128,7 @@ export default function SubsidyStep() {
           />
 
           <WizardNav
-            backHref="/tournaments/new/travel"
+            showBack
             onNext={handleNext}
           />
         </View>
