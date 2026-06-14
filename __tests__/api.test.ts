@@ -97,6 +97,18 @@ describe("api client", () => {
     );
   });
 
+  it("accepts the documented FX response shape", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ converted: 91.5, rate: 0.915 }),
+    } as unknown as Response);
+
+    await expect(api.fx.convert("USD", "EUR", 100)).resolves.toEqual({
+      converted: 91.5,
+      rate: 0.915,
+    });
+  });
+
   it("rejects successful responses with an invalid shape", async () => {
     fetchMock.mockResolvedValue({
       ok: true,
