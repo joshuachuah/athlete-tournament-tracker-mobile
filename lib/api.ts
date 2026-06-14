@@ -1,10 +1,15 @@
+import { z } from "zod";
+
+import {
+  athleteProfileSchema,
+  deleteResultSchema,
+  fxConversionSchema,
+  healthSchema,
+  knownTournamentSchema,
+  tournamentWithPnLSchema,
+} from "@/lib/api-schemas";
 import { supabase } from "@/lib/supabase";
-import type {
-  AthleteProfile,
-  KnownTournament,
-  Tournament,
-  TournamentWithPnL,
-} from "@/types";
+import type { AthleteProfile, Tournament } from "@/types";
 
 export class ApiError extends Error {
   constructor(
@@ -68,41 +73,64 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   }
 }
 
+async function requestParsed<S extends z.ZodType>(
+  schema: S,
+  path: string,
+  options?: RequestInit,
+): Promise<z.output<S>> {
+  const raw = await request<unknown>(path, options);
+  const parsed = schema.safeParse(raw);
+
+  if (!parsed.success) {
+    throw new ApiError(
+      `Unexpected response shape from ${path.split("?")[0]}`,
+      0,
+      "INVALID_RESPONSE",
+    );
+  }
+
+  return parsed.data;
+}
+
 export const api = {
-  health: () => request<{ status: string }>("/health"),
+  health: () => requestParsed(healthSchema, "/health"),
   profile: {
     get: (email: string) =>
-      request<AthleteProfile | null>(
+      requestParsed(
+        athleteProfileSchema.nullable(),
         `/api/profile?email=${encodeURIComponent(email)}`,
       ),
     save: (data: Partial<AthleteProfile> & { email: string }) =>
-      request<AthleteProfile>("/api/profile", {
+      requestParsed(athleteProfileSchema, "/api/profile", {
         method: "POST",
         body: JSON.stringify(data),
       }),
   },
   tournaments: {
     list: (userId: string) =>
-      request<TournamentWithPnL[]>(
+      requestParsed(
+        z.array(tournamentWithPnLSchema),
         `/api/tournaments?user_id=${encodeURIComponent(userId)}`,
       ),
-    get: (id: string) => request<TournamentWithPnL>(`/api/tournaments/${id}`),
+    get: (id: string) =>
+      requestParsed(tournamentWithPnLSchema, `/api/tournaments/${id}`),
     create: (data: Omit<Tournament, "id" | "created_at">) =>
-      request<TournamentWithPnL>("/api/tournaments", {
+      requestParsed(tournamentWithPnLSchema, "/api/tournaments", {
         method: "POST",
         body: JSON.stringify(data),
       }),
     update: (id: string, data: Partial<Tournament>) =>
-      request<TournamentWithPnL>(`/api/tournaments/${id}`, {
+      requestParsed(tournamentWithPnLSchema, `/api/tournaments/${id}`, {
         method: "PATCH",
         body: JSON.stringify(data),
       }),
     delete: (id: string) =>
-      request<{ success: boolean }>(`/api/tournaments/${id}`, {
+      requestParsed(deleteResultSchema, `/api/tournaments/${id}`, {
         method: "DELETE",
       }),
     search: (query: string, sport?: string) =>
-      request<KnownTournament[]>(
+      requestParsed(
+        z.array(knownTournamentSchema),
         `/api/tournaments/search?q=${encodeURIComponent(query)}${
           sport ? `&sport=${encodeURIComponent(sport)}` : ""
         }`,
@@ -110,12 +138,9 @@ export const api = {
   },
   fx: {
     convert: (from: string, to: string, amount: number) =>
-      request<{
-        from: string;
-        to: string;
-        amount: number;
-        converted: number;
-        rate: number;
-      }>(`/api/fx?from=${from}&to=${to}&amount=${amount}`),
+      requestParsed(
+        fxConversionSchema,
+        `/api/fx?from=${from}&to=${to}&amount=${amount}`,
+      ),
   },
 };
