@@ -68,6 +68,22 @@ export default function PrizesStep() {
             />
           ))}
         </View>
+        <View style={{ gap: spacing.xs }}>
+          <MoneyInput
+            label="Prize tax withholding %"
+            value={draft.prize_tax_rate}
+            onChangeValue={(amount) =>
+              updateDraft({
+                prize_tax_rate: amount,
+              })
+            }
+            error={errors.prize_tax_rate}
+            style={{ maxWidth: 220 }}
+          />
+          <Text style={{ color: colors.mutedForeground, lineHeight: 20 }} selectable>
+            Most events withhold 15–30% for visiting athletes.
+          </Text>
+        </View>
         <WizardNav showBack onNext={handleNext} />
       </WizardShell>
     </ScrollView>

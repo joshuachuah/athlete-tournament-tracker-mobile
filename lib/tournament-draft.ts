@@ -19,6 +19,7 @@ export type TournamentDraft = {
   duration_days: number;
   entry_fee: number;
   prize_rounds: Required<PrizeRounds>;
+  prize_tax_rate: number;
   flight_cost: number;
   accommodation_nightly: number;
   accommodation_nights: number;
@@ -53,6 +54,7 @@ export const defaultTournamentDraft: TournamentDraft = {
     f: 0,
     w: 0,
   },
+  prize_tax_rate: 0,
   flight_cost: 0,
   accommodation_nightly: 0,
   accommodation_nights: 0,
@@ -90,6 +92,10 @@ export const prizesSchema = z.object({
     f: money,
     w: money,
   }),
+  prize_tax_rate: z.coerce
+    .number()
+    .min(0, "Must be between 0 and 100.")
+    .max(100, "Must be between 0 and 100."),
 });
 
 export const travelSchema = z.object({
@@ -140,6 +146,22 @@ export function resumableDraft(stored: TournamentDraft): TournamentDraft {
   return stored.editId ? defaultTournamentDraft : stored;
 }
 
+type StoredTournamentDraft = Partial<Omit<TournamentDraft, "prize_rounds">> & {
+  prize_rounds?: Partial<TournamentDraft["prize_rounds"]>;
+};
+
+export function normalizeTournamentDraft(stored: StoredTournamentDraft): TournamentDraft {
+  return {
+    ...defaultTournamentDraft,
+    ...stored,
+    prize_rounds: {
+      ...defaultTournamentDraft.prize_rounds,
+      ...stored.prize_rounds,
+    },
+    prize_tax_rate: stored.prize_tax_rate ?? defaultTournamentDraft.prize_tax_rate,
+  };
+}
+
 export function tournamentToDraft(tournament: TournamentWithPnL): TournamentDraft {
   const accommodationNights = Math.max(0, tournament.duration_days - 1);
 
@@ -158,6 +180,7 @@ export function tournamentToDraft(tournament: TournamentWithPnL): TournamentDraf
       ...defaultTournamentDraft.prize_rounds,
       ...tournament.prize_rounds,
     },
+    prize_tax_rate: tournament.prize_tax_rate ?? 0,
     flight_cost: tournament.flight_cost,
     accommodation_total: tournament.accommodation_total,
     accommodation_nightly: deriveAccommodationNightly(
@@ -210,5 +233,6 @@ export function toTournamentPayload(
     subsidy_covers: normalized.subsidy_enabled ? normalized.subsidy_covers : null,
     sponsorship_allocated: normalized.sponsorship_allocated,
     prize_rounds: normalized.prize_rounds,
+    prize_tax_rate: normalized.prize_tax_rate,
   };
 }

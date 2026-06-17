@@ -58,6 +58,7 @@ export const tournamentSchema = z.looseObject({
     .nullable(),
   sponsorship_allocated: z.number(),
   prize_rounds: prizeRoundsSchema,
+  prize_tax_rate: z.number(),
   created_at: z.string(),
 });
 
@@ -65,6 +66,7 @@ export const scenarioResultSchema = z.looseObject({
   scenario: z.enum(["worst", "realistic", "best"]),
   round: roundSchema,
   prize_money: z.number(),
+  prize_money_after_tax: z.number(),
   net_result: z.number(),
   profitable: z.boolean(),
 });
