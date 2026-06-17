@@ -4,6 +4,8 @@ import {
   deriveAccommodationNightly,
   deriveDraftDates,
   detailsSchema,
+  normalizeTournamentDraft,
+  prizesSchema,
   resumableDraft,
   toTournamentPayload,
   tournamentToDraft,
@@ -36,6 +38,7 @@ function tournament(
     subsidy_covers: null,
     sponsorship_allocated: 40,
     prize_rounds: { r1: 100 },
+    prize_tax_rate: 0,
     created_at: "2026-01-01",
     home_currency: "USD",
     pnl: {
@@ -78,6 +81,12 @@ describe("tournamentToDraft", () => {
       f: 0,
       w: 0,
     });
+  });
+
+  it("preserves prize tax rate for edit drafts", () => {
+    const draft = tournamentToDraft(tournament({ prize_tax_rate: 30 }));
+
+    expect(draft.prize_tax_rate).toBe(30);
   });
 
   it("enables subsidies when a provider or amount is present", () => {
@@ -239,6 +248,27 @@ describe("resumableDraft", () => {
   });
 });
 
+describe("normalizeTournamentDraft", () => {
+  it("backfills fields missing from older stored drafts", () => {
+    const draft = normalizeTournamentDraft({
+      name: "Stored draft",
+      prize_rounds: { r1: 100 },
+    });
+
+    expect(draft.name).toBe("Stored draft");
+    expect(draft.prize_tax_rate).toBe(0);
+    expect(draft.prize_rounds).toEqual({
+      r1: 100,
+      r2: 0,
+      r3: 0,
+      qf: 0,
+      sf: 0,
+      f: 0,
+      w: 0,
+    });
+  });
+});
+
 describe("toTournamentPayload", () => {
   it("normalizes text and stamps the user id", () => {
     const payload = toTournamentPayload(
@@ -279,10 +309,22 @@ describe("toTournamentPayload", () => {
     expect(payload.subsidy_amount).toBe(0);
     expect(payload.subsidy_covers).toBeNull();
   });
+
+  it("includes prize tax rate in create and edit payloads", () => {
+    const payload = toTournamentPayload(
+      {
+        ...defaultTournamentDraft,
+        prize_tax_rate: 30,
+      },
+      "athlete-1",
+    );
+
+    expect(payload.prize_tax_rate).toBe(30);
+  });
 });
 
 describe("wizard schemas", () => {
-  it("enforces required details and non-negative travel costs", () => {
+  it("enforces required details, prize tax range, and travel costs", () => {
     const validDetails = {
       name: "Open Championship",
       location: "Detroit",
@@ -298,6 +340,12 @@ describe("wizard schemas", () => {
     );
     expect(
       detailsSchema.safeParse({ ...validDetails, currency: "US" }).success,
+    ).toBe(false);
+    expect(
+      prizesSchema.safeParse({
+        prize_rounds: defaultTournamentDraft.prize_rounds,
+        prize_tax_rate: 101,
+      }).success,
     ).toBe(false);
     expect(
       travelSchema.safeParse({
