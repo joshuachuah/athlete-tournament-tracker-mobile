@@ -32,6 +32,7 @@ describe("zodErrorMap", () => {
         f: 0,
         w: 0,
       },
+      prize_tax_rate: 0,
     });
 
     expect(result.success).toBe(false);
@@ -41,6 +42,30 @@ describe("zodErrorMap", () => {
 
     expect(zodErrorMap(result.error)["prize_rounds.r1"]).toBe(
       "Must be zero or more.",
+    );
+  });
+
+  it("maps prize tax validation failures", () => {
+    const result = prizesSchema.safeParse({
+      prize_rounds: {
+        r1: 0,
+        r2: 0,
+        r3: 0,
+        qf: 0,
+        sf: 0,
+        f: 0,
+        w: 0,
+      },
+      prize_tax_rate: 101,
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      return;
+    }
+
+    expect(zodErrorMap(result.error).prize_tax_rate).toBe(
+      "Must be between 0 and 100.",
     );
   });
 });

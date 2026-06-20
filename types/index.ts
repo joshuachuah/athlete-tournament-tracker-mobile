@@ -50,6 +50,7 @@ export type Tournament = {
   subsidy_covers: SubsidyCovers | null;
   sponsorship_allocated: number;
   prize_rounds: PrizeRounds;
+  prize_tax_rate: number;
   created_at: string;
 };
 
@@ -59,6 +60,7 @@ export type ScenarioResult = {
   scenario: Scenario;
   round: keyof PrizeRounds;
   prize_money: number;
+  prize_money_after_tax: number;
   net_result: number;
   profitable: boolean;
 };
@@ -88,4 +90,5 @@ export type KnownTournament = {
   tour_level?: string;
   estimated_prize_total?: number;
   prize_rounds?: PrizeRounds;
+  prize_tax_rate?: number;
 };

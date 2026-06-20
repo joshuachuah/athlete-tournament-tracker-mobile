@@ -2,7 +2,11 @@ import { addDays } from "date-fns";
 import { z } from "zod";
 
 import type { PrizeRounds, Tournament, TournamentWithPnL } from "@/types";
-import { calculateDurationDays, isoToday } from "@/lib/utils";
+import {
+  calculateDurationDays,
+  isoToday,
+  roundCurrencyAmount,
+} from "@/lib/utils";
 
 export type TournamentDraft = {
   editId?: string;
@@ -15,6 +19,7 @@ export type TournamentDraft = {
   duration_days: number;
   entry_fee: number;
   prize_rounds: Required<PrizeRounds>;
+  prize_tax_rate: number;
   flight_cost: number;
   accommodation_nightly: number;
   accommodation_nights: number;
@@ -49,6 +54,7 @@ export const defaultTournamentDraft: TournamentDraft = {
     f: 0,
     w: 0,
   },
+  prize_tax_rate: 0,
   flight_cost: 0,
   accommodation_nightly: 0,
   accommodation_nights: 0,
@@ -86,6 +92,10 @@ export const prizesSchema = z.object({
     f: money,
     w: money,
   }),
+  prize_tax_rate: z.coerce
+    .number()
+    .min(0, "Must be between 0 and 100.")
+    .max(100, "Must be between 0 and 100."),
 });
 
 export const travelSchema = z.object({
@@ -114,7 +124,47 @@ export const spendingSchema = z.object({
   misc_cost: money,
 });
 
+export function calculateAccommodationTotal(
+  nightly: number,
+  nights: number,
+  currency: string,
+): number {
+  return roundCurrencyAmount(nightly * nights, currency);
+}
+
+export function deriveAccommodationNightly(
+  total: number,
+  nights: number,
+  currency: string,
+): number {
+  return nights > 0 ? roundCurrencyAmount(total / nights, currency) : total;
+}
+
+// Abandoned edits must restart from the server record so a stale editId cannot
+// cause a later wizard submission to update the wrong tournament.
+export function resumableDraft(stored: TournamentDraft): TournamentDraft {
+  return stored.editId ? defaultTournamentDraft : stored;
+}
+
+type StoredTournamentDraft = Partial<Omit<TournamentDraft, "prize_rounds">> & {
+  prize_rounds?: Partial<TournamentDraft["prize_rounds"]>;
+};
+
+export function normalizeTournamentDraft(stored: StoredTournamentDraft): TournamentDraft {
+  return {
+    ...defaultTournamentDraft,
+    ...stored,
+    prize_rounds: {
+      ...defaultTournamentDraft.prize_rounds,
+      ...stored.prize_rounds,
+    },
+    prize_tax_rate: stored.prize_tax_rate ?? defaultTournamentDraft.prize_tax_rate,
+  };
+}
+
 export function tournamentToDraft(tournament: TournamentWithPnL): TournamentDraft {
+  const accommodationNights = Math.max(0, tournament.duration_days - 1);
+
   return {
     ...defaultTournamentDraft,
     editId: tournament.id,
@@ -130,13 +180,15 @@ export function tournamentToDraft(tournament: TournamentWithPnL): TournamentDraf
       ...defaultTournamentDraft.prize_rounds,
       ...tournament.prize_rounds,
     },
+    prize_tax_rate: tournament.prize_tax_rate ?? 0,
     flight_cost: tournament.flight_cost,
     accommodation_total: tournament.accommodation_total,
-    accommodation_nightly:
-      tournament.duration_days > 1
-        ? Math.round(tournament.accommodation_total / (tournament.duration_days - 1))
-        : tournament.accommodation_total,
-    accommodation_nights: Math.max(0, tournament.duration_days - 1),
+    accommodation_nightly: deriveAccommodationNightly(
+      tournament.accommodation_total,
+      accommodationNights,
+      tournament.currency,
+    ),
+    accommodation_nights: accommodationNights,
     daily_spending_cap: tournament.daily_spending_cap,
     coaching_cost: tournament.coaching_cost,
     misc_cost: tournament.misc_cost,
@@ -181,5 +233,6 @@ export function toTournamentPayload(
     subsidy_covers: normalized.subsidy_enabled ? normalized.subsidy_covers : null,
     sponsorship_allocated: normalized.sponsorship_allocated,
     prize_rounds: normalized.prize_rounds,
+    prize_tax_rate: normalized.prize_tax_rate,
   };
 }

@@ -10,7 +10,7 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "test": "jest --watchAll=false",
-    "doctor": "npx react-doctor@latest"
+    "doctor": "pnpm dlx react-doctor@0.5.1 --verbose --diff"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",

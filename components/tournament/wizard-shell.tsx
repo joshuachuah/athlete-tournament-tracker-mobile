@@ -1,4 +1,4 @@
-import { Link } from "expo-router";
+import { router } from "expo-router";
 import type { ReactNode } from "react";
 import { Text, View } from "react-native";
 
@@ -57,22 +57,25 @@ export function WizardShell({
 }
 
 export function WizardNav({
-  backHref,
+  showBack = false,
   nextLabel = "Next",
   onNext,
   loading,
 }: {
-  backHref?: string;
+  showBack?: boolean;
   nextLabel?: string;
   onNext: () => void;
   loading?: boolean;
 }) {
   return (
     <View style={{ flexDirection: "row", gap: spacing.md }}>
-      {backHref ? (
-        <Link href={backHref} asChild>
-          <Button label="Back" variant="secondary" style={{ flex: 1 }} />
-        </Link>
+      {showBack ? (
+        <Button
+          label="Back"
+          variant="secondary"
+          onPress={() => router.back()}
+          style={{ flex: 1 }}
+        />
       ) : null}
       <Button
         label={nextLabel}

@@ -6,14 +6,17 @@ import {
   useState,
 } from "react";
 
-import { draftStorage } from "@/lib/storage";
+import {
+  clearLegacyTournamentDraft,
+  draftStorage,
+  tournamentDraftStorageKey,
+} from "@/lib/storage";
 import {
   defaultTournamentDraft,
   deriveDraftDates,
+  normalizeTournamentDraft,
   type TournamentDraft,
 } from "@/lib/tournament-draft";
-
-const draftKey = "athlete-tracker:tournament-draft";
 
 type TournamentDraftContextValue = {
   draft: TournamentDraft;
@@ -26,14 +29,25 @@ const TournamentDraftContext = createContext<TournamentDraftContextValue | null>
   null,
 );
 
-export function TournamentDraftProvider({ children }: PropsWithChildren) {
+export function TournamentDraftProvider({
+  children,
+  userId,
+}: PropsWithChildren<{ userId?: string }>) {
+  const draftKey = userId ? tournamentDraftStorageKey(userId) : null;
   const [draft, setDraftState] = useState<TournamentDraft>(() => {
-    return draftStorage.get<TournamentDraft>(draftKey) ?? defaultTournamentDraft;
+    const stored = draftKey ? draftStorage.get<Partial<TournamentDraft>>(draftKey) : null;
+    return stored ? normalizeTournamentDraft(stored) : defaultTournamentDraft;
   });
 
   useEffect(() => {
-    draftStorage.set(draftKey, draft);
-  }, [draft]);
+    clearLegacyTournamentDraft();
+  }, []);
+
+  useEffect(() => {
+    if (draftKey) {
+      draftStorage.set(draftKey, draft);
+    }
+  }, [draft, draftKey]);
 
   function setDraft(nextDraft: TournamentDraft) {
     setDraftState(deriveDraftDates(nextDraft));
@@ -44,7 +58,9 @@ export function TournamentDraftProvider({ children }: PropsWithChildren) {
   }
 
   function resetDraft() {
-    draftStorage.clear(draftKey);
+    if (draftKey) {
+      draftStorage.clear(draftKey);
+    }
     setDraftState(defaultTournamentDraft);
   }
 

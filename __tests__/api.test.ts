@@ -96,4 +96,33 @@ describe("api client", () => {
       expect.any(Object),
     );
   });
+
+  it("accepts the documented FX response shape", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ converted: 91.5, rate: 0.915 }),
+    } as unknown as Response);
+
+    await expect(api.fx.convert("USD", "EUR", 100)).resolves.toEqual({
+      converted: 91.5,
+      rate: 0.915,
+    });
+  });
+
+  it("rejects successful responses with an invalid shape", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ totally: "wrong" }),
+    } as unknown as Response);
+
+    const request = api.tournaments.get("t1");
+
+    await expect(request).rejects.toBeInstanceOf(ApiError);
+    await expect(request).rejects.toMatchObject({
+      name: "ApiError",
+      message: "Unexpected response shape from /api/tournaments/t1",
+      status: 0,
+      code: "INVALID_RESPONSE",
+    });
+  });
 });
