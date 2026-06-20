@@ -31,6 +31,7 @@ type DetailsParams = {
   end_date?: string;
   duration_days?: string;
   prize_rounds?: string;
+  prize_tax_rate?: string;
 };
 
 function draftFromParams(params: DetailsParams): TournamentDraft {
@@ -46,6 +47,7 @@ function draftFromParams(params: DetailsParams): TournamentDraft {
   if (params.start_date) next.start_date = String(params.start_date);
   if (params.end_date) next.end_date = String(params.end_date);
   if (params.duration_days) next.duration_days = Number(params.duration_days);
+  if (params.prize_tax_rate) next.prize_tax_rate = Number(params.prize_tax_rate);
   if (params.prize_rounds) {
     try {
       next.prize_rounds = {
@@ -169,6 +171,7 @@ export default function DetailsStep() {
     params.end_date,
     params.duration_days,
     params.prize_rounds,
+    params.prize_tax_rate,
   ].some(Boolean);
   const initialDraft = editTournament
     ? tournamentToDraft(editTournament)
@@ -187,6 +190,7 @@ export default function DetailsStep() {
           params.end_date,
           params.duration_days,
           params.prize_rounds,
+          params.prize_tax_rate,
         ])}`
       : "resume";
 

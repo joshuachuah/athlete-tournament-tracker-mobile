@@ -30,6 +30,10 @@ function prefillTournament(tournament: KnownTournament) {
       prize_rounds: tournament.prize_rounds
         ? JSON.stringify(tournament.prize_rounds)
         : undefined,
+      prize_tax_rate:
+        tournament.prize_tax_rate === undefined
+          ? undefined
+          : String(tournament.prize_tax_rate),
     },
   });
 }

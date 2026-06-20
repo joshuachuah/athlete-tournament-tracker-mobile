@@ -90,4 +90,5 @@ export type KnownTournament = {
   tour_level?: string;
   estimated_prize_total?: number;
   prize_rounds?: PrizeRounds;
+  prize_tax_rate?: number;
 };
