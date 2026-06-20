@@ -1,43 +1,13 @@
 import { Redirect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as Haptics from "expo-haptics";
-import {
-  ArrowRight,
-  ShieldCheck,
-  Target,
-  TrendingUp,
-  Trophy,
-  Wallet,
-  type LucideIcon,
-} from "lucide-react-native";
+import { ArrowRight, ShieldCheck, TrendingUp } from "lucide-react-native";
 import { useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { colors, radii, spacing } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
-
-type FeatureProps = {
-  icon: LucideIcon;
-  label: string;
-};
-
-function Feature({ icon: Icon, label }: FeatureProps) {
-  return (
-    <View style={styles.feature}>
-      <View style={styles.featureIcon}>
-        <Icon color="#FFFFFF" size={18} strokeWidth={2.4} />
-      </View>
-      <Text style={styles.featureLabel}>{label}</Text>
-    </View>
-  );
-}
 
 export default function LoginScreen() {
   const { authError, profile, session, signInWithGoogle, status } = useAuth();
@@ -67,210 +37,146 @@ export default function LoginScreen() {
   const isLoading = status === "loading" || isSigningIn;
 
   return (
-    <View style={styles.screen}>
-      <StatusBar style="light" />
+    <SafeAreaView style={styles.screen}>
+      <StatusBar style="dark" />
 
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.brand}>
-          <View style={styles.brandMark}>
-            <Trophy color="#FFFFFF" size={20} strokeWidth={2.4} />
-          </View>
-          <Text style={styles.brandName}>Athlete Tracker</Text>
+      <View style={styles.brand}>
+        <View style={styles.brandMark}>
+          <TrendingUp color="#FFFFFF" size={18} strokeWidth={2.6} />
         </View>
+        <Text style={styles.brandName}>Athlete Tracker</Text>
+      </View>
 
-        <View style={styles.hero}>
-          <Text style={styles.eyebrow}>Compete with clarity</Text>
+      <View style={styles.hero}>
+        <Text style={styles.title} selectable>
+          Know your net,{"\n"}every tournament.
+        </Text>
+        <Text style={styles.subtitle} selectable>
+          Travel, fees and prize money — settled to a single profit or loss per
+          event.
+        </Text>
+      </View>
 
-          <Text style={styles.title} selectable>
-            Know your numbers before you enter.
-          </Text>
-
-          <Text style={styles.subtitle} selectable>
-            Plan tournament costs, model prize outcomes, and protect your season
-            runway — all from one focused dashboard.
-          </Text>
-
-          <View style={styles.features}>
-            <Feature icon={Wallet} label="Plan every cost" />
-            <Feature icon={Target} label="Find break-even" />
-            <Feature icon={TrendingUp} label="Protect runway" />
+      <View style={styles.cta}>
+        {authError ? (
+          <View accessibilityRole="alert" style={styles.error}>
+            <Text style={styles.errorText} selectable>
+              {authError}
+            </Text>
           </View>
-        </View>
+        ) : null}
 
-        <View style={styles.cta}>
-          <Text style={styles.accountDescription} selectable>
-            Continue with Google to sign in or create an account. New athletes
-            will set up their profile next.
-          </Text>
-
-          {authError ? (
-            <View accessibilityRole="alert" style={styles.error}>
-              <Text style={styles.errorText} selectable>
-                {authError}
-              </Text>
+        <Pressable
+          accessibilityLabel="Continue with Google"
+          accessibilityRole="button"
+          accessibilityHint="Opens Google sign in in a secure browser"
+          accessibilityState={{ busy: isLoading, disabled: isLoading }}
+          disabled={isLoading}
+          onPress={handleContinue}
+          style={({ pressed }) => [
+            styles.googleButton,
+            { opacity: isLoading ? 0.6 : pressed ? 0.9 : 1 },
+          ]}
+        >
+          {isLoading ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <View accessible={false} style={styles.googleMark}>
+              <Text style={styles.googleLetter}>G</Text>
             </View>
-          ) : null}
-
-          <Pressable
-            accessibilityLabel="Continue with Google"
-            accessibilityRole="button"
-            accessibilityHint="Opens Google sign in in a secure browser"
-            accessibilityState={{ busy: isLoading, disabled: isLoading }}
-            disabled={isLoading}
-            onPress={handleContinue}
-            style={({ pressed }) => [
-              styles.googleButton,
-              { opacity: isLoading ? 0.6 : pressed ? 0.9 : 1 },
-            ]}
-          >
-            {isLoading ? (
-              <ActivityIndicator color={colors.foreground} />
-            ) : (
-              <View accessible={false} style={styles.googleMark}>
-                <Text style={styles.googleLetter}>G</Text>
-              </View>
-            )}
-            <Text style={styles.googleLabel}>
-              {isLoading ? "Just a moment…" : "Continue with Google"}
-            </Text>
-            {!isLoading ? (
-              <ArrowRight
-                accessible={false}
-                color={colors.foreground}
-                size={18}
-                strokeWidth={2.6}
-              />
-            ) : null}
-          </Pressable>
-
-          <View style={styles.trust}>
-            <ShieldCheck
-              color="rgba(255, 255, 255, 0.5)"
-              size={14}
-              strokeWidth={2.4}
+          )}
+          <Text style={styles.googleLabel}>
+            {isLoading ? "Just a moment…" : "Continue with Google"}
+          </Text>
+          {!isLoading ? (
+            <ArrowRight
+              accessible={false}
+              color="#FFFFFF"
+              size={18}
+              strokeWidth={2.6}
             />
-            <Text style={styles.trustText}>
-              One secure account · stored safely on this device
-            </Text>
-          </View>
+          ) : null}
+        </Pressable>
+
+        <View style={styles.trust}>
+          <ShieldCheck
+            color={colors.mutedForeground}
+            size={14}
+            strokeWidth={2.4}
+          />
+          <Text style={styles.trustText}>
+            One secure account · stored safely on this device
+          </Text>
         </View>
-      </ScrollView>
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#121110",
-    overflow: "hidden",
-  },
-  content: {
-    flexGrow: 1,
-    gap: 48,
+    backgroundColor: colors.background,
     paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.xxl,
+    paddingVertical: spacing.lg,
   },
   brand: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
+    paddingTop: spacing.sm,
   },
   brandMark: {
-    width: 40,
-    height: 40,
+    width: 30,
+    height: 30,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: radii.lg,
+    borderRadius: radii.sm,
     borderCurve: "continuous",
-    backgroundColor: colors.accent,
+    backgroundColor: colors.foreground,
   },
   brandName: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "500",
-    letterSpacing: 0.2,
+    color: colors.foreground,
+    fontSize: 15,
+    fontWeight: "700",
+    letterSpacing: -0.2,
   },
   hero: {
-    gap: spacing.lg,
-  },
-  eyebrow: {
-    color: "rgba(255, 255, 255, 0.62)",
-    fontSize: 12,
-    fontWeight: "500",
-    letterSpacing: 1.6,
-    textTransform: "uppercase",
+    flex: 1,
+    justifyContent: "center",
+    gap: spacing.md,
   },
   title: {
-    color: "#FFFFFF",
-    fontSize: 40,
-    fontWeight: "400",
-    letterSpacing: -1,
-    lineHeight: 46,
+    color: colors.foreground,
+    fontSize: 34,
+    fontWeight: "700",
+    letterSpacing: -0.8,
+    lineHeight: 40,
   },
   subtitle: {
-    color: "rgba(255, 255, 255, 0.7)",
+    color: colors.mutedForeground,
     fontSize: 16,
     lineHeight: 24,
-    maxWidth: 380,
-  },
-  features: {
-    flexDirection: "column",
-    gap: spacing.md,
-    paddingTop: spacing.md,
-  },
-  feature: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    padding: spacing.md,
-    borderRadius: radii.lg,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.12)",
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
-  },
-  featureIcon: {
-    width: 36,
-    height: 36,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 18,
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
-  },
-  featureLabel: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "500",
-    lineHeight: 20,
+    maxWidth: 320,
   },
   cta: {
     gap: spacing.lg,
   },
-  accountDescription: {
-    color: "rgba(255, 255, 255, 0.7)",
-    fontSize: 14,
-    lineHeight: 20,
-  },
   error: {
     padding: spacing.md,
-    borderRadius: radii.lg,
+    borderRadius: radii.md,
     borderCurve: "continuous",
-    backgroundColor: "rgba(180, 35, 24, 0.18)",
+    backgroundColor: colors.lossSoft,
     borderWidth: 1,
-    borderColor: "rgba(253, 227, 223, 0.25)",
+    borderColor: colors.loss,
   },
   errorText: {
-    color: "#FDE3DF",
+    color: colors.loss,
     fontSize: 14,
     lineHeight: 20,
   },
   googleButton: {
-    minHeight: 58,
+    minHeight: 56,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -278,8 +184,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     borderRadius: radii.lg,
     borderCurve: "continuous",
-    backgroundColor: "#FFFFFF",
-    boxShadow: "0 12px 30px rgba(0, 0, 0, 0.35)",
+    backgroundColor: colors.foreground,
   },
   googleMark: {
     width: 24,
@@ -287,18 +192,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 12,
-    backgroundColor: colors.accentSoft,
+    backgroundColor: "#FFFFFF",
   },
   googleLetter: {
-    color: colors.accent,
+    color: colors.foreground,
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "700",
   },
   googleLabel: {
-    color: colors.foreground,
+    color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: "500",
-    letterSpacing: 0.2,
+    fontWeight: "600",
+    letterSpacing: -0.2,
   },
   trust: {
     flexDirection: "row",
@@ -307,7 +212,7 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   trustText: {
-    color: "rgba(255, 255, 255, 0.5)",
+    color: colors.mutedForeground,
     fontSize: 12,
     fontWeight: "400",
   },
