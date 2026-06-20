@@ -14,6 +14,7 @@ import {
 import {
   defaultTournamentDraft,
   deriveDraftDates,
+  normalizeTournamentDraft,
   type TournamentDraft,
 } from "@/lib/tournament-draft";
 
@@ -34,9 +35,8 @@ export function TournamentDraftProvider({
 }: PropsWithChildren<{ userId?: string }>) {
   const draftKey = userId ? tournamentDraftStorageKey(userId) : null;
   const [draft, setDraftState] = useState<TournamentDraft>(() => {
-    return draftKey
-      ? draftStorage.get<TournamentDraft>(draftKey) ?? defaultTournamentDraft
-      : defaultTournamentDraft;
+    const stored = draftKey ? draftStorage.get<Partial<TournamentDraft>>(draftKey) : null;
+    return stored ? normalizeTournamentDraft(stored) : defaultTournamentDraft;
   });
 
   useEffect(() => {

@@ -159,6 +159,7 @@ export default function TournamentDetailScreen() {
                   result={result}
                   homeCurrency={data.home_currency}
                   tournamentCurrency={data.currency}
+                  prizeTaxRate={data.prize_tax_rate}
                 />
               ) : null;
             })}
