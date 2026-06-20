@@ -3,6 +3,7 @@ import "expo-sqlite/localStorage/install";
 import type { AthleteProfile } from "@/types";
 
 const profileKey = "athlete-tracker:profile";
+const legacyTournamentDraftKey = "athlete-tracker:tournament-draft";
 
 function getJson<T>(key: string): T | null {
   const raw = localStorage.getItem(key);
@@ -34,3 +35,11 @@ export const draftStorage = {
   set: <T>(key: string, value: T) => setJson(key, value),
   clear: (key: string) => localStorage.removeItem(key),
 };
+
+export function tournamentDraftStorageKey(userId: string): string {
+  return `${legacyTournamentDraftKey}:${userId}`;
+}
+
+export function clearLegacyTournamentDraft(): void {
+  localStorage.removeItem(legacyTournamentDraftKey);
+}

@@ -15,6 +15,7 @@ import {
   defaultTournamentDraft,
   detailsSchema,
   deriveDraftDates,
+  resumableDraft,
   tournamentToDraft,
   type TournamentDraft,
 } from "@/lib/tournament-draft";
@@ -30,6 +31,7 @@ type DetailsParams = {
   end_date?: string;
   duration_days?: string;
   prize_rounds?: string;
+  prize_tax_rate?: string;
 };
 
 function draftFromParams(params: DetailsParams): TournamentDraft {
@@ -45,6 +47,7 @@ function draftFromParams(params: DetailsParams): TournamentDraft {
   if (params.start_date) next.start_date = String(params.start_date);
   if (params.end_date) next.end_date = String(params.end_date);
   if (params.duration_days) next.duration_days = Number(params.duration_days);
+  if (params.prize_tax_rate) next.prize_tax_rate = Number(params.prize_tax_rate);
   if (params.prize_rounds) {
     try {
       next.prize_rounds = {
@@ -146,6 +149,7 @@ function DetailsForm({ initialDraft }: { initialDraft: TournamentDraft }) {
 
 export default function DetailsStep() {
   const { session } = useAuth();
+  const { draft } = useTournamentDraft();
   const params = useLocalSearchParams<DetailsParams>();
   const editId = typeof params.editId === "string" ? params.editId : undefined;
   const { data: editTournament, isLoading: editTournamentLoading } = useQuery({
@@ -158,21 +162,37 @@ export default function DetailsStep() {
     return <Redirect href="/login" />;
   }
 
+  const hasPrefill = [
+    params.name,
+    params.location,
+    params.country,
+    params.currency,
+    params.start_date,
+    params.end_date,
+    params.duration_days,
+    params.prize_rounds,
+    params.prize_tax_rate,
+  ].some(Boolean);
   const initialDraft = editTournament
     ? tournamentToDraft(editTournament)
-    : draftFromParams(params);
+    : hasPrefill
+      ? draftFromParams(params)
+      : resumableDraft(draft);
   const formKey = editTournament
     ? `edit:${editTournament.id}`
-    : `prefill:${JSON.stringify([
-        params.name,
-        params.location,
-        params.country,
-        params.currency,
-        params.start_date,
-        params.end_date,
-        params.duration_days,
-        params.prize_rounds,
-      ])}`;
+    : hasPrefill
+      ? `prefill:${JSON.stringify([
+          params.name,
+          params.location,
+          params.country,
+          params.currency,
+          params.start_date,
+          params.end_date,
+          params.duration_days,
+          params.prize_rounds,
+          params.prize_tax_rate,
+        ])}`
+      : "resume";
 
   return (
     <ScrollView
