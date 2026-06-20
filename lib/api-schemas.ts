@@ -96,6 +96,7 @@ export const knownTournamentSchema = z.looseObject({
   tour_level: z.string().optional(),
   estimated_prize_total: z.number().optional(),
   prize_rounds: prizeRoundsSchema.optional(),
+  prize_tax_rate: z.number().optional(),
 });
 
 export const fxConversionSchema = z.looseObject({

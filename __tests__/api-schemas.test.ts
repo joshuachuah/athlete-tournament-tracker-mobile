@@ -116,4 +116,14 @@ describe("API response schemas", () => {
   it("accepts a known tournament with only its required name", () => {
     expect(knownTournamentSchema.parse({ name: "X" })).toEqual({ name: "X" });
   });
+
+  it("accepts known tournament tax defaults for prefill", () => {
+    const response = {
+      name: "Open Championship",
+      prize_rounds: { qf: 500 },
+      prize_tax_rate: 30,
+    };
+
+    expect(knownTournamentSchema.parse(response)).toEqual(response);
+  });
 });
