@@ -14,6 +14,34 @@ import type { PrizeRounds } from "@/types";
 
 const rounds: (keyof PrizeRounds)[] = ["r1", "r2", "r3", "qf", "sf", "f", "w"];
 
+function PrizeRoundInput({
+  currency,
+  error,
+  onChange,
+  round,
+  value,
+}: {
+  currency: string;
+  error?: string;
+  onChange: (round: keyof PrizeRounds, amount: number) => void;
+  round: keyof PrizeRounds;
+  value: number;
+}) {
+  function handlePrizeRoundChange(amount: number) {
+    onChange(round, amount);
+  }
+
+  return (
+    <MoneyInput
+      label={`${roundLabels[round]} (${currency})`}
+      value={value}
+      onChangeValue={handlePrizeRoundChange}
+      error={error}
+      style={{ minWidth: 135 }}
+    />
+  );
+}
+
 export default function PrizesStep() {
   const { session } = useAuth();
   const { draft, updateDraft } = useTournamentDraft();
@@ -35,6 +63,19 @@ export default function PrizesStep() {
     router.push("/tournaments/new/travel");
   }
 
+  function handlePrizeTaxRateChange(prize_tax_rate: number) {
+    updateDraft({ prize_tax_rate });
+  }
+
+  function handlePrizeRoundChange(round: keyof PrizeRounds, amount: number) {
+    updateDraft({
+      prize_rounds: {
+        ...draft.prize_rounds,
+        [round]: amount,
+      },
+    });
+  }
+
   return (
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
@@ -51,22 +92,27 @@ export default function PrizesStep() {
         </Text>
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.md }}>
           {rounds.map((round) => (
-            <MoneyInput
+            <PrizeRoundInput
               key={round}
-              label={`${roundLabels[round]} (${draft.currency})`}
-              value={draft.prize_rounds[round]}
-              onChangeValue={(amount) =>
-                updateDraft({
-                  prize_rounds: {
-                    ...draft.prize_rounds,
-                    [round]: amount,
-                  },
-                })
-              }
+              currency={draft.currency}
               error={errors[`prize_rounds.${round}`]}
-              style={{ minWidth: 135 }}
+              onChange={handlePrizeRoundChange}
+              round={round}
+              value={draft.prize_rounds[round]}
             />
           ))}
+        </View>
+        <View style={{ gap: spacing.xs }}>
+          <MoneyInput
+            label="Prize tax withholding %"
+            value={draft.prize_tax_rate}
+            onChangeValue={handlePrizeTaxRateChange}
+            error={errors.prize_tax_rate}
+            style={{ maxWidth: 220 }}
+          />
+          <Text style={{ color: colors.mutedForeground, lineHeight: 20 }} selectable>
+            Most events withhold 15–30% for visiting athletes.
+          </Text>
         </View>
         <WizardNav showBack onNext={handleNext} />
       </WizardShell>
