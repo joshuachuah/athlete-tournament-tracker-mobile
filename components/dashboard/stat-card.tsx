@@ -27,22 +27,32 @@ function toneColor(tone: StatTone) {
 
 export function StatCard({ label, value, detail, tone = "neutral" }: StatCardProps) {
   return (
-    <Card style={{ flex: 1, minWidth: 150, gap: spacing.sm }}>
+    <Card
+      style={{
+        flex: 1,
+        minWidth: 0,
+        gap: spacing.sm,
+        padding: spacing.md,
+        backgroundColor: colors.surfaceMuted,
+        borderColor: colors.surfaceMuted,
+        boxShadow: "none",
+      }}
+    >
       <Text
         style={{
           color: colors.mutedForeground,
-          fontSize: 12,
-          fontWeight: "800",
-          textTransform: "uppercase",
+          fontSize: 12.5,
+          fontWeight: "500",
         }}
+        numberOfLines={1}
       >
         {label}
       </Text>
       <Text
         style={{
           color: toneColor(tone),
-          fontSize: 24,
-          fontWeight: "800",
+          fontSize: 20,
+          fontWeight: "700",
           fontVariant: ["tabular-nums"],
         }}
         numberOfLines={1}
@@ -51,7 +61,11 @@ export function StatCard({ label, value, detail, tone = "neutral" }: StatCardPro
       >
         {value}
       </Text>
-      <Text style={{ color: colors.mutedForeground, fontSize: 13 }} selectable>
+      <Text
+        style={{ color: colors.mutedForeground, fontSize: 12, lineHeight: 16 }}
+        numberOfLines={2}
+        selectable
+      >
         {detail}
       </Text>
     </Card>
