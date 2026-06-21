@@ -41,9 +41,8 @@ export function Badge({ label, tone = "neutral" }: BadgeProps) {
       <Text
         style={{
           color: palette.color,
-          fontSize: 12,
-          fontWeight: "800",
-          textTransform: "uppercase",
+          fontSize: 13,
+          fontWeight: "600",
           fontVariant: ["tabular-nums"],
         }}
         selectable
