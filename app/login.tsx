@@ -6,6 +6,7 @@ import { useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { GoogleLogo } from "@/components/ui/google-logo";
 import { colors, radii, spacing } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
 
@@ -49,7 +50,7 @@ export default function LoginScreen() {
 
       <View style={styles.hero}>
         <Text style={styles.title} selectable>
-          Know your net,{"\n"}every tournament.
+          Know your net, every tournament.
         </Text>
         <Text style={styles.subtitle} selectable>
           Travel, fees and prize money — settled to a single profit or loss per
@@ -82,7 +83,7 @@ export default function LoginScreen() {
             <ActivityIndicator color="#FFFFFF" />
           ) : (
             <View accessible={false} style={styles.googleMark}>
-              <Text style={styles.googleLetter}>G</Text>
+              <GoogleLogo size={18} />
             </View>
           )}
           <Text style={styles.googleLabel}>
@@ -151,7 +152,6 @@ const styles = StyleSheet.create({
     fontSize: 34,
     fontWeight: "700",
     letterSpacing: -0.8,
-    lineHeight: 40,
   },
   subtitle: {
     color: colors.mutedForeground,
@@ -193,11 +193,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 12,
     backgroundColor: "#FFFFFF",
-  },
-  googleLetter: {
-    color: colors.foreground,
-    fontSize: 14,
-    fontWeight: "700",
   },
   googleLabel: {
     color: "#FFFFFF",

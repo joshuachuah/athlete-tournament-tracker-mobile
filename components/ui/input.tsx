@@ -13,9 +13,8 @@ export function Input({ label, error, style, ...props }: InputProps) {
       <Text
         style={{
           color: colors.mutedForeground,
-          fontSize: 12,
-          fontWeight: "800",
-          textTransform: "uppercase",
+          fontSize: 13,
+          fontWeight: "500",
         }}
       >
         {label}

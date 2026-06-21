@@ -4,7 +4,7 @@ export const colors = {
   surfaceMuted: "#F5F6F5",
   foreground: "#0E1012",
   mutedForeground: "#5B6168",
-  border: "#EBEDEB",
+  border: "#E4E7E4",
   profit: "#16A06A",
   profitSoft: "#E7F5EE",
   loss: "#DD4B39",
