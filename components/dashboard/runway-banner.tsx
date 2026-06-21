@@ -1,7 +1,7 @@
-import { Text } from "react-native";
+import { Text, View } from "react-native";
 
 import { Card } from "@/components/ui/card";
-import { colors, spacing } from "@/constants/theme";
+import { colors, radii, spacing } from "@/constants/theme";
 import { formatMoney } from "@/lib/utils";
 
 type RunwayBannerProps = {
@@ -40,34 +40,38 @@ export function RunwayBanner({
   return (
     <Card
       style={{
-        gap: spacing.sm,
+        gap: spacing.md,
+        borderRadius: radii.lg,
+        padding: spacing.md,
         backgroundColor,
         borderColor,
+        boxShadow: "none",
       }}
     >
-      <Text
-        style={{
-          color: accentColor,
-          fontSize: 12,
-          fontWeight: "800",
-          textTransform: "uppercase",
-        }}
-      >
-        Runway
-      </Text>
-      <Text
-        style={{
-          color: colors.foreground,
-          fontSize: 22,
-          fontWeight: "800",
-          fontVariant: ["tabular-nums"],
-        }}
-        selectable
-      >
-        {profitable
-          ? "Profitable on average"
-          : `${runway} tournament${runway === 1 ? "" : "s"} remaining`}
-      </Text>
+      <View style={{ gap: spacing.xs }}>
+        <Text
+          style={{
+            color: accentColor,
+            fontSize: 13,
+            fontWeight: "600",
+          }}
+        >
+          Runway
+        </Text>
+        <Text
+          style={{
+            color: colors.foreground,
+            fontSize: 21,
+            fontWeight: "700",
+            fontVariant: ["tabular-nums"],
+          }}
+          selectable
+        >
+          {profitable
+            ? "Profitable on average"
+            : `${runway} tournament${runway === 1 ? "" : "s"} remaining`}
+        </Text>
+      </View>
       <Text style={{ color: colors.mutedForeground, lineHeight: 20 }} selectable>
         {profitable
           ? "Your realistic scenarios are not averaging a loss."
