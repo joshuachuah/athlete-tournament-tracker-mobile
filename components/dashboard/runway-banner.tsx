@@ -18,29 +18,36 @@ export function RunwayBanner({
   const profitable = runway === null;
   const warning = runway !== null && runway <= 3;
 
+  // Profitable → green, low runway → amber, otherwise a neutral (ink) state.
+  // Neutral must NOT read as green: accent and profit share a hue now, so an
+  // informational runway would otherwise look like a profit.
+  const accentColor = profitable
+    ? colors.profit
+    : warning
+      ? colors.warning
+      : colors.mutedForeground;
+  const backgroundColor = profitable
+    ? colors.profitSoft
+    : warning
+      ? colors.warningSoft
+      : colors.surfaceMuted;
+  const borderColor = profitable
+    ? colors.profit
+    : warning
+      ? colors.warning
+      : colors.border;
+
   return (
     <Card
       style={{
         gap: spacing.sm,
-        backgroundColor: profitable
-          ? colors.profitSoft
-          : warning
-            ? colors.warningSoft
-            : colors.accentSoft,
-        borderColor: profitable
-          ? colors.profit
-          : warning
-            ? colors.warning
-            : colors.accent,
+        backgroundColor,
+        borderColor,
       }}
     >
       <Text
         style={{
-          color: profitable
-            ? colors.profit
-            : warning
-              ? colors.warning
-              : colors.accent,
+          color: accentColor,
           fontSize: 12,
           fontWeight: "800",
           textTransform: "uppercase",

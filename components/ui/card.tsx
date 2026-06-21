@@ -14,7 +14,8 @@ export function Card({ style, ...props }: ViewProps) {
           borderColor: colors.border,
           padding: spacing.lg,
           gap: spacing.md,
-          boxShadow: "0 1px 2px rgba(30, 29, 26, 0.06)",
+          boxShadow:
+            "0 1px 2px rgba(14, 16, 18, 0.04), 0 8px 20px -8px rgba(14, 16, 18, 0.10)",
         },
         style,
       ]}
