@@ -30,7 +30,7 @@ export function StatCard({ label, value, detail, tone = "neutral" }: StatCardPro
     <Card
       style={{
         flex: 1,
-        minWidth: 0,
+        minWidth: 150,
         gap: spacing.sm,
         padding: spacing.md,
         backgroundColor: colors.surfaceMuted,

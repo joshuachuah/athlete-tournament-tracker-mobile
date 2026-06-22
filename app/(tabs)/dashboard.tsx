@@ -117,7 +117,7 @@ export default function DashboardScreen() {
             </View>
           </View>
 
-          <View style={{ flexDirection: "row", gap: spacing.md }}>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.md }}>
             <StatCard
               label="Earned"
               value={formatMoney(stats.ytdEarnings, profile.home_currency)}
@@ -148,7 +148,7 @@ export default function DashboardScreen() {
               style={{ color: colors.foreground, fontSize: 22, fontWeight: "700" }}
               selectable
             >
-              Recent events
+              Tournaments
             </Text>
             {tournaments.length === 0 ? (
               <EmptyState
