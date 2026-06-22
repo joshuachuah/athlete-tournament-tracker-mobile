@@ -1,4 +1,4 @@
-import { Text, View } from "react-native";
+import { Text, View, type StyleProp, type ViewStyle } from "react-native";
 
 import { colors, radii, spacing } from "@/constants/theme";
 
@@ -7,6 +7,7 @@ type BadgeTone = "profit" | "loss" | "warning" | "neutral" | "accent";
 type BadgeProps = {
   label: string;
   tone?: BadgeTone;
+  style?: StyleProp<ViewStyle>;
 };
 
 function toneColors(tone: BadgeTone) {
@@ -24,19 +25,22 @@ function toneColors(tone: BadgeTone) {
   }
 }
 
-export function Badge({ label, tone = "neutral" }: BadgeProps) {
+export function Badge({ label, tone = "neutral", style }: BadgeProps) {
   const palette = toneColors(tone);
 
   return (
     <View
-      style={{
-        alignSelf: "flex-start",
-        borderRadius: radii.sm,
-        borderCurve: "continuous",
-        paddingHorizontal: spacing.sm,
-        paddingVertical: 5,
-        backgroundColor: palette.backgroundColor,
-      }}
+      style={[
+        {
+          alignSelf: "flex-start",
+          borderRadius: radii.sm,
+          borderCurve: "continuous",
+          paddingHorizontal: spacing.sm,
+          paddingVertical: 5,
+          backgroundColor: palette.backgroundColor,
+        },
+        style,
+      ]}
     >
       <Text
         style={{
@@ -45,6 +49,8 @@ export function Badge({ label, tone = "neutral" }: BadgeProps) {
           fontWeight: "600",
           fontVariant: ["tabular-nums"],
         }}
+        numberOfLines={1}
+        adjustsFontSizeToFit
         selectable
       >
         {label}
