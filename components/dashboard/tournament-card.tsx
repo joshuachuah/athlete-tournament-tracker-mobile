@@ -34,7 +34,7 @@ export function TournamentCard({ tournament }: { tournament: TournamentWithPnL }
                 gap: spacing.md,
               }}
             >
-              <View style={{ flex: 1, gap: spacing.xs }}>
+              <View style={{ flex: 1, minWidth: 0, gap: spacing.xs }}>
                 <Text
                   style={{ color: colors.foreground, fontSize: 17, fontWeight: "700" }}
                   numberOfLines={2}
@@ -53,6 +53,7 @@ export function TournamentCard({ tournament }: { tournament: TournamentWithPnL }
               <Badge
                 label={formatMoney(netResult, tournament.home_currency)}
                 tone={netResult >= 0 ? "profit" : "loss"}
+                style={{ maxWidth: "42%" }}
               />
             </View>
 
