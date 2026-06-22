@@ -7,7 +7,7 @@ import { EmptyState, ErrorState, LoadingState } from "@/components/ui/state";
 import { RunwayBanner } from "@/components/dashboard/runway-banner";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { TournamentCard } from "@/components/dashboard/tournament-card";
-import { colors, spacing } from "@/constants/theme";
+import { colors, radii, spacing } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
 import { api } from "@/lib/api";
 import { buildDashboardStats } from "@/lib/dashboard";
@@ -38,6 +38,7 @@ export default function DashboardScreen() {
 
   const stats = buildDashboardStats(tournaments, profile);
   const currentYear = new Date().getFullYear();
+  const seasonProfitable = stats.netResult >= 0;
 
   return (
     <ScrollView
@@ -52,18 +53,11 @@ export default function DashboardScreen() {
       }}
     >
       <View style={{ gap: spacing.xs }}>
-        <Text
-          style={{
-            color: colors.mutedForeground,
-            fontSize: 12,
-            fontWeight: "800",
-            textTransform: "uppercase",
-          }}
-        >
+        <Text style={{ color: colors.mutedForeground, fontSize: 15 }}>
           Welcome back
         </Text>
         <Text
-          style={{ color: colors.foreground, fontSize: 32, fontWeight: "900" }}
+          style={{ color: colors.foreground, fontSize: 30, fontWeight: "700" }}
           selectable
         >
           {profile.name}
@@ -83,27 +77,61 @@ export default function DashboardScreen() {
 
       {!isLoading && !isError ? (
         <>
+          <View style={{ gap: spacing.md }}>
+            <Text style={{ color: colors.mutedForeground, fontSize: 13 }} selectable>
+              Season net · {currentYear}
+            </Text>
+            <Text
+              style={{
+                color: colors.foreground,
+                fontSize: 44,
+                fontWeight: "800",
+                fontVariant: ["tabular-nums"],
+              }}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              selectable
+            >
+              {formatMoney(stats.netResult, profile.home_currency)}
+            </Text>
+            <View
+              style={{
+                alignSelf: "flex-start",
+                borderRadius: radii.sm,
+                borderCurve: "continuous",
+                paddingHorizontal: spacing.sm,
+                paddingVertical: 6,
+                backgroundColor: seasonProfitable ? colors.profitSoft : colors.lossSoft,
+              }}
+            >
+              <Text
+                style={{
+                  color: seasonProfitable ? colors.profit : colors.loss,
+                  fontSize: 13,
+                  fontWeight: "600",
+                }}
+                selectable
+              >
+                {seasonProfitable ? "Profitable season" : "In the red"}
+              </Text>
+            </View>
+          </View>
+
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.md }}>
             <StatCard
-              label="YTD Earnings"
+              label="Earned"
               value={formatMoney(stats.ytdEarnings, profile.home_currency)}
               detail="Server income total"
               tone="profit"
             />
             <StatCard
-              label="YTD Expenses"
+              label="Spent"
               value={formatMoney(stats.ytdExpenses, profile.home_currency)}
               detail="Server-adjusted spend"
               tone="loss"
             />
             <StatCard
-              label="Net Result"
-              value={formatMoney(stats.netResult, profile.home_currency)}
-              detail={stats.netResult >= 0 ? "Profitable season" : "In the red"}
-              tone={stats.netResult >= 0 ? "profit" : "loss"}
-            />
-            <StatCard
-              label="Tournaments"
+              label="Events"
               value={String(stats.tournamentCount)}
               detail={`${stats.tournamentCount} this year`}
             />
@@ -117,7 +145,7 @@ export default function DashboardScreen() {
 
           <View style={{ gap: spacing.md }}>
             <Text
-              style={{ color: colors.foreground, fontSize: 22, fontWeight: "800" }}
+              style={{ color: colors.foreground, fontSize: 22, fontWeight: "700" }}
               selectable
             >
               Tournaments
