@@ -133,8 +133,7 @@ export function roundCurrencyAmount(amount: number, currency: string): number {
   return Math.round((amount + Number.EPSILON) * factor) / factor;
 }
 
-export function isoToday(): string {
-  const today = new Date();
+export function isoToday(today: Date = new Date()): string {
   const year = String(today.getFullYear()).padStart(4, "0");
   const month = String(today.getMonth() + 1).padStart(2, "0");
   const day = String(today.getDate()).padStart(2, "0");

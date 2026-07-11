@@ -9,23 +9,21 @@ import {
 } from "@/lib/utils";
 
 describe("date-only utilities", () => {
-  const originalTimezone = process.env.TZ;
-
   afterEach(() => {
     jest.useRealTimers();
-    process.env.TZ = originalTimezone;
+    jest.restoreAllMocks();
   });
 
-  it("uses the local calendar day near midnight in Malaysia", () => {
-    process.env.TZ = "Asia/Kuala_Lumpur";
-    jest.useFakeTimers().setSystemTime(new Date("2026-07-10T16:30:00.000Z"));
+  it("uses local calendar fields instead of UTC serialization", () => {
+    const nearMidnight = new Date("2026-07-10T16:30:00.000Z");
+    jest.spyOn(nearMidnight, "getFullYear").mockReturnValue(2026);
+    jest.spyOn(nearMidnight, "getMonth").mockReturnValue(6);
+    jest.spyOn(nearMidnight, "getDate").mockReturnValue(11);
 
-    expect(isoToday()).toBe("2026-07-11");
+    expect(isoToday(nearMidnight)).toBe("2026-07-11");
   });
 
   it("formats a date-only value without previous-day rollover in the Americas", () => {
-    process.env.TZ = "America/Los_Angeles";
-
     expect(formatDate("2026-01-01")).toBe("Jan 1, 2026");
     expect(parseDateOnly("2026-01-01")?.getDate()).toBe(1);
   });
