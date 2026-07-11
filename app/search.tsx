@@ -54,6 +54,13 @@ function tournamentKey(tournament: KnownTournament): string {
   ]);
 }
 
+function knownPrizeTotal(tournament: KnownTournament): number | undefined {
+  return (
+    tournament.estimated_prize_total ??
+    (tournament as KnownTournament & { prize_total?: number }).prize_total
+  );
+}
+
 export default function SearchScreen() {
   const { profile, session } = useAuth();
   const [query, setQuery] = useState("");
@@ -159,7 +166,7 @@ export default function SearchScreen() {
                     />
                   ) : null}
                 </View>
-                {tournament.estimated_prize_total && tournament.currency ? (
+                {knownPrizeTotal(tournament) !== undefined && tournament.currency ? (
                   <Text
                     style={{
                       color: colors.foreground,
@@ -169,7 +176,7 @@ export default function SearchScreen() {
                     selectable
                   >
                     Estimated prize total:{" "}
-                    {formatMoney(tournament.estimated_prize_total, tournament.currency)}
+                    {formatMoney(knownPrizeTotal(tournament) ?? 0, tournament.currency)}
                   </Text>
                 ) : null}
               </Card>

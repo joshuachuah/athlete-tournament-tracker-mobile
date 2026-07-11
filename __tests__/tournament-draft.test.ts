@@ -8,6 +8,7 @@ import {
   prizesSchema,
   resumableDraft,
   toTournamentPayload,
+  tournamentDraftFromPrefill,
   tournamentToDraft,
   travelSchema,
 } from "@/lib/tournament-draft";
@@ -245,6 +246,44 @@ describe("resumableDraft", () => {
     };
 
     expect(resumableDraft(stored)).toBe(defaultTournamentDraft);
+  });
+});
+
+describe("tournamentDraftFromPrefill", () => {
+  it("hydrates all supplied known-tournament fields and derives duration", () => {
+    const draft = tournamentDraftFromPrefill({
+      name: "Known Open",
+      location: "Paris",
+      country: "France",
+      currency: "eur",
+      start_date: "2026-05-01",
+      end_date: "2026-05-04",
+      duration_days: "99",
+      prize_rounds: JSON.stringify({ qf: 500, w: 2_000 }),
+      prize_tax_rate: "30",
+    });
+
+    expect(draft).toEqual(
+      expect.objectContaining({
+        name: "Known Open",
+        location: "Paris",
+        country: "France",
+        currency: "EUR",
+        start_date: "2026-05-01",
+        end_date: "2026-05-04",
+        duration_days: 4,
+        prize_tax_rate: 30,
+      }),
+    );
+    expect(draft.prize_rounds).toEqual(
+      expect.objectContaining({ qf: 500, w: 2_000 }),
+    );
+  });
+
+  it("keeps defaults when optional JSON prefill is malformed", () => {
+    const draft = tournamentDraftFromPrefill({ prize_rounds: "not-json" });
+
+    expect(draft.prize_rounds).toEqual(defaultTournamentDraft.prize_rounds);
   });
 });
 
