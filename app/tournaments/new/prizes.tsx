@@ -1,5 +1,5 @@
-import { Redirect } from "expo-router";
+import { LegacyTournamentRedirect } from "@/components/tournament/legacy-tournament-redirect";
 
 export default function LegacyPrizesRoute() {
-  return <Redirect href="/tournaments/new/details" />;
+  return <LegacyTournamentRedirect />;
 }

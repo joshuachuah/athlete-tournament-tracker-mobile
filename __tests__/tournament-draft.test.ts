@@ -1,6 +1,7 @@
 import {
+  addDateOnlyDays,
   calculateAccommodationTotal,
-  defaultTournamentDraft,
+  createDefaultTournamentDraft,
   deriveAccommodationNightly,
   deriveDraftDates,
   detailsSchema,
@@ -14,6 +15,10 @@ import {
 } from "@/lib/tournament-draft";
 import { roundCurrencyAmount } from "@/lib/utils";
 import type { TournamentWithPnL } from "@/types";
+
+const defaultTournamentDraft = createDefaultTournamentDraft(
+  new Date(2026, 0, 1),
+);
 
 function tournament(
   overrides: Partial<TournamentWithPnL> = {},
@@ -228,6 +233,36 @@ describe("deriveDraftDates", () => {
   });
 });
 
+describe("default tournament dates", () => {
+  const originalTimezone = process.env.TZ;
+
+  afterEach(() => {
+    jest.useRealTimers();
+    process.env.TZ = originalTimezone;
+  });
+
+  it("adds calendar days across the Los Angeles DST boundary", () => {
+    process.env.TZ = "America/Los_Angeles";
+
+    expect(addDateOnlyDays("2026-03-08", 2)).toBe("2026-03-10");
+  });
+
+  it("creates new defaults at call time instead of freezing the module day", () => {
+    jest.useFakeTimers().setSystemTime(new Date(2026, 2, 8, 23, 59));
+
+    expect(createDefaultTournamentDraft().start_date).toBe("2026-03-08");
+
+    jest.setSystemTime(new Date(2026, 2, 9, 0, 1));
+
+    expect(createDefaultTournamentDraft()).toEqual(
+      expect.objectContaining({
+        start_date: "2026-03-09",
+        end_date: "2026-03-11",
+      }),
+    );
+  });
+});
+
 describe("resumableDraft", () => {
   it("returns a stored new-tournament draft as-is", () => {
     const stored = {
@@ -245,7 +280,10 @@ describe("resumableDraft", () => {
       name: "Stale edit",
     };
 
-    expect(resumableDraft(stored)).toBe(defaultTournamentDraft);
+    const resumed = resumableDraft(stored);
+
+    expect(resumed.editId).toBeUndefined();
+    expect(resumed.name).toBe("");
   });
 });
 

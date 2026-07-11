@@ -67,6 +67,16 @@ describe("API response schemas", () => {
       expect(tournamentWithPnLSchema.parse(tournament)).toEqual(tournament);
     });
 
+    it("accepts no scenarios when the backend has no prize rounds to project", () => {
+      const response = {
+        ...tournament,
+        prize_rounds: {},
+        pnl: { ...tournament.pnl, scenarios: [] },
+      };
+
+      expect(tournamentWithPnLSchema.parse(response)).toEqual(response);
+    });
+
     it("preserves unknown fields for additive backend changes", () => {
       const response = { ...tournament, some_new_field: 1 };
 
@@ -108,7 +118,7 @@ describe("API response schemas", () => {
       expect(tournamentWithPnLSchema.safeParse(response).success).toBe(false);
     });
 
-    it("rejects missing scenario kinds", () => {
+    it("rejects a partial non-empty scenario set", () => {
       const response = {
         ...tournament,
         pnl: {

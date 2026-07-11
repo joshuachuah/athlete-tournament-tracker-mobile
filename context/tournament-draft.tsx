@@ -12,7 +12,7 @@ import {
   tournamentDraftStorageKey,
 } from "@/lib/storage";
 import {
-  defaultTournamentDraft,
+  createDefaultTournamentDraft,
   deriveDraftDates,
   normalizeTournamentDraft,
   type TournamentDraft,
@@ -36,7 +36,7 @@ export function TournamentDraftProvider({
   const draftKey = userId ? tournamentDraftStorageKey(userId) : null;
   const [draft, setDraftState] = useState<TournamentDraft>(() => {
     const stored = draftKey ? draftStorage.get<Partial<TournamentDraft>>(draftKey) : null;
-    return stored ? normalizeTournamentDraft(stored) : defaultTournamentDraft;
+    return stored ? normalizeTournamentDraft(stored) : createDefaultTournamentDraft();
   });
 
   useEffect(() => {
@@ -61,7 +61,7 @@ export function TournamentDraftProvider({
     if (draftKey) {
       draftStorage.clear(draftKey);
     }
-    setDraftState(defaultTournamentDraft);
+    setDraftState(createDefaultTournamentDraft());
   }
 
   return (
