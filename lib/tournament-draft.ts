@@ -5,6 +5,7 @@ import type { PrizeRounds, Tournament, TournamentWithPnL } from "@/types";
 import {
   calculateDurationDays,
   isoToday,
+  parseDateOnly,
   roundCurrencyAmount,
 } from "@/lib/utils";
 
@@ -71,16 +72,32 @@ export const defaultTournamentDraft: TournamentDraft = {
 
 const requiredText = z.string().min(1, "Required.");
 const money = z.coerce.number().min(0, "Must be zero or more.");
-
-export const detailsSchema = z.object({
-  name: requiredText,
-  location: requiredText,
-  country: requiredText,
-  currency: z.string().length(3, "Use a 3-letter code."),
-  start_date: requiredText,
-  end_date: requiredText,
-  entry_fee: money,
+const dateOnly = z.string().refine((value) => parseDateOnly(value) !== null, {
+  message: "Use a valid date in YYYY-MM-DD format.",
 });
+
+export const detailsSchema = z
+  .object({
+    name: requiredText,
+    location: requiredText,
+    country: requiredText,
+    currency: z.string().length(3, "Use a 3-letter code."),
+    start_date: dateOnly,
+    end_date: dateOnly,
+    entry_fee: money,
+  })
+  .superRefine((details, context) => {
+    const start = parseDateOnly(details.start_date);
+    const end = parseDateOnly(details.end_date);
+
+    if (start && end && end < start) {
+      context.addIssue({
+        code: "custom",
+        path: ["end_date"],
+        message: "End date must be on or after start date.",
+      });
+    }
+  });
 
 export const prizesSchema = z.object({
   prize_rounds: z.object({
@@ -101,7 +118,10 @@ export const prizesSchema = z.object({
 export const travelSchema = z.object({
   flight_cost: money,
   accommodation_nightly: money,
-  accommodation_nights: z.coerce.number().min(0),
+  accommodation_nights: z.coerce
+    .number()
+    .int("Must be a whole number.")
+    .min(0, "Must be zero or more."),
   accommodation_total: money,
 });
 

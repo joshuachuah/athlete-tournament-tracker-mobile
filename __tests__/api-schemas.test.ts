@@ -107,6 +107,49 @@ describe("API response schemas", () => {
 
       expect(tournamentWithPnLSchema.safeParse(response).success).toBe(false);
     });
+
+    it("rejects missing scenario kinds", () => {
+      const response = {
+        ...tournament,
+        pnl: {
+          ...tournament.pnl,
+          scenarios: tournament.pnl.scenarios.slice(0, 2),
+        },
+      };
+
+      expect(tournamentWithPnLSchema.safeParse(response).success).toBe(false);
+    });
+
+    it("rejects duplicate scenario kinds", () => {
+      const response = {
+        ...tournament,
+        pnl: {
+          ...tournament.pnl,
+          scenarios: [
+            tournament.pnl.scenarios[0],
+            tournament.pnl.scenarios[1],
+            { ...tournament.pnl.scenarios[2], scenario: "realistic" },
+          ],
+        },
+      };
+
+      expect(tournamentWithPnLSchema.safeParse(response).success).toBe(false);
+    });
+
+    it("preserves additive fields within P&L scenarios", () => {
+      const response = {
+        ...tournament,
+        pnl: {
+          ...tournament.pnl,
+          scenarios: tournament.pnl.scenarios.map((scenario) => ({
+            ...scenario,
+            projected_rank: 10,
+          })),
+        },
+      };
+
+      expect(tournamentWithPnLSchema.parse(response)).toEqual(response);
+    });
   });
 
   it("accepts a null athlete profile", () => {
