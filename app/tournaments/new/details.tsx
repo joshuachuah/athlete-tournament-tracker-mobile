@@ -5,7 +5,7 @@ import { ScrollView, Text, View } from "react-native";
 
 import { Input } from "@/components/ui/input";
 import { MoneyInput } from "@/components/ui/money-input";
-import { LoadingState } from "@/components/ui/state";
+import { ErrorState, LoadingState } from "@/components/ui/state";
 import { WizardNav, WizardShell } from "@/components/tournament/wizard-shell";
 import { colors, spacing } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
@@ -152,7 +152,13 @@ export default function DetailsStep() {
   const { draft } = useTournamentDraft();
   const params = useLocalSearchParams<DetailsParams>();
   const editId = typeof params.editId === "string" ? params.editId : undefined;
-  const { data: editTournament, isLoading: editTournamentLoading } = useQuery({
+  const {
+    data: editTournament,
+    error: editTournamentError,
+    isError: editTournamentIsError,
+    isLoading: editTournamentLoading,
+    refetch: refetchEditTournament,
+  } = useQuery({
     queryKey: ["tournament", editId],
     queryFn: () => api.tournaments.get(editId ?? ""),
     enabled: Boolean(editId),
@@ -205,6 +211,12 @@ export default function DetailsStep() {
     >
       <WizardShell step="details">
         {editTournamentLoading ? <LoadingState label="Loading tournament" /> : null}
+        {editTournamentIsError ? (
+          <ErrorState
+            message={editTournamentError.message}
+            onRetry={() => refetchEditTournament()}
+          />
+        ) : null}
         {!editId || editTournament ? (
           <DetailsForm key={formKey} initialDraft={initialDraft} />
         ) : null}

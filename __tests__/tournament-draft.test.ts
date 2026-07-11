@@ -202,7 +202,7 @@ describe("roundCurrencyAmount", () => {
 });
 
 describe("deriveDraftDates", () => {
-  it("recomputes duration and clamps invalid date ranges to one day", () => {
+  it("recomputes duration without treating invalid ranges as one-day events", () => {
     expect(
       deriveDraftDates({
         ...defaultTournamentDraft,
@@ -216,14 +216,14 @@ describe("deriveDraftDates", () => {
         start_date: "2026-04-03",
         end_date: "2026-04-01",
       }).duration_days,
-    ).toBe(1);
+    ).toBe(0);
     expect(
       deriveDraftDates({
         ...defaultTournamentDraft,
         start_date: "not-a-date",
         end_date: "also-not-a-date",
       }).duration_days,
-    ).toBe(1);
+    ).toBe(0);
   });
 });
 
@@ -363,5 +363,42 @@ describe("wizard schemas", () => {
         accommodation_total: 0,
       }).success,
     ).toBe(false);
+    expect(
+      travelSchema.safeParse({
+        flight_cost: 0,
+        accommodation_nightly: 100,
+        accommodation_nights: 1.5,
+        accommodation_total: 150,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("requires valid ordered calendar dates and attaches errors to the dates", () => {
+    const validDetails = {
+      name: "Open Championship",
+      location: "Detroit",
+      country: "United States",
+      currency: "USD",
+      start_date: "2024-02-29",
+      end_date: "2024-03-01",
+      entry_fee: 0,
+    };
+
+    expect(detailsSchema.safeParse(validDetails).success).toBe(true);
+
+    const invalidStart = detailsSchema.safeParse({
+      ...validDetails,
+      start_date: "2026-02-29",
+    });
+    expect(invalidStart.success).toBe(false);
+    expect(invalidStart.error?.issues[0]?.path).toEqual(["start_date"]);
+
+    const reversed = detailsSchema.safeParse({
+      ...validDetails,
+      start_date: "2026-04-03",
+      end_date: "2026-04-01",
+    });
+    expect(reversed.success).toBe(false);
+    expect(reversed.error?.issues[0]?.path).toEqual(["end_date"]);
   });
 });

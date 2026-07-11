@@ -5,7 +5,7 @@ import { Pressable, ScrollView, Text, View } from "react-native";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { EmptyState, LoadingState } from "@/components/ui/state";
+import { EmptyState, ErrorState, LoadingState } from "@/components/ui/state";
 import { colors, spacing } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
@@ -58,7 +58,13 @@ export default function SearchScreen() {
   const { profile, session } = useAuth();
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebouncedValue(query.trim(), 300);
-  const { data: results, isLoading: resultsLoading } = useQuery({
+  const {
+    data: results,
+    error: resultsError,
+    isError: resultsIsError,
+    isLoading: resultsLoading,
+    refetch: refetchResults,
+  } = useQuery({
     queryKey: ["tournament-search", debouncedQuery, profile?.sport],
     queryFn: () => api.tournaments.search(debouncedQuery, profile?.sport),
     enabled: debouncedQuery.length >= 2,
@@ -90,6 +96,12 @@ export default function SearchScreen() {
       />
 
       {resultsLoading ? <LoadingState label="Searching tournaments" /> : null}
+      {resultsIsError ? (
+        <ErrorState
+          message={resultsError.message}
+          onRetry={() => refetchResults()}
+        />
+      ) : null}
 
       {debouncedQuery.length < 2 ? (
         <EmptyState
@@ -98,7 +110,7 @@ export default function SearchScreen() {
         />
       ) : null}
 
-      {results?.length === 0 ? (
+      {!resultsLoading && !resultsIsError && results?.length === 0 ? (
         <EmptyState
           title="No matches"
           body="Start from scratch if this tournament is not in the server search results."
@@ -106,7 +118,7 @@ export default function SearchScreen() {
       ) : null}
 
       <View style={{ gap: spacing.md }}>
-        {results?.map((tournament) => (
+        {!resultsIsError ? results?.map((tournament) => (
           <Pressable
             key={tournamentKey(tournament)}
             onPress={() => prefillTournament(tournament)}
@@ -163,7 +175,7 @@ export default function SearchScreen() {
               </Card>
             )}
           </Pressable>
-        ))}
+        )) : null}
       </View>
     </ScrollView>
   );

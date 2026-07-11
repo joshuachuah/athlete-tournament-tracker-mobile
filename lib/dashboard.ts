@@ -1,5 +1,5 @@
 import type { AthleteProfile, TournamentWithPnL } from "@/types";
-import { getScenario } from "@/lib/utils";
+import { dateOnlyYear, getScenario } from "@/lib/utils";
 
 export type DashboardStats = {
   ytdEarnings: number;
@@ -18,7 +18,7 @@ export function buildDashboardStats(
 ): DashboardStats {
   const currentYear = today.getFullYear();
   const ytd = tournaments.filter(
-    (tournament) => new Date(tournament.start_date).getFullYear() === currentYear,
+    (tournament) => dateOnlyYear(tournament.start_date) === currentYear,
   );
 
   const ytdEarnings = ytd.reduce(

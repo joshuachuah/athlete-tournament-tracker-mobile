@@ -14,6 +14,7 @@ export const roundLabels: Record<keyof PrizeRounds, string> = {
 
 const moneyFormatters = new Map<string, Intl.NumberFormat>();
 const currencyFractionDigits = new Map<string, number>();
+const isoDateOnlyPattern = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 function getMoneyFormatter(currency: string): Intl.NumberFormat {
   const cached = moneyFormatters.get(currency);
@@ -25,7 +26,8 @@ function getMoneyFormatter(currency: string): Intl.NumberFormat {
   const formatter = Intl.NumberFormat("en-US", {
     style: "currency",
     currency,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: getCurrencyFractionDigits(currency),
   });
   moneyFormatters.set(currency, formatter);
   return formatter;
@@ -44,18 +46,48 @@ export function formatMoney(amount: number | null | undefined, currency: string)
 }
 
 export function formatDate(date: string | Date): string {
-  return format(new Date(date), "MMM d, yyyy");
+  const parsed = typeof date === "string" ? parseDateOnly(date) : date;
+  return format(parsed ?? new Date(date), "MMM d, yyyy");
+}
+
+export function parseDateOnly(value: string): Date | null {
+  const match = isoDateOnlyPattern.exec(value);
+
+  if (!match) {
+    return null;
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(0);
+  parsed.setHours(0, 0, 0, 0);
+  parsed.setFullYear(year, month - 1, day);
+
+  if (
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return parsed;
+}
+
+export function dateOnlyYear(value: string): number | null {
+  return parseDateOnly(value)?.getFullYear() ?? null;
 }
 
 export function calculateDurationDays(startDate: string, endDate: string): number {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const start = parseDateOnly(startDate);
+  const end = parseDateOnly(endDate);
 
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-    return 1;
+  if (!start || !end || end < start) {
+    return 0;
   }
 
-  return Math.max(1, differenceInCalendarDays(end, start) + 1);
+  return differenceInCalendarDays(end, start) + 1;
 }
 
 export function getScenario(
@@ -66,7 +98,13 @@ export function getScenario(
 }
 
 export function parseMoneyInput(value: string): number {
-  const next = Number(value.replace(/,/g, ""));
+  const trimmed = value.trim();
+
+  if (!/^\d*(?:[.,]\d*)?$/.test(trimmed)) {
+    return 0;
+  }
+
+  const next = Number(trimmed.replace(",", "."));
   return Number.isFinite(next) ? next : 0;
 }
 
@@ -96,7 +134,12 @@ export function roundCurrencyAmount(amount: number, currency: string): number {
 }
 
 export function isoToday(): string {
-  return new Date().toISOString().slice(0, 10);
+  const today = new Date();
+  const year = String(today.getFullYear()).padStart(4, "0");
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
 }
 
 export function scenarioLabel(scenario: Scenario): string {
