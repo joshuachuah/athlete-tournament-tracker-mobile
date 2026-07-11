@@ -97,4 +97,23 @@ describe("dashboard stats", () => {
   it("keeps currency codes visible in money output", () => {
     expect(formatMoney(4800, "usd")).toBe("$4,800 USD");
   });
+
+  it("filters year-boundary date-only values without UTC rollover", () => {
+    const previousYear = tournament("previous", 100, 100, 0);
+    previousYear.start_date = "2025-12-31";
+    const currentYear = tournament("current", 200, 200, 0);
+    currentYear.start_date = "2026-01-01";
+    const invalid = tournament("invalid", 300, 300, 0);
+    invalid.start_date = "not-a-date";
+
+    const stats = buildDashboardStats(
+      [previousYear, currentYear, invalid],
+      profile,
+      new Date(2026, 0, 1),
+    );
+
+    expect(stats.tournamentCount).toBe(1);
+    expect(stats.ytdEarnings).toBe(200);
+    expect(stats.netResult).toBe(200);
+  });
 });

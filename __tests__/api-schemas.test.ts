@@ -67,6 +67,16 @@ describe("API response schemas", () => {
       expect(tournamentWithPnLSchema.parse(tournament)).toEqual(tournament);
     });
 
+    it("accepts no scenarios when the backend has no prize rounds to project", () => {
+      const response = {
+        ...tournament,
+        prize_rounds: {},
+        pnl: { ...tournament.pnl, scenarios: [] },
+      };
+
+      expect(tournamentWithPnLSchema.parse(response)).toEqual(response);
+    });
+
     it("preserves unknown fields for additive backend changes", () => {
       const response = { ...tournament, some_new_field: 1 };
 
@@ -106,6 +116,49 @@ describe("API response schemas", () => {
       };
 
       expect(tournamentWithPnLSchema.safeParse(response).success).toBe(false);
+    });
+
+    it("rejects a partial non-empty scenario set", () => {
+      const response = {
+        ...tournament,
+        pnl: {
+          ...tournament.pnl,
+          scenarios: tournament.pnl.scenarios.slice(0, 2),
+        },
+      };
+
+      expect(tournamentWithPnLSchema.safeParse(response).success).toBe(false);
+    });
+
+    it("rejects duplicate scenario kinds", () => {
+      const response = {
+        ...tournament,
+        pnl: {
+          ...tournament.pnl,
+          scenarios: [
+            tournament.pnl.scenarios[0],
+            tournament.pnl.scenarios[1],
+            { ...tournament.pnl.scenarios[2], scenario: "realistic" },
+          ],
+        },
+      };
+
+      expect(tournamentWithPnLSchema.safeParse(response).success).toBe(false);
+    });
+
+    it("preserves additive fields within P&L scenarios", () => {
+      const response = {
+        ...tournament,
+        pnl: {
+          ...tournament.pnl,
+          scenarios: tournament.pnl.scenarios.map((scenario) => ({
+            ...scenario,
+            projected_rank: 10,
+          })),
+        },
+      };
+
+      expect(tournamentWithPnLSchema.parse(response)).toEqual(response);
     });
   });
 
