@@ -77,8 +77,21 @@ export const pnlResultSchema = z.looseObject({
   total_income_base: z.number(),
   scenarios: z
     .array(scenarioResultSchema)
-    .length(scenarioKinds.length)
     .superRefine((scenarios, context) => {
+      // Contract-tolerant until the backend always emits projections: an event
+      // with no prize rounds legitimately has no scenarios. Any non-empty set
+      // remains strict so partial or duplicate projections cannot reach the UI.
+      if (scenarios.length === 0) {
+        return;
+      }
+
+      if (scenarios.length !== scenarioKinds.length) {
+        context.addIssue({
+          code: "custom",
+          message: `Expected either no scenarios or ${scenarioKinds.length} scenarios.`,
+        });
+      }
+
       for (const kind of scenarioKinds) {
         if (scenarios.filter((scenario) => scenario.scenario === kind).length !== 1) {
           context.addIssue({

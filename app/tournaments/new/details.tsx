@@ -9,6 +9,7 @@ import { useTournamentDraft } from "@/context/tournament-draft";
 import { api } from "@/lib/api";
 import { queryClient } from "@/lib/query-client";
 import {
+  completeTournamentSave,
   resumableDraft,
   saveTournamentDraft,
   tournamentDraftFromPrefill,
@@ -47,10 +48,11 @@ export default function DetailsStep() {
       return saveTournamentDraft(nextDraft, profile.id, api.tournaments);
     },
     onSuccess: (savedTournament) => {
-      queryClient.invalidateQueries({ queryKey: ["tournaments", profile?.id] });
-      queryClient.invalidateQueries({ queryKey: ["tournament", savedTournament.id] });
-      resetDraft();
-      router.replace(`/tournaments/${savedTournament.id}`);
+      completeTournamentSave(savedTournament.id, profile?.id, {
+        invalidate: (queryKey) => queryClient.invalidateQueries({ queryKey }),
+        resetDraft,
+        replace: (href) => router.replace(href),
+      });
     },
     onError: (error) => setSubmitError((error as Error).message),
   });

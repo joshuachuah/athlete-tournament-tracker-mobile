@@ -3,11 +3,16 @@ import { fireEvent, render } from "@testing-library/react-native";
 import { TournamentForm } from "@/components/tournament/tournament-form";
 import { TournamentDraftProvider } from "@/context/tournament-draft";
 import {
-  defaultTournamentDraft,
+  completeTournamentSave,
+  createDefaultTournamentDraft,
   saveTournamentDraft,
   tournamentToDraft,
 } from "@/lib/tournament-draft";
 import type { TournamentWithPnL } from "@/types";
+
+const defaultTournamentDraft = createDefaultTournamentDraft(
+  new Date(2026, 0, 1),
+);
 
 jest.mock("expo-sqlite/localStorage/install", () => {
   const values = new Map<string, string>();
@@ -178,5 +183,28 @@ describe("saveTournamentDraft", () => {
       }),
     );
     expect(writer.create).not.toHaveBeenCalled();
+  });
+
+  it("invalidates list/detail data, resets the draft, and redirects after save", () => {
+    const completion = {
+      invalidate: jest.fn(),
+      resetDraft: jest.fn(),
+      replace: jest.fn(),
+    };
+
+    completeTournamentSave("tournament-1", "athlete-1", completion);
+
+    expect(completion.invalidate).toHaveBeenNthCalledWith(1, [
+      "tournaments",
+      "athlete-1",
+    ]);
+    expect(completion.invalidate).toHaveBeenNthCalledWith(2, [
+      "tournament",
+      "tournament-1",
+    ]);
+    expect(completion.resetDraft).toHaveBeenCalledTimes(1);
+    expect(completion.replace).toHaveBeenCalledWith(
+      "/tournaments/tournament-1",
+    );
   });
 });
