@@ -35,6 +35,18 @@ export type TournamentDraft = {
   sponsorship_allocated: number;
 };
 
+export type TournamentDraftPrefill = {
+  name?: string;
+  location?: string;
+  country?: string;
+  currency?: string;
+  start_date?: string;
+  end_date?: string;
+  duration_days?: string;
+  prize_rounds?: string;
+  prize_tax_rate?: string;
+};
+
 const today = isoToday();
 
 export const defaultTournamentDraft: TournamentDraft = {
@@ -182,6 +194,36 @@ export function normalizeTournamentDraft(stored: StoredTournamentDraft): Tournam
   };
 }
 
+export function tournamentDraftFromPrefill(
+  params: TournamentDraftPrefill,
+): TournamentDraft {
+  const next = {
+    ...defaultTournamentDraft,
+    prize_rounds: { ...defaultTournamentDraft.prize_rounds },
+  };
+
+  if (params.name) next.name = String(params.name);
+  if (params.location) next.location = String(params.location);
+  if (params.country) next.country = String(params.country);
+  if (params.currency) next.currency = String(params.currency).toUpperCase();
+  if (params.start_date) next.start_date = String(params.start_date);
+  if (params.end_date) next.end_date = String(params.end_date);
+  if (params.duration_days) next.duration_days = Number(params.duration_days);
+  if (params.prize_tax_rate) next.prize_tax_rate = Number(params.prize_tax_rate);
+  if (params.prize_rounds) {
+    try {
+      next.prize_rounds = {
+        ...next.prize_rounds,
+        ...JSON.parse(String(params.prize_rounds)),
+      };
+    } catch {
+      // Ignore malformed prefill data from navigation params.
+    }
+  }
+
+  return deriveDraftDates(next);
+}
+
 export function tournamentToDraft(tournament: TournamentWithPnL): TournamentDraft {
   const accommodationNights = Math.max(0, tournament.duration_days - 1);
 
@@ -255,4 +297,28 @@ export function toTournamentPayload(
     prize_rounds: normalized.prize_rounds,
     prize_tax_rate: normalized.prize_tax_rate,
   };
+}
+
+type TournamentWriter = {
+  create: (
+    payload: Omit<Tournament, "id" | "created_at">,
+  ) => Promise<{ id: string }>;
+  update: (
+    id: string,
+    payload: Omit<Tournament, "id" | "created_at">,
+  ) => Promise<{ id: string }>;
+};
+
+export function saveTournamentDraft(
+  draft: TournamentDraft,
+  userId: string,
+  writer: TournamentWriter,
+) {
+  const payload = toTournamentPayload(draft, userId);
+
+  if (draft.editId) {
+    return writer.update(draft.editId, payload);
+  }
+
+  return writer.create(payload);
 }

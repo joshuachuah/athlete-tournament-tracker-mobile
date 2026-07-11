@@ -55,11 +55,11 @@ export default function AddScreen() {
           Start from scratch
         </Text>
         <Text style={{ color: colors.mutedForeground, lineHeight: 20 }} selectable>
-          Enter dates, prize rounds, travel costs, subsidies, and spending plan
-          across the five-step wizard.
+          Add the required details, then open only the financial sections that
+          apply to this tournament.
         </Text>
         <Link href="/tournaments/new/details" asChild>
-          <Button label="Open wizard" />
+          <Button label="Create projection" />
         </Link>
       </Card>
 
@@ -72,7 +72,7 @@ export default function AddScreen() {
           Search known tournaments
         </Text>
         <Text style={{ color: colors.mutedForeground, lineHeight: 20 }} selectable>
-          Find server-provided tournament records and prefill the wizard with
+          Find server-provided tournament records and prefill the form with
           known dates, location, currency, and prize estimates.
         </Text>
         <Link href="/search" asChild>
