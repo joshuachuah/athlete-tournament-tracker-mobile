@@ -15,20 +15,14 @@ function moneyToText(value: number): string {
   return value === 0 || Number.isNaN(value) ? "" : String(value);
 }
 
-// Keep at most one decimal point and drop anything that isn't a digit or dot so
-// partial entries like "10." or "" survive while the user is still typing.
-function sanitize(input: string): string {
-  const cleaned = input.replace(/[^0-9.]/g, "");
-  const firstDot = cleaned.indexOf(".");
+// Keep one decimal separator without interpreting commas as thousands groups.
+// Returning null rejects an extra separator instead of joining digits and
+// accidentally changing the magnitude.
+function sanitize(input: string): string | null {
+  const cleaned = input.replace(/[^0-9.,]/g, "");
+  const separators = cleaned.match(/[.,]/g);
 
-  if (firstDot === -1) {
-    return cleaned;
-  }
-
-  return (
-    cleaned.slice(0, firstDot + 1) +
-    cleaned.slice(firstDot + 1).replace(/\./g, "")
-  );
+  return (separators?.length ?? 0) <= 1 ? cleaned : null;
 }
 
 /**
@@ -48,6 +42,11 @@ export function MoneyInput({
 
   function handleChangeText(next: string) {
     const cleaned = sanitize(next);
+
+    if (cleaned === null) {
+      return;
+    }
+
     setEditingText(cleaned);
     onChangeValue(parseMoneyInput(cleaned));
   }
@@ -56,7 +55,7 @@ export function MoneyInput({
     <Input
       {...rest}
       value={editingText ?? moneyToText(value)}
-      keyboardType="numeric"
+      keyboardType="decimal-pad"
       onChangeText={handleChangeText}
       onFocus={(event) => {
         setEditingText(moneyToText(value));

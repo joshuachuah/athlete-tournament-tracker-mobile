@@ -1,6 +1,7 @@
 import {
+  addDateOnlyDays,
   calculateAccommodationTotal,
-  defaultTournamentDraft,
+  createDefaultTournamentDraft,
   deriveAccommodationNightly,
   deriveDraftDates,
   detailsSchema,
@@ -8,11 +9,16 @@ import {
   prizesSchema,
   resumableDraft,
   toTournamentPayload,
+  tournamentDraftFromPrefill,
   tournamentToDraft,
   travelSchema,
 } from "@/lib/tournament-draft";
 import { roundCurrencyAmount } from "@/lib/utils";
 import type { TournamentWithPnL } from "@/types";
+
+const defaultTournamentDraft = createDefaultTournamentDraft(
+  new Date(2026, 0, 1),
+);
 
 function tournament(
   overrides: Partial<TournamentWithPnL> = {},
@@ -202,7 +208,7 @@ describe("roundCurrencyAmount", () => {
 });
 
 describe("deriveDraftDates", () => {
-  it("recomputes duration and clamps invalid date ranges to one day", () => {
+  it("recomputes duration without treating invalid ranges as one-day events", () => {
     expect(
       deriveDraftDates({
         ...defaultTournamentDraft,
@@ -216,14 +222,44 @@ describe("deriveDraftDates", () => {
         start_date: "2026-04-03",
         end_date: "2026-04-01",
       }).duration_days,
-    ).toBe(1);
+    ).toBe(0);
     expect(
       deriveDraftDates({
         ...defaultTournamentDraft,
         start_date: "not-a-date",
         end_date: "also-not-a-date",
       }).duration_days,
-    ).toBe(1);
+    ).toBe(0);
+  });
+});
+
+describe("default tournament dates", () => {
+  const originalTimezone = process.env.TZ;
+
+  afterEach(() => {
+    jest.useRealTimers();
+    process.env.TZ = originalTimezone;
+  });
+
+  it("adds calendar days across the Los Angeles DST boundary", () => {
+    process.env.TZ = "America/Los_Angeles";
+
+    expect(addDateOnlyDays("2026-03-08", 2)).toBe("2026-03-10");
+  });
+
+  it("creates new defaults at call time instead of freezing the module day", () => {
+    jest.useFakeTimers().setSystemTime(new Date(2026, 2, 8, 23, 59));
+
+    expect(createDefaultTournamentDraft().start_date).toBe("2026-03-08");
+
+    jest.setSystemTime(new Date(2026, 2, 9, 0, 1));
+
+    expect(createDefaultTournamentDraft()).toEqual(
+      expect.objectContaining({
+        start_date: "2026-03-09",
+        end_date: "2026-03-11",
+      }),
+    );
   });
 });
 
@@ -244,7 +280,48 @@ describe("resumableDraft", () => {
       name: "Stale edit",
     };
 
-    expect(resumableDraft(stored)).toBe(defaultTournamentDraft);
+    const resumed = resumableDraft(stored);
+
+    expect(resumed.editId).toBeUndefined();
+    expect(resumed.name).toBe("");
+  });
+});
+
+describe("tournamentDraftFromPrefill", () => {
+  it("hydrates all supplied known-tournament fields and derives duration", () => {
+    const draft = tournamentDraftFromPrefill({
+      name: "Known Open",
+      location: "Paris",
+      country: "France",
+      currency: "eur",
+      start_date: "2026-05-01",
+      end_date: "2026-05-04",
+      duration_days: "99",
+      prize_rounds: JSON.stringify({ qf: 500, w: 2_000 }),
+      prize_tax_rate: "30",
+    });
+
+    expect(draft).toEqual(
+      expect.objectContaining({
+        name: "Known Open",
+        location: "Paris",
+        country: "France",
+        currency: "EUR",
+        start_date: "2026-05-01",
+        end_date: "2026-05-04",
+        duration_days: 4,
+        prize_tax_rate: 30,
+      }),
+    );
+    expect(draft.prize_rounds).toEqual(
+      expect.objectContaining({ qf: 500, w: 2_000 }),
+    );
+  });
+
+  it("keeps defaults when optional JSON prefill is malformed", () => {
+    const draft = tournamentDraftFromPrefill({ prize_rounds: "not-json" });
+
+    expect(draft.prize_rounds).toEqual(defaultTournamentDraft.prize_rounds);
   });
 });
 
@@ -363,5 +440,42 @@ describe("wizard schemas", () => {
         accommodation_total: 0,
       }).success,
     ).toBe(false);
+    expect(
+      travelSchema.safeParse({
+        flight_cost: 0,
+        accommodation_nightly: 100,
+        accommodation_nights: 1.5,
+        accommodation_total: 150,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("requires valid ordered calendar dates and attaches errors to the dates", () => {
+    const validDetails = {
+      name: "Open Championship",
+      location: "Detroit",
+      country: "United States",
+      currency: "USD",
+      start_date: "2024-02-29",
+      end_date: "2024-03-01",
+      entry_fee: 0,
+    };
+
+    expect(detailsSchema.safeParse(validDetails).success).toBe(true);
+
+    const invalidStart = detailsSchema.safeParse({
+      ...validDetails,
+      start_date: "2026-02-29",
+    });
+    expect(invalidStart.success).toBe(false);
+    expect(invalidStart.error?.issues[0]?.path).toEqual(["start_date"]);
+
+    const reversed = detailsSchema.safeParse({
+      ...validDetails,
+      start_date: "2026-04-03",
+      end_date: "2026-04-01",
+    });
+    expect(reversed.success).toBe(false);
+    expect(reversed.error?.issues[0]?.path).toEqual(["end_date"]);
   });
 });

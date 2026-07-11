@@ -89,6 +89,12 @@ export default function TournamentDetailScreen() {
           onRetry={() => refetch()}
         />
       ) : null}
+      {deleteMutation.isError ? (
+        <ErrorState
+          message={deleteMutation.error.message}
+          onRetry={confirmDelete}
+        />
+      ) : null}
 
       {data ? (
         <>

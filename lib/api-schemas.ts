@@ -11,6 +11,7 @@ import type {
 } from "@/types";
 
 const roundSchema = z.enum(["r1", "r2", "r3", "qf", "sf", "f", "w"]);
+const scenarioKinds = ["worst", "realistic", "best"] as const;
 
 export const prizeRoundsSchema = z.looseObject({
   r1: z.number().optional(),
@@ -63,7 +64,7 @@ export const tournamentSchema = z.looseObject({
 });
 
 export const scenarioResultSchema = z.looseObject({
-  scenario: z.enum(["worst", "realistic", "best"]),
+  scenario: z.enum(scenarioKinds),
   round: roundSchema,
   prize_money: z.number(),
   prize_money_after_tax: z.number(),
@@ -74,7 +75,32 @@ export const scenarioResultSchema = z.looseObject({
 export const pnlResultSchema = z.looseObject({
   total_expenses: z.number(),
   total_income_base: z.number(),
-  scenarios: z.array(scenarioResultSchema),
+  scenarios: z
+    .array(scenarioResultSchema)
+    .superRefine((scenarios, context) => {
+      // Contract-tolerant until the backend always emits projections: an event
+      // with no prize rounds legitimately has no scenarios. Any non-empty set
+      // remains strict so partial or duplicate projections cannot reach the UI.
+      if (scenarios.length === 0) {
+        return;
+      }
+
+      if (scenarios.length !== scenarioKinds.length) {
+        context.addIssue({
+          code: "custom",
+          message: `Expected either no scenarios or ${scenarioKinds.length} scenarios.`,
+        });
+      }
+
+      for (const kind of scenarioKinds) {
+        if (scenarios.filter((scenario) => scenario.scenario === kind).length !== 1) {
+          context.addIssue({
+            code: "custom",
+            message: `Expected exactly one ${kind} scenario.`,
+          });
+        }
+      }
+    }),
   break_even_round: roundSchema.nullable(),
 });
 
