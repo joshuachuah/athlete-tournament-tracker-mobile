@@ -23,6 +23,11 @@ export class ApiError extends Error {
 }
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:5000";
+export const API_REQUEST_TIMEOUT_MS = 15_000;
+
+type ApiRequestOptions = {
+  signal?: AbortSignal;
+};
 
 async function authHeaders(): Promise<Record<string, string>> {
   if (!supabase) {
@@ -41,15 +46,44 @@ async function authHeaders(): Promise<Record<string, string>> {
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const url = path.startsWith("http") ? path : `${API_BASE}${path}`;
+  const callerSignal = options?.signal;
+  let abortCause: "caller" | "timeout" | undefined;
+  let cancelFromCaller: (() => void) | undefined;
+  let timeout: ReturnType<typeof setTimeout> | undefined;
 
   try {
+    const headers = {
+      "Content-Type": "application/json",
+      ...(await authHeaders()),
+      ...options?.headers,
+    };
+    const controller = new AbortController();
+
+    cancelFromCaller = () => {
+      if (!abortCause) {
+        abortCause = "caller";
+        controller.abort();
+      }
+    };
+    if (callerSignal?.aborted) {
+      cancelFromCaller();
+    } else {
+      callerSignal?.addEventListener("abort", cancelFromCaller, { once: true });
+    }
+
+    // The deadline covers fetch and response parsing. Auth resolution happens
+    // first because the Supabase session lookup is not abortable.
+    timeout = setTimeout(() => {
+      if (!abortCause) {
+        abortCause = "timeout";
+        controller.abort();
+      }
+    }, API_REQUEST_TIMEOUT_MS);
+
     const response = await fetch(url, {
       ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...(await authHeaders()),
-        ...options?.headers,
-      },
+      signal: controller.signal,
+      headers,
     });
 
     if (!response.ok) {
@@ -65,11 +99,26 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
     return response.json();
   } catch (error) {
+    if (abortCause === "timeout") {
+      throw new ApiError("Request timed out", 0, "TIMEOUT");
+    }
+
+    if (abortCause === "caller") {
+      throw new ApiError("Request aborted", 0, "ABORTED");
+    }
+
     if (error instanceof ApiError) {
       throw error;
     }
 
     throw new ApiError("Network request failed", 0, "NETWORK_ERROR");
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+    if (cancelFromCaller) {
+      callerSignal?.removeEventListener("abort", cancelFromCaller);
+    }
   }
 }
 
@@ -93,54 +142,82 @@ async function requestParsed<S extends z.ZodType>(
 }
 
 export const api = {
-  health: () => requestParsed(healthSchema, "/health"),
+  health: (options?: ApiRequestOptions) =>
+    requestParsed(healthSchema, "/health", options),
   profile: {
-    get: (email: string) =>
+    get: (email: string, options?: ApiRequestOptions) =>
       requestParsed(
         athleteProfileSchema.nullable(),
         `/api/profile?email=${encodeURIComponent(email)}`,
+        options,
       ),
-    save: (data: Partial<AthleteProfile> & { email: string }) =>
+    save: (
+      data: Partial<AthleteProfile> & { email: string },
+      options?: ApiRequestOptions,
+    ) =>
       requestParsed(athleteProfileSchema, "/api/profile", {
         method: "POST",
         body: JSON.stringify(data),
+        signal: options?.signal,
       }),
   },
   tournaments: {
-    list: (userId: string) =>
+    list: (userId: string, options?: ApiRequestOptions) =>
       requestParsed(
         z.array(tournamentWithPnLSchema),
         `/api/tournaments?user_id=${encodeURIComponent(userId)}`,
+        options,
       ),
-    get: (id: string) =>
-      requestParsed(tournamentWithPnLSchema, `/api/tournaments/${id}`),
-    create: (data: Omit<Tournament, "id" | "created_at">) =>
+    get: (id: string, options?: ApiRequestOptions) =>
+      requestParsed(tournamentWithPnLSchema, `/api/tournaments/${id}`, options),
+    create: (
+      data: Omit<Tournament, "id" | "created_at">,
+      options?: ApiRequestOptions,
+    ) =>
       requestParsed(tournamentWithPnLSchema, "/api/tournaments", {
         method: "POST",
         body: JSON.stringify(data),
+        signal: options?.signal,
       }),
-    update: (id: string, data: Partial<Tournament>) =>
+    update: (
+      id: string,
+      data: Partial<Tournament>,
+      options?: ApiRequestOptions,
+    ) =>
       requestParsed(tournamentWithPnLSchema, `/api/tournaments/${id}`, {
         method: "PATCH",
         body: JSON.stringify(data),
+        signal: options?.signal,
       }),
-    delete: (id: string) =>
+    delete: (id: string, options?: ApiRequestOptions) =>
       requestParsed(deleteResultSchema, `/api/tournaments/${id}`, {
         method: "DELETE",
+        signal: options?.signal,
       }),
-    search: (query: string, sport?: string) =>
+    search: (
+      query: string,
+      sport?: string,
+      options?: ApiRequestOptions,
+    ) =>
       requestParsed(
         z.array(knownTournamentSchema),
         `/api/tournaments/search?q=${encodeURIComponent(query)}${
           sport ? `&sport=${encodeURIComponent(sport)}` : ""
         }`,
+        options,
       ),
   },
   fx: {
-    convert: (from: string, to: string, amount: number) =>
+    convert: (
+      from: string,
+      to: string,
+      amount: number,
+      options?: ApiRequestOptions,
+    ) =>
       requestParsed(
         fxConversionSchema,
         `/api/fx?from=${from}&to=${to}&amount=${amount}`,
+        options,
       ),
   },
 };
