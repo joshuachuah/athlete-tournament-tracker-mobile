@@ -1,9 +1,11 @@
+import { createRef, useImperativeHandle, type RefObject } from "react";
 import { act, render, waitFor } from "@testing-library/react-native";
 import { Text, View } from "react-native";
 import type { Session } from "@supabase/supabase-js";
 
 import { AuthProvider, useAuth } from "@/context/auth";
 import { api } from "@/lib/api";
+import { queryClient } from "@/lib/query-client";
 import { profileStorage } from "@/lib/storage";
 import { supabase } from "@/lib/supabase";
 import type { AthleteProfile } from "@/types";
@@ -46,13 +48,6 @@ jest.mock("@/lib/api", () => ({
   },
 }));
 
-jest.mock("@/lib/query-client", () => ({
-  queryClient: {
-    clear: jest.fn(),
-    invalidateQueries: jest.fn(),
-  },
-}));
-
 jest.mock("@/lib/supabase", () => ({
   hasSupabaseConfig: true,
   supabase: {
@@ -85,8 +80,12 @@ function deferred<T>() {
   return { promise, reject, resolve };
 }
 
-function session(email: string): Session {
-  return { user: { email } } as Session;
+function session(
+  email: string,
+  userId = email,
+  accessToken = `token:${userId}`,
+): Session {
+  return { access_token: accessToken, user: { email, id: userId } } as Session;
 }
 
 function profile(id: string, email: string): AthleteProfile {
@@ -111,15 +110,23 @@ const mockAuth = supabase!.auth as unknown as {
 const mockGetSession = mockAuth.getSession;
 const mockSignOut = mockAuth.signOut;
 
-let latestAuth: ReturnType<typeof useAuth> | undefined;
+type AuthProbe = Pick<
+  ReturnType<typeof useAuth>,
+  "refreshProfile" | "saveProfile" | "signOut"
+>;
 
-function AuthState() {
+function AuthState({ authRef }: { authRef: RefObject<AuthProbe | null> }) {
   const auth = useAuth();
-  latestAuth = auth;
+  useImperativeHandle(authRef, () => ({
+    refreshProfile: auth.refreshProfile,
+    saveProfile: auth.saveProfile,
+    signOut: auth.signOut,
+  }));
 
   return (
     <View>
       <Text testID="session-email">{auth.session?.user.email ?? "none"}</Text>
+      <Text testID="session-user-id">{auth.session?.user.id ?? "none"}</Text>
       <Text testID="profile-email">{auth.profile?.email ?? "none"}</Text>
       <Text testID="profile-name">{auth.profile?.name ?? "none"}</Text>
       <Text testID="status">{auth.status}</Text>
@@ -128,9 +135,22 @@ function AuthState() {
   );
 }
 
+function renderAuthProvider() {
+  const authRef = createRef<AuthProbe>();
+  const screen = render(
+    <AuthProvider>
+      <AuthState authRef={authRef} />
+    </AuthProvider>,
+  );
+
+  return { authRef, screen };
+}
+
 describe("AuthProvider profile isolation", () => {
   const firstProfile = profile("athlete-1", "first@example.com");
   const secondProfile = profile("athlete-2", "second@example.com");
+  const firstUserId = "auth-user-1";
+  const secondUserId = "auth-user-2";
   const getProfile = api.profile.get as jest.MockedFunction<typeof api.profile.get>;
   const saveProfile = api.profile.save as jest.MockedFunction<
     typeof api.profile.save
@@ -139,23 +159,19 @@ describe("AuthProvider profile isolation", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     localStorage.clear();
-    latestAuth = undefined;
+    queryClient.clear();
     mockAuthStateCallback = undefined;
     mockSignOut.mockResolvedValue({ error: null });
   });
 
   it("clears a stale cache when bootstrap has no authenticated session", async () => {
-    profileStorage.set(firstProfile);
+    profileStorage.set(firstUserId, firstProfile);
     mockGetSession.mockResolvedValue({
       data: { session: null },
       error: null,
     });
 
-    const screen = render(
-      <AuthProvider>
-        <AuthState />
-      </AuthProvider>,
-    );
+    const { screen } = renderAuthProvider();
 
     await waitFor(() => {
       expect(screen.getByTestId("status").props.children).toBe("ready");
@@ -167,18 +183,14 @@ describe("AuthProvider profile isolation", () => {
   });
 
   it("keeps the same-account cache when its background refresh fails", async () => {
-    profileStorage.set(firstProfile);
+    profileStorage.set(firstUserId, firstProfile);
     mockGetSession.mockResolvedValue({
-      data: { session: session(firstProfile.email) },
+      data: { session: session(firstProfile.email, firstUserId) },
       error: null,
     });
     getProfile.mockRejectedValue(new Error("refresh unavailable"));
 
-    const screen = render(
-      <AuthProvider>
-        <AuthState />
-      </AuthProvider>,
-    );
+    const { screen } = renderAuthProvider();
 
     await waitFor(() => {
       expect(screen.getByTestId("auth-error").props.children).toBe(
@@ -193,18 +205,14 @@ describe("AuthProvider profile isolation", () => {
   });
 
   it("clears the current profile when the server returns null", async () => {
-    profileStorage.set(firstProfile);
+    profileStorage.set(firstUserId, firstProfile);
     mockGetSession.mockResolvedValue({
-      data: { session: session(firstProfile.email) },
+      data: { session: session(firstProfile.email, firstUserId) },
       error: null,
     });
     getProfile.mockResolvedValue(null);
 
-    const screen = render(
-      <AuthProvider>
-        <AuthState />
-      </AuthProvider>,
-    );
+    const { screen } = renderAuthProvider();
 
     await waitFor(() => {
       expect(profileStorage.get()).toBeNull();
@@ -216,20 +224,16 @@ describe("AuthProvider profile isolation", () => {
   it("clears the previous account synchronously and ignores its late refresh", async () => {
     const firstRefresh = deferred<AthleteProfile | null>();
     const secondLoad = deferred<AthleteProfile | null>();
-    profileStorage.set(firstProfile);
+    profileStorage.set(firstUserId, firstProfile);
     mockGetSession.mockResolvedValue({
-      data: { session: session(firstProfile.email) },
+      data: { session: session(firstProfile.email, firstUserId) },
       error: null,
     });
     getProfile.mockImplementation((email) =>
       email === firstProfile.email ? firstRefresh.promise : secondLoad.promise,
     );
 
-    const screen = render(
-      <AuthProvider>
-        <AuthState />
-      </AuthProvider>,
-    );
+    const { screen } = renderAuthProvider();
 
     await waitFor(() => {
       expect(screen.getByTestId("profile-email").props.children).toBe(
@@ -238,7 +242,10 @@ describe("AuthProvider profile isolation", () => {
     });
 
     act(() => {
-      mockAuthStateCallback?.("SIGNED_IN", session(secondProfile.email));
+      mockAuthStateCallback?.(
+        "SIGNED_IN",
+        session(secondProfile.email, secondUserId),
+      );
     });
 
     expect(screen.getByTestId("session-email").props.children).toBe(
@@ -269,10 +276,116 @@ describe("AuthProvider profile isolation", () => {
     expect(profileStorage.get()).toEqual(secondProfile);
   });
 
-  it("does not restore another account when the new profile request fails", async () => {
-    profileStorage.set(firstProfile);
+  it("removes private tournament data before the next subject can read it", async () => {
     mockGetSession.mockResolvedValue({
-      data: { session: session(firstProfile.email) },
+      data: { session: session(firstProfile.email, firstUserId) },
+      error: null,
+    });
+    getProfile.mockReturnValue(new Promise(() => undefined));
+
+    const { screen } = renderAuthProvider();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("session-user-id").props.children).toBe(
+        firstUserId,
+      );
+    });
+
+    const privateTournament = { id: "shared-tournament", name: "Account A" };
+    queryClient.setQueryData(
+      ["tournament", privateTournament.id],
+      privateTournament,
+    );
+
+    act(() => {
+      mockAuthStateCallback?.(
+        "SIGNED_IN",
+        session(secondProfile.email, secondUserId),
+      );
+    });
+
+    expect(screen.getByTestId("session-user-id").props.children).toBe(
+      secondUserId,
+    );
+    expect(
+      queryClient.getQueryData(["tournament", privateTournament.id]),
+    ).toBeUndefined();
+  });
+
+  it("clears private queries for a SIGNED_OUT event even when already signed out", async () => {
+    mockGetSession.mockResolvedValue({ data: { session: null }, error: null });
+
+    const { screen } = renderAuthProvider();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("status").props.children).toBe("ready");
+    });
+
+    queryClient.setQueryData(["tournament", "private"], { id: "private" });
+
+    act(() => {
+      mockAuthStateCallback?.("SIGNED_OUT", null);
+    });
+
+    expect(queryClient.getQueryData(["tournament", "private"])).toBeUndefined();
+  });
+
+  it("isolates deleted and recreated accounts that share an email", async () => {
+    const firstLoad = deferred<AthleteProfile | null>();
+    const recreatedLoad = deferred<AthleteProfile | null>();
+    const recreatedProfile = profile("athlete-recreated", firstProfile.email);
+    let loadCount = 0;
+    profileStorage.set(firstUserId, firstProfile);
+    mockGetSession.mockResolvedValue({
+      data: { session: session(firstProfile.email, firstUserId) },
+      error: null,
+    });
+    getProfile.mockImplementation(() => {
+      loadCount += 1;
+      return loadCount === 1 ? firstLoad.promise : recreatedLoad.promise;
+    });
+
+    const { screen } = renderAuthProvider();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("profile-name").props.children).toBe(
+        firstProfile.name,
+      );
+    });
+
+    act(() => {
+      mockAuthStateCallback?.(
+        "SIGNED_IN",
+        session(firstProfile.email, secondUserId),
+      );
+    });
+
+    expect(screen.getByTestId("profile-name").props.children).toBe("none");
+    expect(profileStorage.get()).toBeNull();
+
+    await act(async () => {
+      recreatedLoad.resolve(recreatedProfile);
+      await recreatedLoad.promise;
+    });
+
+    await act(async () => {
+      firstLoad.resolve(firstProfile);
+      await firstLoad.promise;
+    });
+
+    expect(screen.getByTestId("session-user-id").props.children).toBe(
+      secondUserId,
+    );
+    expect(screen.getByTestId("profile-name").props.children).toBe(
+      recreatedProfile.name,
+    );
+    expect(profileStorage.getForUser(secondUserId)).toEqual(recreatedProfile);
+  });
+
+  it("does not restore another account when the new profile request fails", async () => {
+    profileStorage.set(firstUserId, firstProfile);
+    mockGetSession.mockResolvedValue({
+      data: { session: session(firstProfile.email, firstUserId) },
       error: null,
     });
     getProfile.mockImplementation((email) => {
@@ -283,11 +396,7 @@ describe("AuthProvider profile isolation", () => {
       return Promise.reject(new Error("profile unavailable"));
     });
 
-    const screen = render(
-      <AuthProvider>
-        <AuthState />
-      </AuthProvider>,
-    );
+    const { screen } = renderAuthProvider();
 
     await waitFor(() => {
       expect(screen.getByTestId("profile-email").props.children).toBe(
@@ -296,7 +405,10 @@ describe("AuthProvider profile isolation", () => {
     });
 
     act(() => {
-      mockAuthStateCallback?.("SIGNED_IN", session(secondProfile.email));
+      mockAuthStateCallback?.(
+        "SIGNED_IN",
+        session(secondProfile.email, secondUserId),
+      );
     });
 
     await waitFor(() => {
@@ -318,14 +430,13 @@ describe("AuthProvider profile isolation", () => {
     mockGetSession.mockReturnValue(bootstrap.promise);
     getProfile.mockResolvedValue(secondProfile);
 
-    const screen = render(
-      <AuthProvider>
-        <AuthState />
-      </AuthProvider>,
-    );
+    const { screen } = renderAuthProvider();
 
     act(() => {
-      mockAuthStateCallback?.("SIGNED_IN", session(secondProfile.email));
+      mockAuthStateCallback?.(
+        "SIGNED_IN",
+        session(secondProfile.email, secondUserId),
+      );
     });
 
     await waitFor(() => {
@@ -336,7 +447,7 @@ describe("AuthProvider profile isolation", () => {
 
     await act(async () => {
       bootstrap.resolve({
-        data: { session: session(firstProfile.email) },
+        data: { session: session(firstProfile.email, firstUserId) },
         error: null,
       });
       await bootstrap.promise;
@@ -356,17 +467,13 @@ describe("AuthProvider profile isolation", () => {
     const save = deferred<AthleteProfile>();
     const savedProfile = { ...firstProfile, name: "Updated athlete" };
     mockGetSession.mockResolvedValue({
-      data: { session: session(firstProfile.email) },
+      data: { session: session(firstProfile.email, firstUserId) },
       error: null,
     });
     getProfile.mockReturnValue(tokenRefresh.promise);
     saveProfile.mockReturnValue(save.promise);
 
-    const screen = render(
-      <AuthProvider>
-        <AuthState />
-      </AuthProvider>,
-    );
+    const { authRef, screen } = renderAuthProvider();
 
     await waitFor(() => {
       expect(screen.getByTestId("session-email").props.children).toBe(
@@ -378,14 +485,22 @@ describe("AuthProvider profile isolation", () => {
 
     let savePromise!: Promise<AthleteProfile>;
     act(() => {
-      savePromise = latestAuth!.saveProfile({
+      savePromise = authRef.current!.saveProfile({
         name: savedProfile.name,
         home_country: savedProfile.home_country,
         home_currency: savedProfile.home_currency,
         sport: savedProfile.sport,
       });
-      mockAuthStateCallback?.("TOKEN_REFRESHED", session(firstProfile.email));
+      mockAuthStateCallback?.(
+        "TOKEN_REFRESHED",
+        session(firstProfile.email, firstUserId, "refreshed-token"),
+      );
     });
+
+    expect(saveProfile).toHaveBeenCalledWith(
+      expect.objectContaining({ email: firstProfile.email }),
+      { authToken: `token:${firstUserId}` },
+    );
 
     await act(async () => {
       save.resolve(savedProfile);
@@ -414,9 +529,9 @@ describe("AuthProvider profile isolation", () => {
     const refresh = deferred<AthleteProfile | null>();
     const secondLoad = deferred<AthleteProfile | null>();
     let firstAccountLoads = 0;
-    profileStorage.set(firstProfile);
+    profileStorage.set(firstUserId, firstProfile);
     mockGetSession.mockResolvedValue({
-      data: { session: session(firstProfile.email) },
+      data: { session: session(firstProfile.email, firstUserId) },
       error: null,
     });
     getProfile.mockImplementation((email) => {
@@ -428,11 +543,7 @@ describe("AuthProvider profile isolation", () => {
       return firstAccountLoads === 1 ? backgroundLoad.promise : refresh.promise;
     });
 
-    const screen = render(
-      <AuthProvider>
-        <AuthState />
-      </AuthProvider>,
-    );
+    const { authRef, screen } = renderAuthProvider();
 
     await waitFor(() => {
       expect(screen.getByTestId("profile-email").props.children).toBe(
@@ -442,8 +553,11 @@ describe("AuthProvider profile isolation", () => {
 
     let refreshPromise!: Promise<void>;
     act(() => {
-      refreshPromise = latestAuth!.refreshProfile();
-      mockAuthStateCallback?.("SIGNED_IN", session(secondProfile.email));
+      refreshPromise = authRef.current!.refreshProfile();
+      mockAuthStateCallback?.(
+        "SIGNED_IN",
+        session(secondProfile.email, secondUserId),
+      );
     });
 
     await act(async () => {
@@ -467,19 +581,15 @@ describe("AuthProvider profile isolation", () => {
 
   it("discards a save that completes after the account changes", async () => {
     const save = deferred<AthleteProfile>();
-    profileStorage.set(firstProfile);
+    profileStorage.set(firstUserId, firstProfile);
     mockGetSession.mockResolvedValue({
-      data: { session: session(firstProfile.email) },
+      data: { session: session(firstProfile.email, firstUserId) },
       error: null,
     });
     getProfile.mockReturnValue(new Promise(() => undefined));
     saveProfile.mockReturnValue(save.promise);
 
-    const screen = render(
-      <AuthProvider>
-        <AuthState />
-      </AuthProvider>,
-    );
+    const { authRef, screen } = renderAuthProvider();
 
     await waitFor(() => {
       expect(screen.getByTestId("profile-email").props.children).toBe(
@@ -489,13 +599,16 @@ describe("AuthProvider profile isolation", () => {
 
     let savePromise!: Promise<AthleteProfile>;
     act(() => {
-      savePromise = latestAuth!.saveProfile({
+      savePromise = authRef.current!.saveProfile({
         name: firstProfile.name,
         home_country: firstProfile.home_country,
         home_currency: firstProfile.home_currency,
         sport: firstProfile.sport,
       });
-      mockAuthStateCallback?.("SIGNED_IN", session(secondProfile.email));
+      mockAuthStateCallback?.(
+        "SIGNED_IN",
+        session(secondProfile.email, secondUserId),
+      );
     });
 
     await act(async () => {
@@ -510,9 +623,9 @@ describe("AuthProvider profile isolation", () => {
   it("keeps local sign-out isolated when a load and remote sign-out fail", async () => {
     const secondLoad = deferred<AthleteProfile | null>();
     const remoteSignOut = deferred<{ error: Error | null }>();
-    profileStorage.set(firstProfile);
+    profileStorage.set(firstUserId, firstProfile);
     mockGetSession.mockResolvedValue({
-      data: { session: session(firstProfile.email) },
+      data: { session: session(firstProfile.email, firstUserId) },
       error: null,
     });
     getProfile.mockImplementation((email) =>
@@ -522,11 +635,7 @@ describe("AuthProvider profile isolation", () => {
     );
     mockSignOut.mockReturnValue(remoteSignOut.promise);
 
-    const screen = render(
-      <AuthProvider>
-        <AuthState />
-      </AuthProvider>,
-    );
+    const { authRef, screen } = renderAuthProvider();
 
     await waitFor(() => {
       expect(screen.getByTestId("profile-email").props.children).toBe(
@@ -535,12 +644,15 @@ describe("AuthProvider profile isolation", () => {
     });
 
     act(() => {
-      mockAuthStateCallback?.("SIGNED_IN", session(secondProfile.email));
+      mockAuthStateCallback?.(
+        "SIGNED_IN",
+        session(secondProfile.email, secondUserId),
+      );
     });
 
     let signOutPromise!: Promise<void>;
     act(() => {
-      signOutPromise = latestAuth!.signOut();
+      signOutPromise = authRef.current!.signOut();
     });
 
     expect(screen.getByTestId("session-email").props.children).toBe("none");
@@ -565,16 +677,12 @@ describe("AuthProvider profile isolation", () => {
   it("does not write a pending profile after unmount", async () => {
     const load = deferred<AthleteProfile | null>();
     mockGetSession.mockResolvedValue({
-      data: { session: session(firstProfile.email) },
+      data: { session: session(firstProfile.email, firstUserId) },
       error: null,
     });
     getProfile.mockReturnValue(load.promise);
 
-    const screen = render(
-      <AuthProvider>
-        <AuthState />
-      </AuthProvider>,
-    );
+    const { screen } = renderAuthProvider();
 
     await waitFor(() => {
       expect(getProfile).toHaveBeenCalledWith(firstProfile.email);

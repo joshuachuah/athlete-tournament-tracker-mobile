@@ -1,12 +1,46 @@
 import { api, ApiError, API_REQUEST_TIMEOUT_MS } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
+
+jest.mock("@/lib/supabase", () => ({
+  supabase: {
+    auth: {
+      getSession: jest.fn(),
+    },
+  },
+}));
 
 const apiBase = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:5000";
 const originalFetch = globalThis.fetch;
 const fetchMock = jest.fn() as jest.MockedFunction<typeof fetch>;
+const mockGetSession = supabase!.auth.getSession as jest.Mock;
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+
+  return { promise, resolve };
+}
+
+const profileResponse = {
+  id: "athlete-1",
+  email: "first@example.com",
+  name: "First athlete",
+  home_country: "MY",
+  home_currency: "MYR",
+  sport: "tennis",
+  monthly_income: 0,
+  savings_balance: 0,
+  monthly_sponsorship: 0,
+  created_at: "2026-01-01T00:00:00Z",
+};
 
 beforeEach(() => {
   jest.useFakeTimers();
   fetchMock.mockReset();
+  mockGetSession.mockReset();
+  mockGetSession.mockResolvedValue({ data: { session: null }, error: null });
   globalThis.fetch = fetchMock;
 });
 
@@ -137,6 +171,7 @@ describe("api client", () => {
       code: "ABORTED",
     });
     await Promise.resolve();
+    await Promise.resolve();
     const requestSignal = fetchMock.mock.calls[0]?.[1]?.signal;
 
     expect(requestSignal).not.toBe(callerController.signal);
@@ -266,6 +301,53 @@ describe("api client", () => {
       `${apiBase}/api/profile?email=a%2Bb%40x.com`,
       expect.any(Object),
     );
+  });
+
+  it("keeps a profile mutation bound to its initiating bearer during an async session switch", async () => {
+    const nextSession = deferred<{
+      data: { session: { access_token: string } };
+      error: null;
+    }>();
+    mockGetSession.mockReturnValueOnce(nextSession.promise);
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => profileResponse,
+    } as Response);
+
+    const dynamicallyAuthenticatedRead = api.profile.get(profileResponse.email);
+    await Promise.resolve();
+    expect(mockGetSession).toHaveBeenCalledTimes(1);
+
+    const subjectBoundSave = api.profile.save(profileResponse, {
+      authToken: "account-a-token",
+    });
+    await Promise.resolve();
+
+    nextSession.resolve({
+      data: { session: { access_token: "account-b-token" } },
+      error: null,
+    });
+
+    await expect(subjectBoundSave).resolves.toEqual(profileResponse);
+    await expect(dynamicallyAuthenticatedRead).resolves.toEqual(profileResponse);
+
+    const saveCall = fetchMock.mock.calls.find(
+      ([url, options]) =>
+        url === `${apiBase}/api/profile` && options?.method === "POST",
+    );
+    const readCall = fetchMock.mock.calls.find(
+      ([url, options]) =>
+        url === `${apiBase}/api/profile?email=first%40example.com` &&
+        options?.method !== "POST",
+    );
+
+    expect(saveCall?.[1]?.headers).toMatchObject({
+      Authorization: "Bearer account-a-token",
+    });
+    expect(readCall?.[1]?.headers).toMatchObject({
+      Authorization: "Bearer account-b-token",
+    });
+    expect(mockGetSession).toHaveBeenCalledTimes(1);
   });
 
   it("accepts the documented FX response shape", async () => {

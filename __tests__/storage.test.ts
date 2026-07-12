@@ -64,16 +64,23 @@ describe("profile storage", () => {
     localStorage.clear();
   });
 
-  it("returns a profile cached for the authenticated email", () => {
-    profileStorage.set(profile);
+  it("returns a profile cached for the authenticated subject", () => {
+    profileStorage.set("user-1", profile);
 
-    expect(profileStorage.getForEmail(profile.email)).toEqual(profile);
+    expect(profileStorage.getForUser("user-1")).toEqual(profile);
   });
 
-  it("clears a profile cached for a different authenticated email", () => {
-    profileStorage.set(profile);
+  it("clears a profile cached for a different authenticated subject", () => {
+    profileStorage.set("user-1", profile);
 
-    expect(profileStorage.getForEmail("second@example.com")).toBeNull();
+    expect(profileStorage.getForUser("user-2")).toBeNull();
     expect(profileStorage.get()).toBeNull();
+  });
+
+  it("clears the legacy email-only profile cache", () => {
+    localStorage.setItem("athlete-tracker:profile", JSON.stringify(profile));
+
+    expect(profileStorage.getForUser("user-1")).toBeNull();
+    expect(localStorage.getItem("athlete-tracker:profile")).toBeNull();
   });
 });

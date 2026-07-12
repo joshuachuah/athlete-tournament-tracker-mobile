@@ -38,9 +38,9 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function cacheProfile(profile: AthleteProfile | null): void {
+function cacheProfile(userId: string, profile: AthleteProfile | null): void {
   if (profile) {
-    profileStorage.set(profile);
+    profileStorage.set(userId, profile);
   } else {
     profileStorage.clear();
   }
@@ -64,6 +64,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   );
   const identityVersion = useRef(0);
   const profileLoadVersion = useRef(0);
+  const currentUserId = useRef<string | null>(null);
   const currentEmail = useRef<string | null>(null);
   const mounted = useRef(true);
 
@@ -71,26 +72,36 @@ export function AuthProvider({ children }: PropsWithChildren) {
     let active = true;
     mounted.current = true;
 
-    function beginProfileLoad(nextSession: Session | null) {
+    function beginProfileLoad(event: string | null, nextSession: Session | null) {
+      const userId = nextSession?.user.id ?? null;
       const email = nextSession?.user.email ?? null;
-      const identityChanged = currentEmail.current !== email;
+      const identityChanged = currentUserId.current !== userId;
       const loadVersion = ++profileLoadVersion.current;
 
       if (identityChanged) {
         ++identityVersion.current;
       }
 
+      if (identityChanged || event === "SIGNED_OUT") {
+        queryClient.clear();
+      }
+
+      if (event === "SIGNED_OUT") {
+        profileStorage.clear();
+      }
+
+      currentUserId.current = userId;
       currentEmail.current = email;
       setSession(nextSession);
 
-      if (!email) {
+      if (!userId || !email) {
         setProfile(null);
         profileStorage.clear();
         setStatus("ready");
         return;
       }
 
-      const cachedProfile = profileStorage.getForEmail(email);
+      const cachedProfile = profileStorage.getForUser(userId);
       setProfile(cachedProfile);
       setStatus(cachedProfile ? "ready" : "loading");
 
@@ -101,12 +112,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
             !active ||
             !mounted.current ||
             profileLoadVersion.current !== loadVersion ||
+            currentUserId.current !== userId ||
             currentEmail.current !== email
           ) {
             return;
           }
 
-          cacheProfile(freshProfile);
+          cacheProfile(userId, freshProfile);
           setProfile(freshProfile);
           setStatus("ready");
         })
@@ -115,6 +127,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
             !active ||
             !mounted.current ||
             profileLoadVersion.current !== loadVersion ||
+            currentUserId.current !== userId ||
             currentEmail.current !== email
           ) {
             return;
@@ -143,13 +156,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
         setAuthError(error.message);
       }
 
-      beginProfileLoad(data.session);
+      beginProfileLoad(null, data.session);
     }
 
     bootstrap();
 
-    const subscription = supabase?.auth.onAuthStateChange((_event, nextSession) => {
-      beginProfileLoad(nextSession);
+    const subscription = supabase?.auth.onAuthStateChange((event, nextSession) => {
+      beginProfileLoad(event, nextSession);
     });
 
     return () => {
@@ -226,9 +239,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }
 
   async function refreshProfile() {
+    const userId = session?.user.id;
     const email = session?.user.email;
 
-    if (!email) {
+    if (!userId || !email) {
       setProfile(null);
       return;
     }
@@ -239,38 +253,45 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     if (
       mounted.current &&
+      currentUserId.current === userId &&
       currentEmail.current === email &&
       identityVersion.current === identity &&
       profileLoadVersion.current === loadVersion
     ) {
-      cacheProfile(freshProfile);
+      cacheProfile(userId, freshProfile);
       setProfile(freshProfile);
     }
   }
 
   async function saveProfile(data: ProfileInput) {
+    const userId = session?.user.id;
     const email = session?.user.email;
+    const authToken = session?.access_token;
 
-    if (!email) {
+    if (!userId || !email || !authToken) {
       throw new Error("Sign in before saving a profile.");
     }
 
     const identity = identityVersion.current;
-    const savedProfile = await api.profile.save({
-      ...data,
-      email,
-      home_currency: data.home_currency.toUpperCase(),
-    });
+    const savedProfile = await api.profile.save(
+      {
+        ...data,
+        email,
+        home_currency: data.home_currency.toUpperCase(),
+      },
+      { authToken },
+    );
 
     if (
       mounted.current &&
+      currentUserId.current === userId &&
       currentEmail.current === email &&
       identityVersion.current === identity
     ) {
       ++profileLoadVersion.current;
       setProfile(savedProfile);
       setStatus("ready");
-      profileStorage.set(savedProfile);
+      profileStorage.set(userId, savedProfile);
       queryClient.invalidateQueries({ queryKey: ["profile", email] });
     }
 
@@ -280,6 +301,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   async function signOut() {
     ++identityVersion.current;
     ++profileLoadVersion.current;
+    currentUserId.current = null;
     currentEmail.current = null;
     setSession(null);
     setProfile(null);
