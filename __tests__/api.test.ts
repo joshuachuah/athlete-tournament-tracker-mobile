@@ -350,6 +350,37 @@ describe("api client", () => {
     expect(mockGetSession).toHaveBeenCalledTimes(1);
   });
 
+  it("forwards an initiating bearer through every tournament mutation", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ invalid: "response" }),
+    } as Response);
+
+    const options = { authToken: "initiating-account-token" };
+    const requests = [
+      api.tournaments.create(
+        {} as Parameters<typeof api.tournaments.create>[0],
+        options,
+      ),
+      api.tournaments.update("tournament-1", {}, options),
+      api.tournaments.delete("tournament-1", options),
+    ];
+
+    await Promise.all(
+      requests.map((request) =>
+        expect(request).rejects.toMatchObject({ code: "INVALID_RESPONSE" }),
+      ),
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    for (const [, requestOptions] of fetchMock.mock.calls) {
+      expect(requestOptions?.headers).toMatchObject({
+        Authorization: "Bearer initiating-account-token",
+      });
+    }
+    expect(mockGetSession).not.toHaveBeenCalled();
+  });
+
   it("accepts the documented FX response shape", async () => {
     fetchMock.mockResolvedValue({
       ok: true,
