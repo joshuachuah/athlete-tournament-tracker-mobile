@@ -5,6 +5,12 @@ import type { AthleteProfile } from "@/types";
 const profileKey = "athlete-tracker:profile";
 const legacyTournamentDraftKey = "athlete-tracker:tournament-draft";
 
+type StoredProfile = {
+  version: 2;
+  userId: string;
+  profile: AthleteProfile;
+};
+
 function getJson<T>(key: string): T | null {
   const raw = localStorage.getItem(key);
 
@@ -25,8 +31,24 @@ function setJson<T>(key: string, value: T): void {
 }
 
 export const profileStorage = {
-  get: () => getJson<AthleteProfile>(profileKey),
-  set: (profile: AthleteProfile) => setJson(profileKey, profile),
+  get: () => getJson<StoredProfile>(profileKey)?.profile ?? null,
+  getForUser: (userId: string) => {
+    const stored = getJson<StoredProfile | AthleteProfile>(profileKey);
+
+    if (
+      stored &&
+      "version" in stored &&
+      stored.version === 2 &&
+      stored.userId === userId
+    ) {
+      return stored.profile;
+    }
+
+    localStorage.removeItem(profileKey);
+    return null;
+  },
+  set: (userId: string, profile: AthleteProfile) =>
+    setJson<StoredProfile>(profileKey, { version: 2, userId, profile }),
   clear: () => localStorage.removeItem(profileKey),
 };
 
