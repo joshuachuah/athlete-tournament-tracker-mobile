@@ -1,8 +1,10 @@
 import {
   clearLegacyTournamentDraft,
   draftStorage,
+  profileStorage,
   tournamentDraftStorageKey,
 } from "@/lib/storage";
+import type { AthleteProfile } from "@/types";
 
 jest.mock("expo-sqlite/localStorage/install", () => {
   const values = new Map<string, string>();
@@ -49,5 +51,29 @@ describe("tournament draft storage", () => {
     clearLegacyTournamentDraft();
 
     expect(localStorage.getItem("athlete-tracker:tournament-draft")).toBeNull();
+  });
+});
+
+describe("profile storage", () => {
+  const profile = {
+    id: "athlete-1",
+    email: "first@example.com",
+  } as AthleteProfile;
+
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it("returns a profile cached for the authenticated email", () => {
+    profileStorage.set(profile);
+
+    expect(profileStorage.getForEmail(profile.email)).toEqual(profile);
+  });
+
+  it("clears a profile cached for a different authenticated email", () => {
+    profileStorage.set(profile);
+
+    expect(profileStorage.getForEmail("second@example.com")).toBeNull();
+    expect(profileStorage.get()).toBeNull();
   });
 });

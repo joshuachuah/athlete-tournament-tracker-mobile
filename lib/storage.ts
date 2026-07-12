@@ -26,6 +26,16 @@ function setJson<T>(key: string, value: T): void {
 
 export const profileStorage = {
   get: () => getJson<AthleteProfile>(profileKey),
+  getForEmail: (email: string) => {
+    const profile = getJson<AthleteProfile>(profileKey);
+
+    if (profile?.email === email) {
+      return profile;
+    }
+
+    localStorage.removeItem(profileKey);
+    return null;
+  },
   set: (profile: AthleteProfile) => setJson(profileKey, profile),
   clear: () => localStorage.removeItem(profileKey),
 };

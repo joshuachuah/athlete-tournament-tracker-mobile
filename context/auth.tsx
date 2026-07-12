@@ -1,4 +1,11 @@
-import { createContext, type PropsWithChildren, use, useEffect, useState } from "react";
+import {
+  createContext,
+  type PropsWithChildren,
+  use,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import * as AuthSession from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
 import type { Session } from "@supabase/supabase-js";
@@ -31,16 +38,12 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-async function loadProfileForEmail(email: string): Promise<AthleteProfile | null> {
-  const profile = await api.profile.get(email);
-
+function cacheProfile(profile: AthleteProfile | null): void {
   if (profile) {
     profileStorage.set(profile);
   } else {
     profileStorage.clear();
   }
-
-  return profile;
 }
 
 function redirectUri(): string {
@@ -52,29 +55,87 @@ function redirectUri(): string {
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<AthleteProfile | null>(() =>
-    profileStorage.get(),
-  );
+  const [profile, setProfile] = useState<AthleteProfile | null>(null);
   const [status, setStatus] = useState<"loading" | "ready">("loading");
   const [authError, setAuthError] = useState<string | null>(
     hasSupabaseConfig
       ? null
       : "Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.",
   );
+  const identityVersion = useRef(0);
+  const profileLoadVersion = useRef(0);
+  const currentEmail = useRef<string | null>(null);
+  const mounted = useRef(true);
 
   useEffect(() => {
     let active = true;
+    mounted.current = true;
 
-    async function bootstrap() {
-      if (!supabase) {
+    function beginProfileLoad(nextSession: Session | null) {
+      const email = nextSession?.user.email ?? null;
+      const identityChanged = currentEmail.current !== email;
+      const loadVersion = ++profileLoadVersion.current;
+
+      if (identityChanged) {
+        ++identityVersion.current;
+      }
+
+      currentEmail.current = email;
+      setSession(nextSession);
+
+      if (!email) {
+        setProfile(null);
+        profileStorage.clear();
         setStatus("ready");
         return;
       }
 
-      const cachedProfile = profileStorage.get();
+      const cachedProfile = profileStorage.getForEmail(email);
+      setProfile(cachedProfile);
+      setStatus(cachedProfile ? "ready" : "loading");
+
+      api.profile
+        .get(email)
+        .then((freshProfile) => {
+          if (
+            !active ||
+            !mounted.current ||
+            profileLoadVersion.current !== loadVersion ||
+            currentEmail.current !== email
+          ) {
+            return;
+          }
+
+          cacheProfile(freshProfile);
+          setProfile(freshProfile);
+          setStatus("ready");
+        })
+        .catch((profileError: Error) => {
+          if (
+            !active ||
+            !mounted.current ||
+            profileLoadVersion.current !== loadVersion ||
+            currentEmail.current !== email
+          ) {
+            return;
+          }
+
+          setAuthError(profileError.message);
+          setStatus("ready");
+        });
+    }
+
+    async function bootstrap() {
+      if (!supabase) {
+        profileStorage.clear();
+        setStatus("ready");
+        return;
+      }
+
+      const bootstrapVersion = profileLoadVersion.current;
       const { data, error } = await supabase.auth.getSession();
 
-      if (!active) {
+      if (!active || profileLoadVersion.current !== bootstrapVersion) {
         return;
       }
 
@@ -82,64 +143,20 @@ export function AuthProvider({ children }: PropsWithChildren) {
         setAuthError(error.message);
       }
 
-      const nextSession = data.session;
-      setSession(nextSession);
-
-      const email = nextSession?.user.email;
-      if (!email) {
-        setProfile(null);
-        profileStorage.clear();
-        setStatus("ready");
-        return;
-      }
-
-      if (cachedProfile?.email === email) {
-        setProfile(cachedProfile);
-        setStatus("ready");
-        loadProfileForEmail(email)
-          .then((freshProfile) => {
-            if (active) {
-              setProfile(freshProfile);
-            }
-          })
-          .catch((profileError: Error) => {
-            if (active) {
-              setAuthError(profileError.message);
-            }
-          });
-        return;
-      }
-
-      try {
-        setProfile(await loadProfileForEmail(email));
-      } catch (profileError) {
-        setAuthError((profileError as Error).message);
-      }
-
-      if (active) {
-        setStatus("ready");
-      }
+      beginProfileLoad(data.session);
     }
 
     bootstrap();
 
     const subscription = supabase?.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
-      const email = nextSession?.user.email;
-
-      if (!email) {
-        setProfile(null);
-        profileStorage.clear();
-        return;
-      }
-
-      loadProfileForEmail(email)
-        .then(setProfile)
-        .catch((profileError: Error) => setAuthError(profileError.message));
+      beginProfileLoad(nextSession);
     });
 
     return () => {
       active = false;
+      mounted.current = false;
+      ++identityVersion.current;
+      ++profileLoadVersion.current;
       subscription?.data.subscription.unsubscribe();
     };
   }, []);
@@ -216,7 +233,19 @@ export function AuthProvider({ children }: PropsWithChildren) {
       return;
     }
 
-    setProfile(await loadProfileForEmail(email));
+    const identity = identityVersion.current;
+    const loadVersion = ++profileLoadVersion.current;
+    const freshProfile = await api.profile.get(email);
+
+    if (
+      mounted.current &&
+      currentEmail.current === email &&
+      identityVersion.current === identity &&
+      profileLoadVersion.current === loadVersion
+    ) {
+      cacheProfile(freshProfile);
+      setProfile(freshProfile);
+    }
   }
 
   async function saveProfile(data: ProfileInput) {
@@ -226,27 +255,41 @@ export function AuthProvider({ children }: PropsWithChildren) {
       throw new Error("Sign in before saving a profile.");
     }
 
+    const identity = identityVersion.current;
     const savedProfile = await api.profile.save({
       ...data,
       email,
       home_currency: data.home_currency.toUpperCase(),
     });
 
-    setProfile(savedProfile);
-    profileStorage.set(savedProfile);
-    queryClient.invalidateQueries({ queryKey: ["profile", email] });
+    if (
+      mounted.current &&
+      currentEmail.current === email &&
+      identityVersion.current === identity
+    ) {
+      ++profileLoadVersion.current;
+      setProfile(savedProfile);
+      setStatus("ready");
+      profileStorage.set(savedProfile);
+      queryClient.invalidateQueries({ queryKey: ["profile", email] });
+    }
+
     return savedProfile;
   }
 
   async function signOut() {
+    ++identityVersion.current;
+    ++profileLoadVersion.current;
+    currentEmail.current = null;
+    setSession(null);
+    setProfile(null);
+    setStatus("ready");
+    profileStorage.clear();
+    queryClient.clear();
+
     if (supabase) {
       await supabase.auth.signOut();
     }
-
-    setSession(null);
-    setProfile(null);
-    profileStorage.clear();
-    queryClient.clear();
   }
 
   return (
