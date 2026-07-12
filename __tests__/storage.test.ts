@@ -83,4 +83,14 @@ describe("profile storage", () => {
     expect(profileStorage.getForUser("user-1")).toBeNull();
     expect(localStorage.getItem("athlete-tracker:profile")).toBeNull();
   });
+
+  it.each(["\"corrupt\"", "1", "true"])(
+    "clears a primitive profile cache value %s",
+    (storedValue) => {
+      localStorage.setItem("athlete-tracker:profile", storedValue);
+
+      expect(profileStorage.getForUser("user-1")).toBeNull();
+      expect(localStorage.getItem("athlete-tracker:profile")).toBeNull();
+    },
+  );
 });
