@@ -27,9 +27,16 @@ export const API_REQUEST_TIMEOUT_MS = 15_000;
 
 type ApiRequestOptions = {
   signal?: AbortSignal;
+  authToken?: string;
 };
 
-async function authHeaders(): Promise<Record<string, string>> {
+type RequestOptions = RequestInit & ApiRequestOptions;
+
+async function authHeaders(authToken?: string): Promise<Record<string, string>> {
+  if (authToken !== undefined) {
+    return authToken ? { Authorization: `Bearer ${authToken}` } : {};
+  }
+
   if (!supabase) {
     return {};
   }
@@ -44,9 +51,10 @@ async function authHeaders(): Promise<Record<string, string>> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
+async function request<T>(path: string, options?: RequestOptions): Promise<T> {
   const url = path.startsWith("http") ? path : `${API_BASE}${path}`;
-  const callerSignal = options?.signal;
+  const { authToken, ...fetchOptions } = options ?? {};
+  const callerSignal = fetchOptions.signal;
   let abortCause: "caller" | "timeout" | undefined;
   let cancelFromCaller: (() => void) | undefined;
   let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -54,8 +62,8 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   try {
     const headers = {
       "Content-Type": "application/json",
-      ...(await authHeaders()),
-      ...options?.headers,
+      ...(await authHeaders(authToken)),
+      ...fetchOptions.headers,
     };
     const controller = new AbortController();
 
@@ -81,7 +89,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     }, API_REQUEST_TIMEOUT_MS);
 
     const response = await fetch(url, {
-      ...options,
+      ...fetchOptions,
       signal: controller.signal,
       headers,
     });
@@ -125,7 +133,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 async function requestParsed<S extends z.ZodType>(
   schema: S,
   path: string,
-  options?: RequestInit,
+  options?: RequestOptions,
 ): Promise<z.output<S>> {
   const raw = await request<unknown>(path, options);
   const parsed = schema.safeParse(raw);
@@ -159,6 +167,7 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data),
         signal: options?.signal,
+        authToken: options?.authToken,
       }),
   },
   tournaments: {
