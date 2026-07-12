@@ -37,6 +37,7 @@ export const profileStorage = {
 
     if (
       stored &&
+      typeof stored === "object" &&
       "version" in stored &&
       stored.version === 2 &&
       stored.userId === userId
