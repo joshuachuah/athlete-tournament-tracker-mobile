@@ -187,6 +187,7 @@ export const api = {
         method: "POST",
         body: JSON.stringify(data),
         signal: options?.signal,
+        authToken: options?.authToken,
       }),
     update: (
       id: string,
@@ -197,11 +198,13 @@ export const api = {
         method: "PATCH",
         body: JSON.stringify(data),
         signal: options?.signal,
+        authToken: options?.authToken,
       }),
     delete: (id: string, options?: ApiRequestOptions) =>
       requestParsed(deleteResultSchema, `/api/tournaments/${id}`, {
         method: "DELETE",
         signal: options?.signal,
+        authToken: options?.authToken,
       }),
     search: (
       query: string,
