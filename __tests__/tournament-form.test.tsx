@@ -1,7 +1,11 @@
 import { fireEvent, render } from "@testing-library/react-native";
+import { Text } from "react-native";
 
 import { TournamentForm } from "@/components/tournament/tournament-form";
-import { TournamentDraftProvider } from "@/context/tournament-draft";
+import {
+  TournamentDraftProvider,
+  useTournamentDraft,
+} from "@/context/tournament-draft";
 import {
   completeTournamentSave,
   createDefaultTournamentDraft,
@@ -69,7 +73,94 @@ const editTournament: TournamentWithPnL = {
   },
 };
 
+function DraftNameProbe() {
+  const { draft } = useTournamentDraft();
+
+  return <Text testID="draft-name">{draft.name}</Text>;
+}
+
 describe("TournamentForm", () => {
+  it("persists a keyed prefill to draft context on mount", () => {
+    const prefillDraft = {
+      ...validDraft,
+      name: "Prefilled Invitational",
+      location: "Kuala Lumpur",
+      country: "Malaysia",
+    };
+    const screen = render(
+      <TournamentDraftProvider userId="athlete-prefill">
+        <TournamentForm
+          key="prefill:known-tournament"
+          initialDraft={prefillDraft}
+          onSubmit={jest.fn()}
+        />
+        <DraftNameProbe />
+      </TournamentDraftProvider>,
+    );
+
+    expect(screen.getByDisplayValue("Prefilled Invitational")).toBeTruthy();
+    expect(screen.getByTestId("draft-name").props.children).toBe(
+      "Prefilled Invitational",
+    );
+  });
+
+  it("remounts a different keyed edit without submitting stale values", () => {
+    const firstDraft = tournamentToDraft(editTournament);
+    const secondDraft = tournamentToDraft({
+      ...editTournament,
+      id: "tournament-2",
+      name: "Second Championship",
+      location: "Singapore",
+      country: "Singapore",
+    });
+    const firstSubmit = jest.fn();
+    const secondSubmit = jest.fn();
+    const screen = render(
+      <TournamentDraftProvider userId="athlete-1">
+        <TournamentForm
+          key="edit:tournament-1"
+          initialDraft={firstDraft}
+          onSubmit={firstSubmit}
+        />
+      </TournamentDraftProvider>,
+    );
+
+    screen.rerender(
+      <TournamentDraftProvider userId="athlete-1">
+        <TournamentForm
+          key="edit:tournament-2"
+          initialDraft={secondDraft}
+          onSubmit={secondSubmit}
+        />
+      </TournamentDraftProvider>,
+    );
+    fireEvent.press(screen.getByText("Save changes"));
+
+    expect(screen.queryByDisplayValue("Open Championship")).toBeNull();
+    expect(screen.getByDisplayValue("Second Championship")).toBeTruthy();
+    expect(firstSubmit).not.toHaveBeenCalled();
+    expect(secondSubmit).toHaveBeenCalledWith(secondDraft);
+  });
+
+  it("keeps field edits synchronized with draft context", () => {
+    const screen = render(
+      <TournamentDraftProvider userId="athlete-sync">
+        <TournamentForm initialDraft={validDraft} onSubmit={jest.fn()} />
+        <DraftNameProbe />
+      </TournamentDraftProvider>,
+    );
+
+    fireEvent.changeText(
+      screen.getByDisplayValue("Open Championship"),
+      "Updated Championship",
+    );
+
+    expect(screen.getByDisplayValue("Updated Championship")).toBeTruthy();
+    expect(screen.getByTestId("draft-name").props.children).toBe(
+      "Updated Championship",
+    );
+  });
+
   it("expands the first invalid optional section and shows field errors", () => {
     const screen = render(
       <TournamentDraftProvider userId="athlete-1">
