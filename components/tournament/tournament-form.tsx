@@ -47,7 +47,7 @@ const sectionSchemas = [
   ["spending", spendingSchema],
 ] as const;
 
-export function validateTournamentDraft(draft: TournamentDraft): {
+function validateTournamentDraft(draft: TournamentDraft): {
   errors: Record<string, string>;
   firstInvalidSection?: TournamentFormSection;
 } {
