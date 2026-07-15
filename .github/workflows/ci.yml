@@ -32,6 +32,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - run: pnpm exec expo install --check
+
       - run: pnpm typecheck
 
       - run: pnpm test

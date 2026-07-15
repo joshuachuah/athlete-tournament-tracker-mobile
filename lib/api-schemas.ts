@@ -13,7 +13,7 @@ import type {
 const roundSchema = z.enum(["r1", "r2", "r3", "qf", "sf", "f", "w"]);
 const scenarioKinds = ["worst", "realistic", "best"] as const;
 
-export const prizeRoundsSchema = z.looseObject({
+const prizeRoundsSchema = z.looseObject({
   r1: z.number().optional(),
   r2: z.number().optional(),
   r3: z.number().optional(),
@@ -36,7 +36,7 @@ export const athleteProfileSchema = z.looseObject({
   created_at: z.string(),
 });
 
-export const tournamentSchema = z.looseObject({
+const tournamentSchema = z.looseObject({
   id: z.string(),
   user_id: z.string(),
   name: z.string(),
@@ -63,7 +63,7 @@ export const tournamentSchema = z.looseObject({
   created_at: z.string(),
 });
 
-export const scenarioResultSchema = z.looseObject({
+const scenarioResultSchema = z.looseObject({
   scenario: z.enum(scenarioKinds),
   round: roundSchema,
   prize_money: z.number(),
@@ -72,7 +72,7 @@ export const scenarioResultSchema = z.looseObject({
   profitable: z.boolean(),
 });
 
-export const pnlResultSchema = z.looseObject({
+const pnlResultSchema = z.looseObject({
   total_expenses: z.number(),
   total_income_base: z.number(),
   scenarios: z
