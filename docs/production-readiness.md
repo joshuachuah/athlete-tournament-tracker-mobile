@@ -39,18 +39,26 @@ when that section gains independent behavior or a second consumer, not solely to
 improve a scanner score. React Compiler remains the memoization owner; do not add
 `useMemo`, `useCallback`, or `React.memo`.
 
-## Observability prerequisite gate
+## Production observability decision
 
-Production observability is not provisioned. As of 2026-07-13, Expo public config
-still resolves the all-zero placeholder EAS project ID and the local Expo session is
-not authenticated. Sentry organization/project and EAS environment state cannot be
-verified from this checkout. Do not install or configure Sentry until the owner has:
+On 2026-07-16, the owner declined third-party production telemetry for the initial
+release. Plan 014 is rejected rather than partially implemented: there is no Sentry
+SDK, DSN, source-map token, session replay, or application telemetry configured. The
+real EAS project binding and executor access were verified separately on 2026-07-15;
+they remain valid for signed builds and do not imply that runtime monitoring exists.
 
-- replaced the EAS project ID with the real project;
-- provisioned preview and production EAS environments;
-- created the Sentry organization and React Native project;
-- stored the DSN and app environment in the appropriate EAS environments; and
-- stored organization/project identifiers and the source-map token in EAS, with
-  `SENTRY_AUTH_TOKEN` using sensitive visibility and never an `EXPO_PUBLIC_*` name.
+The accepted risk is that the team will not receive centralized crash detection,
+unhandled-error alerts, release correlation, or automatic production stack-trace
+symbolication. Failures must be learned through user reports and reproduced manually.
+This is an explicit product/operations tradeoff, not evidence that observability has
+been completed.
 
-No credentials or secret values belong in this document.
+For manual support, request only the app version/build, platform and OS version,
+user-visible error code, approximate occurrence time, and reproduction steps. Never
+request credentials, tokens, headers, request or response bodies, email addresses,
+user IDs, profile data, tournament data, or financial data.
+
+Reconsider production telemetry if repeated crashes cannot be reproduced, support
+volume makes manual diagnosis ineffective, or incident/compliance requirements need
+centralized evidence. Any future provider requires a new privacy review and an
+explicit implementation plan before collecting data.
