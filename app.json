@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Athlete Tracker",
-    "slug": "athlete-tracker-mobile",
+    "slug": "tournament-tracker",
     "scheme": "athletetracker",
     "version": "0.1.0",
     "orientation": "portrait",
@@ -33,8 +33,10 @@
     },
     "extra": {
       "eas": {
-        "projectId": "00000000-0000-0000-0000-000000000000"
-      }
-    }
+        "projectId": "5ef43fa1-f7d4-4b00-b859-b8a6db788ccc"
+      },
+      "router": {}
+    },
+    "owner": "sillycabana"
   }
 }
