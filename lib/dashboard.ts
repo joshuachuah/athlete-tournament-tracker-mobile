@@ -6,6 +6,8 @@ export type DashboardStats = {
   ytdExpenses: number;
   netResult: number;
   tournamentCount: number;
+  projectedCount: number;
+  unavailableCount: number;
   averageNetSpend: number;
   runway: number | null;
   profitableOnAverage: boolean;
@@ -29,19 +31,23 @@ export function buildDashboardStats(
     (sum, tournament) => sum + tournament.pnl.total_expenses,
     0,
   );
+  const projectedCount = ytd.reduce((count, tournament) => {
+    return count + (getScenario(tournament, "realistic") ? 1 : 0);
+  }, 0);
+  const unavailableCount = ytd.length - projectedCount;
   const netResult = ytd.reduce((sum, tournament) => {
     const realistic = getScenario(tournament, "realistic");
-    return sum + (realistic?.net_result ?? 0);
+    return realistic ? sum + realistic.net_result : sum;
   }, 0);
 
   let totalLosses = 0;
   let lossCount = 0;
 
   for (const tournament of tournaments) {
-    const result = getScenario(tournament, "realistic")?.net_result ?? 0;
+    const realistic = getScenario(tournament, "realistic");
 
-    if (result < 0) {
-      totalLosses += Math.abs(result);
+    if (realistic && realistic.net_result < 0) {
+      totalLosses += Math.abs(realistic.net_result);
       lossCount += 1;
     }
   }
@@ -53,6 +59,8 @@ export function buildDashboardStats(
     ytdExpenses,
     netResult,
     tournamentCount: ytd.length,
+    projectedCount,
+    unavailableCount,
     averageNetSpend,
     runway:
       averageNetSpend > 0

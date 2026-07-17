@@ -123,7 +123,9 @@ export default function TournamentDetailScreen() {
                 label={`${scenarioLabel(realistic.scenario)} net`}
                 tone={realistic.profitable ? "profit" : "loss"}
               />
-            ) : null}
+            ) : (
+              <Badge label="Projection unavailable" tone="neutral" />
+            )}
           </View>
 
           <Card>
@@ -150,26 +152,34 @@ export default function TournamentDetailScreen() {
             </Text>
           </Card>
 
-          <View style={{ gap: spacing.md }}>
-            <Text
-              style={{ color: colors.foreground, fontSize: 22, fontWeight: "800" }}
-              selectable
-            >
-              Scenarios
-            </Text>
-            {scenarioOrder.map((scenario) => {
-              const result = getScenario(data, scenario);
-              return result ? (
-                <ScenarioCard
-                  key={scenario}
-                  result={result}
-                  homeCurrency={data.home_currency}
-                  tournamentCurrency={data.currency}
-                  prizeTaxRate={data.prize_tax_rate}
-                />
-              ) : null;
-            })}
-          </View>
+          {data.pnl.scenarios.length === 0 ? (
+            <Card>
+              <Text style={{ color: colors.mutedForeground }} selectable>
+                Projection unavailable
+              </Text>
+            </Card>
+          ) : (
+            <View style={{ gap: spacing.md }}>
+              <Text
+                style={{ color: colors.foreground, fontSize: 22, fontWeight: "800" }}
+                selectable
+              >
+                Scenarios
+              </Text>
+              {scenarioOrder.map((scenario) => {
+                const result = getScenario(data, scenario);
+                return result ? (
+                  <ScenarioCard
+                    key={scenario}
+                    result={result}
+                    homeCurrency={data.home_currency}
+                    tournamentCurrency={data.currency}
+                    prizeTaxRate={data.prize_tax_rate}
+                  />
+                ) : null;
+              })}
+            </View>
+          )}
 
           <Card>
             <Text
