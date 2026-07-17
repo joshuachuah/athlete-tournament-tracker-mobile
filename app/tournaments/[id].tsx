@@ -23,6 +23,13 @@ import type { Scenario } from "@/types";
 
 const scenarioOrder: Scenario[] = ["worst", "realistic", "best"];
 
+type DeleteTournamentVariables = {
+  tournamentId: string;
+  userId: string;
+  profileId: string;
+  authToken: string;
+};
+
 export default function TournamentDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { profile, session } = useAuth();
@@ -41,9 +48,18 @@ export default function TournamentDetailScreen() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: () => api.tournaments.delete(tournamentId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tournaments", profile?.id] });
+    mutationFn: (variables: DeleteTournamentVariables) =>
+      api.tournaments.delete(variables.tournamentId, {
+        authToken: variables.authToken,
+      }),
+    onSuccess: (_result, variables) => {
+      if (session?.user.id !== variables.userId) {
+        return;
+      }
+
+      queryClient.invalidateQueries({
+        queryKey: ["tournaments", variables.profileId],
+      });
       router.replace("/(tabs)/dashboard");
     },
   });
@@ -57,6 +73,21 @@ export default function TournamentDetailScreen() {
   }
 
   function confirmDelete() {
+    const userId = session?.user.id;
+    const authToken = session?.access_token;
+    const profileId = profile?.id;
+
+    if (!userId || !authToken || !profileId) {
+      return;
+    }
+
+    const variables: DeleteTournamentVariables = {
+      tournamentId,
+      userId,
+      profileId,
+      authToken,
+    };
+
     Alert.alert(
       "Delete tournament",
       "This removes the tournament from the server.",
@@ -65,7 +96,7 @@ export default function TournamentDetailScreen() {
         {
           text: "Delete",
           style: "destructive",
-          onPress: () => deleteMutation.mutate(),
+          onPress: () => deleteMutation.mutate(variables),
         },
       ],
     );
@@ -89,7 +120,8 @@ export default function TournamentDetailScreen() {
           onRetry={() => refetch()}
         />
       ) : null}
-      {deleteMutation.isError ? (
+      {deleteMutation.isError &&
+      deleteMutation.variables?.userId === session.user.id ? (
         <ErrorState
           message={deleteMutation.error.message}
           onRetry={confirmDelete}
