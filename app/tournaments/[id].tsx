@@ -41,7 +41,7 @@ export default function TournamentDetailScreen() {
 
 function TournamentDetailContent() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { profile } = useAuth();
+  const { profile, session } = useAuth();
   const tournamentId = typeof id === "string" ? id : "";
 
   const {
@@ -66,6 +66,10 @@ function TournamentDetailContent() {
         return;
       }
 
+      queryClient.removeQueries({
+        queryKey: ["tournament", variables.tournamentId],
+        exact: true,
+      });
       queryClient.invalidateQueries({
         queryKey: ["tournaments", variables.profileId],
       });
