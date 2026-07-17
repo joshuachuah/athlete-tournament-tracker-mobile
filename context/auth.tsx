@@ -208,29 +208,31 @@ export function AuthProvider({ children }: PropsWithChildren) {
       return;
     }
 
-    const callback = new URL(result.url);
+    if (result.url.includes("#")) {
+      setAuthError("OAuth callback did not include a valid session code.");
+      return;
+    }
+
+    let callback: URL;
+
+    try {
+      callback = new URL(result.url);
+    } catch {
+      setAuthError("OAuth callback URL was invalid.");
+      return;
+    }
+
+    if (callback.searchParams.has("error")) {
+      setAuthError("OAuth sign-in was rejected by the provider.");
+      return;
+    }
+
     const code = callback.searchParams.get("code");
 
     if (code) {
       const exchange = await supabase.auth.exchangeCodeForSession(code);
       if (exchange.error) {
         setAuthError(exchange.error.message);
-      }
-      return;
-    }
-
-    const hash = new URLSearchParams(callback.hash.replace(/^#/, ""));
-    const accessToken = hash.get("access_token");
-    const refreshToken = hash.get("refresh_token");
-
-    if (accessToken && refreshToken) {
-      const nextSession = await supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken,
-      });
-
-      if (nextSession.error) {
-        setAuthError(nextSession.error.message);
       }
       return;
     }

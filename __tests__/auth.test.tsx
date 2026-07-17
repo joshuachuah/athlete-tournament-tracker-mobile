@@ -1,6 +1,7 @@
 import { createRef, useImperativeHandle, type RefObject } from "react";
 import { act, render, waitFor } from "@testing-library/react-native";
 import { Text, View } from "react-native";
+import * as WebBrowser from "expo-web-browser";
 import type { Session } from "@supabase/supabase-js";
 
 import { AuthProvider, useAuth } from "@/context/auth";
@@ -21,6 +22,7 @@ jest.mock("expo-auth-session", () => ({
 jest.mock("expo-web-browser", () => ({
   maybeCompleteAuthSession: jest.fn(),
   openAuthSessionAsync: jest.fn(),
+  WebBrowserResultType: { CANCEL: "cancel" },
 }));
 
 jest.mock("expo-sqlite/localStorage/install", () => {
@@ -112,7 +114,7 @@ const mockSignOut = mockAuth.signOut;
 
 type AuthProbe = Pick<
   ReturnType<typeof useAuth>,
-  "refreshProfile" | "saveProfile" | "signOut"
+  "refreshProfile" | "saveProfile" | "signInWithGoogle" | "signOut"
 >;
 
 function AuthState({ authRef }: { authRef: RefObject<AuthProbe | null> }) {
@@ -120,6 +122,7 @@ function AuthState({ authRef }: { authRef: RefObject<AuthProbe | null> }) {
   useImperativeHandle(authRef, () => ({
     refreshProfile: auth.refreshProfile,
     saveProfile: auth.saveProfile,
+    signInWithGoogle: auth.signInWithGoogle,
     signOut: auth.signOut,
   }));
 
@@ -145,6 +148,133 @@ function renderAuthProvider() {
 
   return { authRef, screen };
 }
+
+const mockOpenAuthSession =
+  WebBrowser.openAuthSessionAsync as jest.MockedFunction<
+    typeof WebBrowser.openAuthSessionAsync
+  >;
+const mockExchangeCodeForSession = supabase!.auth
+  .exchangeCodeForSession as jest.Mock;
+const mockSetSession = supabase!.auth.setSession as jest.Mock;
+const mockSignInWithOAuth = supabase!.auth.signInWithOAuth as jest.Mock;
+
+describe("AuthProvider OAuth callback", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    localStorage.clear();
+    queryClient.clear();
+    mockAuthStateCallback = undefined;
+    mockGetSession.mockResolvedValue({ data: { session: null }, error: null });
+    mockSignInWithOAuth.mockResolvedValue({
+      data: { provider: "google", url: "https://auth.example.test/authorize" },
+      error: null,
+    });
+    mockExchangeCodeForSession.mockResolvedValue({
+      data: { session: null, user: null },
+      error: null,
+    });
+  });
+
+  async function startSignIn() {
+    const { authRef, screen } = renderAuthProvider();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("status").props.children).toBe("ready");
+    });
+
+    await act(async () => {
+      await authRef.current!.signInWithGoogle();
+    });
+
+    return screen;
+  }
+
+  it("exchanges a one-time callback code exactly once", async () => {
+    mockOpenAuthSession.mockResolvedValue({
+      type: "success",
+      url: "athletetracker://auth/callback?code=one-time-code",
+    });
+
+    const screen = await startSignIn();
+
+    expect(mockExchangeCodeForSession).toHaveBeenCalledTimes(1);
+    expect(mockExchangeCodeForSession).toHaveBeenCalledWith("one-time-code");
+    expect(mockSetSession).not.toHaveBeenCalled();
+    expect(screen.getByTestId("auth-error").props.children).toBe("none");
+  });
+
+  it("leaves sign-in usable when the browser session is cancelled", async () => {
+    mockOpenAuthSession.mockResolvedValue({
+      type: WebBrowser.WebBrowserResultType.CANCEL,
+    });
+
+    const screen = await startSignIn();
+
+    expect(mockExchangeCodeForSession).not.toHaveBeenCalled();
+    expect(mockSetSession).not.toHaveBeenCalled();
+    expect(screen.getByTestId("auth-error").props.children).toBe("none");
+  });
+
+  it("reports a provider rejection without exposing callback details", async () => {
+    mockOpenAuthSession.mockResolvedValue({
+      type: "success",
+      url: "athletetracker://auth/callback?error=access_denied&error_description=sensitive-detail",
+    });
+
+    const screen = await startSignIn();
+
+    expect(mockExchangeCodeForSession).not.toHaveBeenCalled();
+    expect(mockSetSession).not.toHaveBeenCalled();
+    expect(screen.getByTestId("auth-error").props.children).toBe(
+      "OAuth sign-in was rejected by the provider.",
+    );
+  });
+
+  it("rejects a callback without a code", async () => {
+    mockOpenAuthSession.mockResolvedValue({
+      type: "success",
+      url: "athletetracker://auth/callback",
+    });
+
+    const screen = await startSignIn();
+
+    expect(mockExchangeCodeForSession).not.toHaveBeenCalled();
+    expect(mockSetSession).not.toHaveBeenCalled();
+    expect(screen.getByTestId("auth-error").props.children).toBe(
+      "OAuth callback did not include a session code.",
+    );
+  });
+
+  it("rejects a malformed callback URL", async () => {
+    mockOpenAuthSession.mockResolvedValue({
+      type: "success",
+      url: "not a callback URL",
+    });
+
+    const screen = await startSignIn();
+
+    expect(mockExchangeCodeForSession).not.toHaveBeenCalled();
+    expect(mockSetSession).not.toHaveBeenCalled();
+    expect(screen.getByTestId("auth-error").props.children).toBe(
+      "OAuth callback URL was invalid.",
+    );
+  });
+
+  it("rejects reusable bearer tokens in a callback fragment", async () => {
+    mockOpenAuthSession.mockResolvedValue({
+      type: "success",
+      url: "athletetracker://auth/callback#access_token=access-secret&refresh_token=refresh-secret",
+    });
+
+    const screen = await startSignIn();
+
+    expect(mockExchangeCodeForSession).not.toHaveBeenCalled();
+    expect(mockSetSession).not.toHaveBeenCalled();
+    expect(screen.getByTestId("auth-error").props.children).toBe(
+      "OAuth callback did not include a valid session code.",
+    );
+  });
+});
 
 describe("AuthProvider profile isolation", () => {
   const firstProfile = profile("athlete-1", "first@example.com");

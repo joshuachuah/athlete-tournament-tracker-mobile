@@ -18,6 +18,7 @@ export const supabase = hasSupabaseConfig
   ? createClient(supabaseUrl as string, supabaseAnonKey as string, {
       auth: {
         storage: secureStoreAdapter,
+        flowType: "pkce",
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: false,
