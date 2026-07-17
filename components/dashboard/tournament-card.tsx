@@ -11,6 +11,7 @@ import { formatDate, formatMoney, getScenario, roundLabels } from "@/lib/utils";
 export function TournamentCard({ tournament }: { tournament: TournamentWithPnL }) {
   const realistic = getScenario(tournament, "realistic");
   const breakEven = tournament.pnl.break_even_round;
+  const hasProjection = tournament.pnl.scenarios.length > 0;
 
   return (
     <Link href={`/tournaments/${tournament.id}`} asChild>
@@ -70,7 +71,12 @@ export function TournamentCard({ tournament }: { tournament: TournamentWithPnL }
               style={{ color: colors.mutedForeground, fontSize: 13, lineHeight: 18 }}
               selectable
             >
-              Break-even: {breakEven ? roundLabels[breakEven] : "No break-even round"}
+              Break-even:{" "}
+              {breakEven
+                ? roundLabels[breakEven]
+                : hasProjection
+                  ? "No break-even round"
+                  : "Projection unavailable"}
             </Text>
           </Card>
         )}

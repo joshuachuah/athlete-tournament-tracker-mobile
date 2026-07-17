@@ -13,7 +13,11 @@ import TournamentDetailScreen from "@/app/tournaments/[id]";
 import { useAuth } from "@/context/auth";
 import { api } from "@/lib/api";
 import { queryClient } from "@/lib/query-client";
-import type { AthleteProfile, TournamentWithPnL } from "@/types";
+import type {
+  AthleteProfile,
+  ScenarioResult,
+  TournamentWithPnL,
+} from "@/types";
 
 jest.mock("expo-router", () => ({
   Redirect: () => null,
@@ -103,6 +107,7 @@ function renderDetail(detail: TournamentWithPnL) {
   queryClient.setQueryData(listKey, [detail, otherDetail]);
   queryClient.setQueryData(detailKey, detail);
   queryClient.setQueryData(["tournament", otherDetail.id], otherDetail);
+  mockUseLocalSearchParams.mockReturnValue({ id: detail.id });
 
   const screen = render(
     <QueryClientProvider client={queryClient}>
@@ -123,6 +128,15 @@ function confirmDelete(screen: ReturnType<typeof render>) {
     deleteButton?.onPress?.();
   });
 }
+
+const losingScenario: ScenarioResult = {
+  scenario: "realistic",
+  round: "qf",
+  prize_money: 300,
+  prize_money_after_tax: 300,
+  net_result: -525,
+  profitable: false,
+};
 
 describe("TournamentDetailScreen deletion", () => {
   beforeEach(() => {
@@ -153,6 +167,28 @@ describe("TournamentDetailScreen deletion", () => {
   afterEach(() => {
     jest.restoreAllMocks();
     queryClient.clear();
+  });
+
+  it("labels a missing break-even projection as unavailable", async () => {
+    const { screen } = renderDetail(tournament("missing-projection"));
+
+    await waitFor(() => {
+      expect(screen.getAllByText("Projection unavailable")).toHaveLength(3);
+      expect(screen.queryByText("No break-even")).toBeNull();
+    });
+    screen.unmount();
+  });
+
+  it("keeps no-break-even wording when a real projection exists", async () => {
+    const detail = tournament("projected-loss");
+    detail.pnl.scenarios = [losingScenario];
+    const { screen } = renderDetail(detail);
+
+    await waitFor(() => {
+      expect(screen.getByText("No break-even")).toBeTruthy();
+      expect(screen.queryByText("Projection unavailable")).toBeNull();
+    });
+    screen.unmount();
   });
 
   it("evicts only the deleted detail before invalidating its list and routing", async () => {

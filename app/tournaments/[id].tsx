@@ -112,6 +112,7 @@ function TournamentDetailContent() {
   }
 
   const realistic = data ? getScenario(data, "realistic") : undefined;
+  const hasProjection = data ? data.pnl.scenarios.length > 0 : false;
 
   return (
     <ScrollView
@@ -186,7 +187,9 @@ function TournamentDetailContent() {
             >
               {data.pnl.break_even_round
                 ? roundLabels[data.pnl.break_even_round]
-                : "No break-even"}
+                : hasProjection
+                  ? "No break-even"
+                  : "Projection unavailable"}
             </Text>
             <Text style={{ color: colors.mutedForeground, lineHeight: 20 }} selectable>
               The server returns the minimum round needed to avoid losing money.
