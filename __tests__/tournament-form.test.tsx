@@ -12,6 +12,7 @@ import {
   saveTournamentDraft,
   tournamentToDraft,
 } from "@/lib/tournament-draft";
+import { tournamentDraftStorageKey } from "@/lib/storage";
 import type { TournamentWithPnL } from "@/types";
 
 const defaultTournamentDraft = createDefaultTournamentDraft(
@@ -80,6 +81,10 @@ function DraftNameProbe() {
 }
 
 describe("TournamentForm", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
   it("persists a keyed prefill to draft context on mount", () => {
     const prefillDraft = {
       ...validDraft,
@@ -101,6 +106,56 @@ describe("TournamentForm", () => {
     expect(screen.getByDisplayValue("Prefilled Invitational")).toBeTruthy();
     expect(screen.getByTestId("draft-name").props.children).toBe(
       "Prefilled Invitational",
+    );
+    expect(
+      JSON.parse(
+        localStorage.getItem(
+          tournamentDraftStorageKey("athlete-prefill"),
+        ) ?? "null",
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        version: 1,
+        draft: expect.objectContaining({ name: "Prefilled Invitational" }),
+      }),
+    );
+  });
+
+  it("replaces corrupt persisted drafts with a versioned fresh draft", () => {
+    const key = tournamentDraftStorageKey("athlete-corrupt");
+    localStorage.setItem(key, JSON.stringify({ name: null }));
+
+    const screen = render(
+      <TournamentDraftProvider userId="athlete-corrupt">
+        <DraftNameProbe />
+      </TournamentDraftProvider>,
+    );
+
+    expect(screen.getByTestId("draft-name").props.children).toBe("");
+    expect(JSON.parse(localStorage.getItem(key) ?? "null")).toEqual(
+      expect.objectContaining({
+        version: 1,
+        draft: expect.objectContaining({ name: "" }),
+      }),
+    );
+  });
+
+  it("replaces malformed persisted draft JSON with a versioned fresh draft", () => {
+    const key = tournamentDraftStorageKey("athlete-malformed");
+    localStorage.setItem(key, "{");
+
+    const screen = render(
+      <TournamentDraftProvider userId="athlete-malformed">
+        <DraftNameProbe />
+      </TournamentDraftProvider>,
+    );
+
+    expect(screen.getByTestId("draft-name").props.children).toBe("");
+    expect(JSON.parse(localStorage.getItem(key) ?? "null")).toEqual(
+      expect.objectContaining({
+        version: 1,
+        draft: expect.objectContaining({ name: "" }),
+      }),
     );
   });
 

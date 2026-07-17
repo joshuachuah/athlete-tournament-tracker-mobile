@@ -15,6 +15,7 @@ import {
   createDefaultTournamentDraft,
   deriveDraftDates,
   normalizeTournamentDraft,
+  persistedTournamentDraft,
   type TournamentDraft,
 } from "@/lib/tournament-draft";
 
@@ -35,7 +36,7 @@ export function TournamentDraftProvider({
 }: PropsWithChildren<{ userId?: string }>) {
   const draftKey = userId ? tournamentDraftStorageKey(userId) : null;
   const [draft, setDraftState] = useState<TournamentDraft>(() => {
-    const stored = draftKey ? draftStorage.get<Partial<TournamentDraft>>(draftKey) : null;
+    const stored = draftKey ? draftStorage.get(draftKey) : null;
     return stored ? normalizeTournamentDraft(stored) : createDefaultTournamentDraft();
   });
 
@@ -45,7 +46,7 @@ export function TournamentDraftProvider({
 
   useEffect(() => {
     if (draftKey) {
-      draftStorage.set(draftKey, draft);
+      draftStorage.set(draftKey, persistedTournamentDraft(draft));
     }
   }, [draft, draftKey]);
 
