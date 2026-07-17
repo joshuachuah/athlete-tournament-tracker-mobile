@@ -6,6 +6,7 @@ import {
   parseDateOnly,
   roundCurrencyAmount,
 } from "@/lib/utils";
+import type { ApiRequestOptions } from "@/lib/api";
 
 export type TournamentDraft = {
   editId?: string;
@@ -326,10 +327,12 @@ export function toTournamentPayload(
 type TournamentWriter = {
   create: (
     payload: Omit<Tournament, "id" | "created_at">,
+    options?: ApiRequestOptions,
   ) => Promise<{ id: string }>;
   update: (
     id: string,
     payload: Omit<Tournament, "id" | "created_at">,
+    options?: ApiRequestOptions,
   ) => Promise<{ id: string }>;
 };
 
@@ -337,14 +340,17 @@ export function saveTournamentDraft(
   draft: TournamentDraft,
   userId: string,
   writer: TournamentWriter,
+  options?: ApiRequestOptions,
 ) {
   const payload = toTournamentPayload(draft, userId);
 
   if (draft.editId) {
-    return writer.update(draft.editId, payload);
+    return options
+      ? writer.update(draft.editId, payload, options)
+      : writer.update(draft.editId, payload);
   }
 
-  return writer.create(payload);
+  return options ? writer.create(payload, options) : writer.create(payload);
 }
 
 type TournamentSaveCompletion = {
