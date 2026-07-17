@@ -1,8 +1,9 @@
-import { Redirect, router } from "expo-router";
+import { router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Pressable, ScrollView, Text, View } from "react-native";
 
 import { Badge } from "@/components/ui/badge";
+import { ProtectedScreen } from "@/components/auth/protected-screen";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/state";
@@ -62,7 +63,15 @@ function knownPrizeTotal(tournament: KnownTournament): number | undefined {
 }
 
 export default function SearchScreen() {
-  const { profile, session } = useAuth();
+  return (
+    <ProtectedScreen>
+      <SearchContent />
+    </ProtectedScreen>
+  );
+}
+
+function SearchContent() {
+  const { profile } = useAuth();
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebouncedValue(query.trim(), 300);
   const {
@@ -76,14 +85,6 @@ export default function SearchScreen() {
     queryFn: () => api.tournaments.search(debouncedQuery, profile?.sport),
     enabled: debouncedQuery.length >= 2,
   });
-
-  if (!session) {
-    return <Redirect href="/login" />;
-  }
-
-  if (!profile) {
-    return <Redirect href="/onboarding" />;
-  }
 
   return (
     <ScrollView

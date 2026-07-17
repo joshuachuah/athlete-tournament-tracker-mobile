@@ -1,4 +1,4 @@
-import { Link, Redirect } from "expo-router";
+import { Link } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { RefreshControl, ScrollView, Text, View } from "react-native";
 
@@ -15,7 +15,7 @@ import { buildDashboardStats } from "@/lib/dashboard";
 import { formatMoney } from "@/lib/utils";
 
 export default function DashboardScreen() {
-  const { profile, session } = useAuth();
+  const { profile } = useAuth();
   const {
     data: tournaments = [],
     error,
@@ -29,12 +29,8 @@ export default function DashboardScreen() {
     enabled: Boolean(profile?.id),
   });
 
-  if (!session) {
-    return <Redirect href="/login" />;
-  }
-
   if (!profile) {
-    return <Redirect href="/onboarding" />;
+    return null;
   }
 
   const stats = buildDashboardStats(tournaments, profile);

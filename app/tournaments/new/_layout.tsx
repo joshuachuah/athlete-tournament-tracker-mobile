@@ -1,10 +1,19 @@
 import { Stack } from "expo-router";
 
+import { ProtectedScreen } from "@/components/auth/protected-screen";
 import { colors } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
 import { TournamentDraftProvider } from "@/context/tournament-draft";
 
 export default function NewTournamentLayout() {
+  return (
+    <ProtectedScreen>
+      <NewTournamentNavigator />
+    </ProtectedScreen>
+  );
+}
+
+function NewTournamentNavigator() {
   const { session } = useAuth();
   const userId = session?.user.id;
 

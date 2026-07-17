@@ -1,4 +1,4 @@
-import { Redirect, router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -35,7 +35,7 @@ type SubmitError = {
 };
 
 export default function DetailsStep() {
-  const { profile, session } = useAuth();
+  const { profile } = useAuth();
   const { draft, resetDraft } = useTournamentDraft();
   const [submitError, setSubmitError] = useState<SubmitError | null>(null);
   const params = useLocalSearchParams<DetailsParams>();
@@ -77,14 +77,6 @@ export default function DetailsStep() {
       }
     },
   });
-
-  if (!session) {
-    return <Redirect href="/login" />;
-  }
-
-  if (!profile) {
-    return <Redirect href="/onboarding" />;
-  }
 
   const hasPrefill = [
     params.name,
