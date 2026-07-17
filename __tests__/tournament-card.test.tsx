@@ -52,6 +52,15 @@ const breakEvenScenario: ScenarioResult = {
   profitable: true,
 };
 
+const losingScenario: ScenarioResult = {
+  scenario: "realistic",
+  round: "qf",
+  prize_money: 300,
+  prize_money_after_tax: 300,
+  net_result: -300,
+  profitable: false,
+};
+
 describe("TournamentCard", () => {
   it("labels a missing realistic projection with a neutral badge", () => {
     const screen = render(<TournamentCard tournament={tournament([])} />);
@@ -61,6 +70,17 @@ describe("TournamentCard", () => {
       expect.objectContaining({ color: colors.mutedForeground }),
     );
     expect(screen.queryByText("$0 USD")).toBeNull();
+    expect(screen.getByText("Break-even: Projection unavailable")).toBeTruthy();
+    expect(screen.queryByText("Break-even: No break-even round")).toBeNull();
+  });
+
+  it("keeps the no-break-even label when a real projection exists", () => {
+    const screen = render(
+      <TournamentCard tournament={tournament([losingScenario])} />,
+    );
+
+    expect(screen.getByText("Break-even: No break-even round")).toBeTruthy();
+    expect(screen.queryByText("Break-even: Projection unavailable")).toBeNull();
   });
 
   it("keeps a real numeric zero as a non-loss badge", () => {
