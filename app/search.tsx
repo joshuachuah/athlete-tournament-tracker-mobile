@@ -82,7 +82,8 @@ function SearchContent() {
     refetch: refetchResults,
   } = useQuery({
     queryKey: ["tournament-search", debouncedQuery, profile?.sport],
-    queryFn: () => api.tournaments.search(debouncedQuery, profile?.sport),
+    queryFn: ({ signal }) =>
+      api.tournaments.search(debouncedQuery, profile?.sport, { signal }),
     enabled: debouncedQuery.length >= 2,
   });
 

@@ -25,7 +25,8 @@ export default function DashboardScreen() {
     refetch,
   } = useQuery({
     queryKey: ["tournaments", profile?.id],
-    queryFn: () => api.tournaments.list(profile?.id ?? ""),
+    queryFn: ({ signal }) =>
+      api.tournaments.list(profile?.id ?? "", { signal }),
     enabled: Boolean(profile?.id),
   });
 
