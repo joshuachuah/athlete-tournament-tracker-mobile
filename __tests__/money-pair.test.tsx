@@ -38,8 +38,11 @@ function renderMoneyPairs(
   const screen = render(
     <QueryClientProvider client={queryClient}>
       <View>
-        {pairs.map((pair, index) => (
-          <MoneyPair key={index} {...pair} />
+        {pairs.map((pair) => (
+          <MoneyPair
+            key={`${pair.fromCurrency}:${pair.toCurrency}:${pair.amount}`}
+            {...pair}
+          />
         ))}
       </View>
     </QueryClientProvider>,
@@ -83,7 +86,7 @@ describe("MoneyPair", () => {
       rate: from === "EUR" && to === "USD" ? 2 : 0.5,
     }));
 
-    renderMoneyPairs([
+    const { screen } = renderMoneyPairs([
       { amount: 10, fromCurrency: "USD", toCurrency: "EUR" },
       { amount: 20, fromCurrency: "EUR", toCurrency: "USD" },
       { amount: 30, fromCurrency: "USD", toCurrency: "JPY" },
@@ -91,6 +94,7 @@ describe("MoneyPair", () => {
 
     await waitFor(() => {
       expect(convert).toHaveBeenCalledTimes(3);
+      expect(screen.queryByText("Converting...")).toBeNull();
     });
 
     expect(convert.mock.calls.map(([from, to, amount]) => [from, to, amount])).toEqual(

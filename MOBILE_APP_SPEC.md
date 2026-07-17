@@ -99,9 +99,8 @@ The implementation lives in `lib/supabase.ts` and `context/auth.tsx`.
 3. Google sign-in requests a Supabase OAuth URL and opens it with
    `WebBrowser.openAuthSessionAsync`. The callback is
    `athletetracker://auth/callback`.
-4. The current callback handler exchanges an authorization `code` when one is
-   present. It also accepts the existing access-token and refresh-token URL
-   fragment response and passes those tokens to `supabase.auth.setSession()`.
+4. The Supabase client uses PKCE. The callback handler exchanges a one-time
+   authorization `code` and rejects access-token or refresh-token URL fragments.
 5. Once a session has both a user ID and email, the provider loads the cached
    profile only when it belongs to that Supabase user, then refreshes it through
    `GET /api/profile?email=`.
@@ -112,11 +111,11 @@ The implementation lives in `lib/supabase.ts` and `context/auth.tsx`.
 
 ### OAuth hardening status
 
-**Deferred:** the client does not yet configure Supabase with explicit
-`flowType: "pkce"`, and the fragment-token callback remains supported. The code
-exchange branch is present, but that alone is not a verified PKCE-only flow.
-Moving to PKCE-only callbacks still requires the separate auth hardening work
-and signed-build verification. This spec does not claim that work has shipped.
+**Shipped locally; external verification pending:** the client configures
+`flowType: "pkce"` and accepts code-only callbacks. The live Supabase redirect
+allow-list and signed iOS/Android login, cancellation, cold-start, and relaunch
+flows have not been verified. Local implementation therefore does not by itself
+establish production OAuth readiness.
 
 The app never records provider IDs, access tokens, refresh tokens, or private
 environment values in documentation or local profile storage.
@@ -151,6 +150,10 @@ The old step paths remain only for compatibility with saved links and navigation
 history. `LegacyTournamentRedirect` sends each one to the canonical details
 route and preserves an edit ID when present.
 
+Protected routes mount their query-owning content only after auth bootstrap is
+ready. Loading preserves the current deep link; signed-out users route to login,
+and signed-in users without a profile route to onboarding.
+
 ## 6. Data and Cache Behavior
 
 ### API client
@@ -181,10 +184,16 @@ failures use distinct API error codes.
 - Tournament lists use `['tournaments', profile.id]`; detail uses
   `['tournament', id]`; search uses
   `['tournament-search', debouncedQuery, profile.sport]`.
-- FX conversions add amount and both currencies to the query key and use a
-  one-hour `staleTime`.
+- Display FX uses one normalized `['fx-rate', from, to]` unit-rate query per
+  currency pair with a one-hour `staleTime`; `MoneyPair` applies the returned
+  server rate and target-currency rounding to each displayed amount.
+- Query functions forward TanStack Query's cancellation signal to the API
+  client for lists, search, detail, edit hydration, and FX rates.
 - Profile saves, tournament saves, deletes, auth identity changes, and sign-out
   invalidate or clear the relevant caches.
+- Tournament writes capture the initiating user, profile, and bearer token.
+  Completion effects are ignored if the authenticated user changes before the
+  request settles.
 - React Query data remains in memory. It is not restored after process exit.
 
 ### Local persistence
@@ -193,8 +202,10 @@ failures use distinct API error codes.
 
 - Profiles are stored in a versioned envelope keyed to the Supabase user ID.
   A cache from another account is removed instead of reused.
-- Tournament drafts are stored under a per-user key. Successful saves clear the
-  draft; stale legacy and abandoned edit drafts are guarded against reuse.
+- Tournament drafts are stored in a runtime-validated, versioned envelope under
+  a per-user key. Known legacy partial drafts migrate through defaults; corrupt
+  or unknown data falls back safely. Successful saves clear the draft, and
+  abandoned edit drafts are guarded against reuse.
 - Supabase session material is separate and remains in SecureStore.
 
 ## 7. Screens
@@ -205,7 +216,8 @@ failures use distinct API error codes.
 
 - athlete greeting and current-season net;
 - earned, spent, and tournament-count cards;
-- profitable/loss season status;
+- profitable/loss or neutral unavailable season status, including partial
+  projection coverage;
 - runway derived from server-returned realistic scenarios;
 - tournament cards with realistic result, scenario bar, and break-even round;
 - pull-to-refresh through `RefreshControl`;
@@ -223,6 +235,8 @@ All dashboard money is formatted with the athlete's `home_currency` code.
 - server-adjusted income, expense, and net values;
 - home-currency values with a tournament-currency FX view when the codes differ;
 - edit navigation and confirmed delete with query invalidation;
+- neutral projection-unavailable UI when scenarios are absent;
+- exact deleted-detail cache eviction before list invalidation and navigation;
 - loading and retryable error states.
 
 The response schema permits either no scenarios or exactly one of each scenario
@@ -262,7 +276,9 @@ includes initial, loading, empty-result, and retryable error states.
 Profile fields are name, home country, three-letter home currency, sport,
 monthly income, savings balance, and monthly sponsorship. Saves are bearer-bound,
 normalize the currency code to uppercase, update the user-bound local cache, and
-invalidate the profile query key. The Profile tab also provides sign-out.
+invalidate the profile query key. An actual normalized home-currency change also
+invalidates tournament list, detail, and shared FX-rate caches. The Profile tab
+provides sign-out.
 
 ## 8. Currency and Financial Contract
 
@@ -423,7 +439,7 @@ later, but the current app validates response shapes at runtime to catch drift.
 | Progressive single-page tournament form | **Shipped** | Old step routes redirect |
 | Search and known-tournament prefill | **Shipped** | Includes tax-rate prefill |
 | Pull-to-refresh and standard loading/error/empty states | **Shipped** | Present on relevant server-backed screens |
-| Explicit PKCE-only OAuth callback | **Deferred** | Requires auth change and signed-build verification |
+| Explicit PKCE-only OAuth callback | **Shipped locally** | Live allow-list and signed iOS/Android callbacks remain unverified |
 | Persisted offline tournament reads and last-synced UI | **Deferred** | No implementation commitment yet |
 | Biometric app lock | **Deferred** | Not installed or exposed in UI |
 | Push reminders | **Deferred** | Would require client and backend work |

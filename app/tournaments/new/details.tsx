@@ -35,7 +35,7 @@ type SubmitError = {
 };
 
 export default function DetailsStep() {
-  const { profile } = useAuth();
+  const { profile, session } = useAuth();
   const { draft, resetDraft } = useTournamentDraft();
   const [submitError, setSubmitError] = useState<SubmitError | null>(null);
   const params = useLocalSearchParams<DetailsParams>();
@@ -77,6 +77,10 @@ export default function DetailsStep() {
       }
     },
   });
+
+  if (!session || !profile) {
+    return null;
+  }
 
   const hasPrefill = [
     params.name,

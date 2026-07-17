@@ -270,7 +270,6 @@ export function AuthProvider({ children }: PropsWithChildren) {
     const email = session?.user.email;
     const authToken = session?.access_token;
     const previousHomeCurrency = profile?.home_currency.toUpperCase();
-    const nextHomeCurrency = data.home_currency.toUpperCase();
 
     if (!userId || !email || !authToken) {
       throw new Error("Sign in before saving a profile.");
@@ -285,6 +284,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       },
       { authToken },
     );
+    const savedHomeCurrency = savedProfile.home_currency.toUpperCase();
 
     if (
       mounted.current &&
@@ -301,11 +301,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
         queryClient.invalidateQueries({ queryKey: ["profile", email] }),
       ];
 
-      if (previousHomeCurrency !== nextHomeCurrency) {
+      if (previousHomeCurrency !== savedHomeCurrency) {
         invalidations.push(
           queryClient.invalidateQueries({ queryKey: ["tournaments"] }),
           queryClient.invalidateQueries({ queryKey: ["tournament"] }),
-          queryClient.invalidateQueries({ queryKey: ["fx"] }),
+          queryClient.invalidateQueries({ queryKey: ["fx-rate"] }),
         );
       }
 

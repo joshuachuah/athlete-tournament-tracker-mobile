@@ -235,7 +235,7 @@ describe("TanStack query cancellation", () => {
 
     await waitFor(() => expect(mockConvert).toHaveBeenCalledTimes(1));
     const signal = signalFromCall(mockConvert.mock.calls[0][3]);
-    expect(mockConvert).toHaveBeenCalledWith("USD", "MYR", 100, { signal });
+    expect(mockConvert).toHaveBeenCalledWith("USD", "MYR", 1, { signal });
 
     screen.unmount();
 
