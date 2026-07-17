@@ -52,7 +52,7 @@ function TournamentDetailContent() {
     refetch,
   } = useQuery({
     queryKey: ["tournament", tournamentId],
-    queryFn: () => api.tournaments.get(tournamentId),
+    queryFn: ({ signal }) => api.tournaments.get(tournamentId, { signal }),
     enabled: Boolean(tournamentId),
   });
 

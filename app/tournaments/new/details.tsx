@@ -48,7 +48,7 @@ export default function DetailsStep() {
     refetch: refetchEditTournament,
   } = useQuery({
     queryKey: ["tournament", editId],
-    queryFn: () => api.tournaments.get(editId ?? ""),
+    queryFn: ({ signal }) => api.tournaments.get(editId ?? "", { signal }),
     enabled: Boolean(editId),
   });
   const mutation = useMutation({
