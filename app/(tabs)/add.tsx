@@ -1,23 +1,12 @@
-import { Link, Redirect } from "expo-router";
+import { Link } from "expo-router";
 import { ScrollView, Text, View } from "react-native";
 import { Search, PlusCircle } from "lucide-react-native";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { colors, spacing } from "@/constants/theme";
-import { useAuth } from "@/context/auth";
 
 export default function AddScreen() {
-  const { profile, session } = useAuth();
-
-  if (!session) {
-    return <Redirect href="/login" />;
-  }
-
-  if (!profile) {
-    return <Redirect href="/onboarding" />;
-  }
-
   return (
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"

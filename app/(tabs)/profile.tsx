@@ -1,4 +1,4 @@
-import { Redirect, router } from "expo-router";
+import { router } from "expo-router";
 import { useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 
@@ -9,16 +9,12 @@ import { colors, spacing } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
 
 export default function ProfileScreen() {
-  const { profile, session, saveProfile, signOut } = useAuth();
+  const { profile, saveProfile, signOut } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  if (!session) {
-    return <Redirect href="/login" />;
-  }
-
   if (!profile) {
-    return <Redirect href="/onboarding" />;
+    return null;
   }
 
   async function handleSubmit(values: ProfileFormValues) {

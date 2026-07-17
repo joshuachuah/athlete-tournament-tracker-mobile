@@ -1,8 +1,9 @@
 import { Alert, ScrollView, Text, View } from "react-native";
-import { Redirect, router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { Badge } from "@/components/ui/badge";
+import { ProtectedScreen } from "@/components/auth/protected-screen";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ErrorState, LoadingState } from "@/components/ui/state";
@@ -31,8 +32,16 @@ type DeleteTournamentVariables = {
 };
 
 export default function TournamentDetailScreen() {
+  return (
+    <ProtectedScreen>
+      <TournamentDetailContent />
+    </ProtectedScreen>
+  );
+}
+
+function TournamentDetailContent() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { profile, session } = useAuth();
+  const { profile } = useAuth();
   const tournamentId = typeof id === "string" ? id : "";
 
   const {
@@ -44,7 +53,7 @@ export default function TournamentDetailScreen() {
   } = useQuery({
     queryKey: ["tournament", tournamentId],
     queryFn: () => api.tournaments.get(tournamentId),
-    enabled: Boolean(session && tournamentId),
+    enabled: Boolean(tournamentId),
   });
 
   const deleteMutation = useMutation({
@@ -63,14 +72,6 @@ export default function TournamentDetailScreen() {
       router.replace("/(tabs)/dashboard");
     },
   });
-
-  if (!session) {
-    return <Redirect href="/login" />;
-  }
-
-  if (!profile) {
-    return <Redirect href="/onboarding" />;
-  }
 
   function confirmDelete() {
     const userId = session?.user.id;
