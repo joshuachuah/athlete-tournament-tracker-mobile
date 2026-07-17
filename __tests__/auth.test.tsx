@@ -678,7 +678,7 @@ describe("AuthProvider profile isolation", () => {
 
     const tournamentListKey = ["tournaments", firstProfile.id];
     const tournamentKey = ["tournament", "tournament-1"];
-    const fxKey = ["fx", "MYR", "USD", 100];
+    const fxKey = ["fx-rate", "MYR", "USD"];
     const unrelatedKey = ["settings", firstProfile.id];
     queryClient.setQueryData(tournamentListKey, [{ id: "tournament-1" }]);
     queryClient.setQueryData(tournamentKey, { id: "tournament-1" });
@@ -704,7 +704,7 @@ describe("AuthProvider profile isolation", () => {
     expect(invalidateQueries).toHaveBeenCalledWith({
       queryKey: ["tournament"],
     });
-    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["fx"] });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["fx-rate"] });
     expect(invalidateQueries).toHaveBeenCalledTimes(4);
     expect(queryClient.getQueryState(tournamentListKey)?.isInvalidated).toBe(
       true,
@@ -734,7 +734,7 @@ describe("AuthProvider profile isolation", () => {
 
     const tournamentListKey = ["tournaments", firstProfile.id];
     const tournamentKey = ["tournament", "tournament-1"];
-    const fxKey = ["fx", "MYR", "USD", 100];
+    const fxKey = ["fx-rate", "MYR", "USD"];
     queryClient.setQueryData(tournamentListKey, [{ id: "tournament-1" }]);
     queryClient.setQueryData(tournamentKey, { id: "tournament-1" });
     queryClient.setQueryData(fxKey, 23.5);

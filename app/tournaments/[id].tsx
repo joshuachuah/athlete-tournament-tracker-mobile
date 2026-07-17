@@ -77,6 +77,10 @@ function TournamentDetailContent() {
     },
   });
 
+  if (!session || !profile) {
+    return null;
+  }
+
   function confirmDelete() {
     const userId = session?.user.id;
     const authToken = session?.access_token;

@@ -136,7 +136,10 @@ describe("TournamentDetailScreen deletion", () => {
 
     mockUseLocalSearchParams.mockReturnValue({ id: "deleted" });
     mockUseAuth.mockReturnValue({
-      session: { user: { id: profile.id } } as Session,
+      session: {
+        access_token: "initiating-token",
+        user: { id: profile.id },
+      } as Session,
       profile,
       status: "ready",
       authError: null,
