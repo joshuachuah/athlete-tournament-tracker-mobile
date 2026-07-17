@@ -10,7 +10,6 @@ import { formatDate, formatMoney, getScenario, roundLabels } from "@/lib/utils";
 
 export function TournamentCard({ tournament }: { tournament: TournamentWithPnL }) {
   const realistic = getScenario(tournament, "realistic");
-  const netResult = realistic?.net_result ?? 0;
   const breakEven = tournament.pnl.break_even_round;
 
   return (
@@ -50,11 +49,19 @@ export function TournamentCard({ tournament }: { tournament: TournamentWithPnL }
                   {tournament.location} · {formatDate(tournament.start_date)}
                 </Text>
               </View>
-              <Badge
-                label={formatMoney(netResult, tournament.home_currency)}
-                tone={netResult >= 0 ? "profit" : "loss"}
-                style={{ maxWidth: "42%" }}
-              />
+              {realistic ? (
+                <Badge
+                  label={formatMoney(realistic.net_result, tournament.home_currency)}
+                  tone={realistic.net_result >= 0 ? "profit" : "loss"}
+                  style={{ maxWidth: "42%" }}
+                />
+              ) : (
+                <Badge
+                  label="Projection unavailable"
+                  tone="neutral"
+                  style={{ maxWidth: "42%" }}
+                />
+              )}
             </View>
 
             <ScenarioBar tournament={tournament} />
