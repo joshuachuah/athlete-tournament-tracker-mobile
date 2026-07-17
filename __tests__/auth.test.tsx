@@ -164,6 +164,10 @@ describe("AuthProvider profile isolation", () => {
     mockSignOut.mockResolvedValue({ error: null });
   });
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it("clears a stale cache when bootstrap has no authenticated session", async () => {
     profileStorage.set(firstUserId, firstProfile);
     mockGetSession.mockResolvedValue({
@@ -524,6 +528,112 @@ describe("AuthProvider profile isolation", () => {
     expect(profileStorage.get()).toEqual(savedProfile);
   });
 
+  it("invalidates currency-derived query families after the home currency changes", async () => {
+    const savedProfile = { ...firstProfile, home_currency: "USD" };
+    profileStorage.set(firstUserId, firstProfile);
+    mockGetSession.mockResolvedValue({
+      data: { session: session(firstProfile.email, firstUserId) },
+      error: null,
+    });
+    getProfile.mockReturnValue(new Promise(() => undefined));
+    saveProfile.mockResolvedValue(savedProfile);
+
+    const { authRef, screen } = renderAuthProvider();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("profile-email").props.children).toBe(
+        firstProfile.email,
+      );
+    });
+
+    const tournamentListKey = ["tournaments", firstProfile.id];
+    const tournamentKey = ["tournament", "tournament-1"];
+    const fxKey = ["fx", "MYR", "USD", 100];
+    const unrelatedKey = ["settings", firstProfile.id];
+    queryClient.setQueryData(tournamentListKey, [{ id: "tournament-1" }]);
+    queryClient.setQueryData(tournamentKey, { id: "tournament-1" });
+    queryClient.setQueryData(fxKey, 23.5);
+    queryClient.setQueryData(unrelatedKey, { notifications: true });
+    const invalidateQueries = jest.spyOn(queryClient, "invalidateQueries");
+
+    await act(async () => {
+      await authRef.current!.saveProfile({
+        name: savedProfile.name,
+        home_country: savedProfile.home_country,
+        home_currency: savedProfile.home_currency,
+        sport: savedProfile.sport,
+      });
+    });
+
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["profile", firstProfile.email],
+    });
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["tournaments"],
+    });
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["tournament"],
+    });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["fx"] });
+    expect(invalidateQueries).toHaveBeenCalledTimes(4);
+    expect(queryClient.getQueryState(tournamentListKey)?.isInvalidated).toBe(
+      true,
+    );
+    expect(queryClient.getQueryState(tournamentKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(fxKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(unrelatedKey)?.isInvalidated).toBe(false);
+  });
+
+  it("does not invalidate currency-derived queries for the same normalized currency", async () => {
+    const savedProfile = { ...firstProfile, name: "Updated athlete" };
+    profileStorage.set(firstUserId, firstProfile);
+    mockGetSession.mockResolvedValue({
+      data: { session: session(firstProfile.email, firstUserId) },
+      error: null,
+    });
+    getProfile.mockReturnValue(new Promise(() => undefined));
+    saveProfile.mockResolvedValue(savedProfile);
+
+    const { authRef, screen } = renderAuthProvider();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("profile-email").props.children).toBe(
+        firstProfile.email,
+      );
+    });
+
+    const tournamentListKey = ["tournaments", firstProfile.id];
+    const tournamentKey = ["tournament", "tournament-1"];
+    const fxKey = ["fx", "MYR", "USD", 100];
+    queryClient.setQueryData(tournamentListKey, [{ id: "tournament-1" }]);
+    queryClient.setQueryData(tournamentKey, { id: "tournament-1" });
+    queryClient.setQueryData(fxKey, 23.5);
+    const invalidateQueries = jest.spyOn(queryClient, "invalidateQueries");
+
+    await act(async () => {
+      await authRef.current!.saveProfile({
+        name: savedProfile.name,
+        home_country: savedProfile.home_country,
+        home_currency: "myr",
+        sport: savedProfile.sport,
+      });
+    });
+
+    expect(saveProfile).toHaveBeenCalledWith(
+      expect.objectContaining({ home_currency: "MYR" }),
+      { authToken: `token:${firstUserId}` },
+    );
+    expect(invalidateQueries).toHaveBeenCalledTimes(1);
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["profile", firstProfile.email],
+    });
+    expect(queryClient.getQueryState(tournamentListKey)?.isInvalidated).toBe(
+      false,
+    );
+    expect(queryClient.getQueryState(tournamentKey)?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryState(fxKey)?.isInvalidated).toBe(false);
+  });
+
   it("discards a refresh that completes after the account changes", async () => {
     const backgroundLoad = deferred<AthleteProfile | null>();
     const refresh = deferred<AthleteProfile | null>();
@@ -597,6 +707,8 @@ describe("AuthProvider profile isolation", () => {
       );
     });
 
+    const invalidateQueries = jest.spyOn(queryClient, "invalidateQueries");
+
     let savePromise!: Promise<AthleteProfile>;
     act(() => {
       savePromise = authRef.current!.saveProfile({
@@ -618,6 +730,7 @@ describe("AuthProvider profile isolation", () => {
 
     expect(screen.getByTestId("profile-email").props.children).toBe("none");
     expect(profileStorage.get()).toBeNull();
+    expect(invalidateQueries).not.toHaveBeenCalled();
   });
 
   it("keeps local sign-out isolated when a load and remote sign-out fail", async () => {

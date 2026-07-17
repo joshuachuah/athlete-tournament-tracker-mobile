@@ -267,6 +267,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
     const userId = session?.user.id;
     const email = session?.user.email;
     const authToken = session?.access_token;
+    const previousHomeCurrency = profile?.home_currency.toUpperCase();
+    const nextHomeCurrency = data.home_currency.toUpperCase();
 
     if (!userId || !email || !authToken) {
       throw new Error("Sign in before saving a profile.");
@@ -292,7 +294,20 @@ export function AuthProvider({ children }: PropsWithChildren) {
       setProfile(savedProfile);
       setStatus("ready");
       profileStorage.set(userId, savedProfile);
-      queryClient.invalidateQueries({ queryKey: ["profile", email] });
+
+      const invalidations = [
+        queryClient.invalidateQueries({ queryKey: ["profile", email] }),
+      ];
+
+      if (previousHomeCurrency !== nextHomeCurrency) {
+        invalidations.push(
+          queryClient.invalidateQueries({ queryKey: ["tournaments"] }),
+          queryClient.invalidateQueries({ queryKey: ["tournament"] }),
+          queryClient.invalidateQueries({ queryKey: ["fx"] }),
+        );
+      }
+
+      await Promise.all(invalidations);
     }
 
     return savedProfile;
