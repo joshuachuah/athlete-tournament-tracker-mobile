@@ -1,8 +1,9 @@
 import { Alert, ScrollView, Text, View } from "react-native";
-import { Redirect, router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { Badge } from "@/components/ui/badge";
+import { ProtectedScreen } from "@/components/auth/protected-screen";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ErrorState, LoadingState } from "@/components/ui/state";
@@ -23,7 +24,21 @@ import type { Scenario } from "@/types";
 
 const scenarioOrder: Scenario[] = ["worst", "realistic", "best"];
 
+type DeleteTournamentVariables = {
+  tournamentId: string;
+  userId: string;
+  profileId: string;
+};
+
 export default function TournamentDetailScreen() {
+  return (
+    <ProtectedScreen>
+      <TournamentDetailContent />
+    </ProtectedScreen>
+  );
+}
+
+function TournamentDetailContent() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { profile, session } = useAuth();
   const tournamentId = typeof id === "string" ? id : "";
@@ -36,27 +51,49 @@ export default function TournamentDetailScreen() {
     refetch,
   } = useQuery({
     queryKey: ["tournament", tournamentId],
-    queryFn: () => api.tournaments.get(tournamentId),
-    enabled: Boolean(session && tournamentId),
+    queryFn: ({ signal }) => api.tournaments.get(tournamentId, { signal }),
+    enabled: Boolean(tournamentId),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: () => api.tournaments.delete(tournamentId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tournaments", profile?.id] });
+    mutationFn: (variables: DeleteTournamentVariables) =>
+      api.tournaments.delete(variables.tournamentId, {
+        authenticatedUserId: variables.userId,
+      }),
+    onSuccess: (_result, variables) => {
+      if (session?.user.id !== variables.userId) {
+        return;
+      }
+
+      queryClient.removeQueries({
+        queryKey: ["tournament", variables.tournamentId],
+        exact: true,
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["tournaments", variables.profileId],
+      });
       router.replace("/(tabs)/dashboard");
     },
   });
 
-  if (!session) {
-    return <Redirect href="/login" />;
-  }
-
-  if (!profile) {
-    return <Redirect href="/onboarding" />;
+  if (!session || !profile) {
+    return null;
   }
 
   function confirmDelete() {
+    const userId = session?.user.id;
+    const profileId = profile?.id;
+
+    if (!userId || !profileId) {
+      return;
+    }
+
+    const variables: DeleteTournamentVariables = {
+      tournamentId,
+      userId,
+      profileId,
+    };
+
     Alert.alert(
       "Delete tournament",
       "This removes the tournament from the server.",
@@ -65,13 +102,14 @@ export default function TournamentDetailScreen() {
         {
           text: "Delete",
           style: "destructive",
-          onPress: () => deleteMutation.mutate(),
+          onPress: () => deleteMutation.mutate(variables),
         },
       ],
     );
   }
 
   const realistic = data ? getScenario(data, "realistic") : undefined;
+  const hasProjection = data ? data.pnl.scenarios.length > 0 : false;
 
   return (
     <ScrollView
@@ -89,7 +127,8 @@ export default function TournamentDetailScreen() {
           onRetry={() => refetch()}
         />
       ) : null}
-      {deleteMutation.isError ? (
+      {deleteMutation.isError &&
+      deleteMutation.variables?.userId === session.user.id ? (
         <ErrorState
           message={deleteMutation.error.message}
           onRetry={confirmDelete}
@@ -123,7 +162,9 @@ export default function TournamentDetailScreen() {
                 label={`${scenarioLabel(realistic.scenario)} net`}
                 tone={realistic.profitable ? "profit" : "loss"}
               />
-            ) : null}
+            ) : (
+              <Badge label="Projection unavailable" tone="neutral" />
+            )}
           </View>
 
           <Card>
@@ -143,33 +184,43 @@ export default function TournamentDetailScreen() {
             >
               {data.pnl.break_even_round
                 ? roundLabels[data.pnl.break_even_round]
-                : "No break-even"}
+                : hasProjection
+                  ? "No break-even"
+                  : "Projection unavailable"}
             </Text>
             <Text style={{ color: colors.mutedForeground, lineHeight: 20 }} selectable>
               The server returns the minimum round needed to avoid losing money.
             </Text>
           </Card>
 
-          <View style={{ gap: spacing.md }}>
-            <Text
-              style={{ color: colors.foreground, fontSize: 22, fontWeight: "800" }}
-              selectable
-            >
-              Scenarios
-            </Text>
-            {scenarioOrder.map((scenario) => {
-              const result = getScenario(data, scenario);
-              return result ? (
-                <ScenarioCard
-                  key={scenario}
-                  result={result}
-                  homeCurrency={data.home_currency}
-                  tournamentCurrency={data.currency}
-                  prizeTaxRate={data.prize_tax_rate}
-                />
-              ) : null;
-            })}
-          </View>
+          {data.pnl.scenarios.length === 0 ? (
+            <Card>
+              <Text style={{ color: colors.mutedForeground }} selectable>
+                Projection unavailable
+              </Text>
+            </Card>
+          ) : (
+            <View style={{ gap: spacing.md }}>
+              <Text
+                style={{ color: colors.foreground, fontSize: 22, fontWeight: "800" }}
+                selectable
+              >
+                Scenarios
+              </Text>
+              {scenarioOrder.map((scenario) => {
+                const result = getScenario(data, scenario);
+                return result ? (
+                  <ScenarioCard
+                    key={scenario}
+                    result={result}
+                    homeCurrency={data.home_currency}
+                    tournamentCurrency={data.currency}
+                    prizeTaxRate={data.prize_tax_rate}
+                  />
+                ) : null;
+              })}
+            </View>
+          )}
 
           <Card>
             <Text

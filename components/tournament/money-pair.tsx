@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { colors, spacing } from "@/constants/theme";
 import { api } from "@/lib/api";
-import { formatMoney } from "@/lib/utils";
+import { formatMoney, roundCurrencyAmount } from "@/lib/utils";
 
 export function MoneyPair({
   amount,
@@ -16,15 +16,35 @@ export function MoneyPair({
   toCurrency: string;
   label?: string;
 }) {
+  const normalizedFromCurrency = fromCurrency.toUpperCase();
+  const normalizedToCurrency = toCurrency.toUpperCase();
   const shouldConvert =
-    fromCurrency.toUpperCase() !== toCurrency.toUpperCase() && Number.isFinite(amount);
+    normalizedFromCurrency !== normalizedToCurrency && Number.isFinite(amount);
 
-  const { data: conversion, isError: conversionFailed } = useQuery({
-    queryKey: ["fx", fromCurrency, toCurrency, amount],
-    queryFn: () => api.fx.convert(fromCurrency, toCurrency, amount),
+  const { data: rate, isError: conversionFailed } = useQuery({
+    queryKey: ["fx-rate", normalizedFromCurrency, normalizedToCurrency],
+    queryFn: async ({ signal }) => {
+      const conversion = await api.fx.convert(
+        normalizedFromCurrency,
+        normalizedToCurrency,
+        1,
+        { signal },
+      );
+
+      if (!Number.isFinite(conversion.rate) || conversion.rate <= 0) {
+        throw new Error("Invalid FX rate");
+      }
+
+      return conversion.rate;
+    },
     enabled: shouldConvert,
     staleTime: 60 * 60 * 1000,
   });
+
+  const convertedAmount =
+    rate === undefined
+      ? undefined
+      : roundCurrencyAmount(amount * rate, normalizedToCurrency);
 
   return (
     <View style={{ gap: 2 }}>
@@ -41,7 +61,7 @@ export function MoneyPair({
         }}
         selectable
       >
-        {formatMoney(amount, fromCurrency)}
+        {formatMoney(amount, normalizedFromCurrency)}
       </Text>
       {shouldConvert ? (
         <Text
@@ -52,8 +72,8 @@ export function MoneyPair({
           }}
           selectable
         >
-          {conversion
-            ? formatMoney(conversion.converted, toCurrency)
+          {convertedAmount !== undefined
+            ? formatMoney(convertedAmount, normalizedToCurrency)
             : conversionFailed
               ? "FX unavailable"
               : "Converting..."}

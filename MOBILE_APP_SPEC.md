@@ -1,497 +1,482 @@
-# Mobile App Spec — Athlete Tournament Tracker (React Native)
+# Mobile App Spec — Athlete Tournament Tracker
 
-A native iOS/Android companion to the existing web app. Athletes track tournament
-expenses, model prize-money scenarios, and see net profit/loss per event — on the
-phone they already carry to every tournament.
+This document describes the behavior and architecture currently shipped by the
+Expo mobile app. Sections 1–14 are current-state documentation. Section 15 is the
+only roadmap section; every entry there is explicitly marked shipped, deferred,
+or rejected.
 
-> **Guiding principle:** the mobile app is a **new client over the existing
-> backend**, not a new system. The Flask API stays the single source of truth for
-> all money math (P&L, currency conversion, subsidy netting). The app renders and
-> collects input — it never re-implements the formula. See the project
-> `CLAUDE.md` "Core Domain Logic" section, which still governs.
-
----
-
-## 1. Goals & Non-Goals
-
-### Goals
-- Full feature parity with the web app's core loop: profile → add tournaments →
-  scenario P&L → dashboard runway.
-- Mobile-first ergonomics the web app only approximates: bottom-tab nav, native
-  forms, pull-to-refresh, offline read access, and (optional) push reminders.
-- Reuse the existing Flask API and Supabase auth verbatim — zero backend rewrite
-  for v1.
-- Share TypeScript domain types with the web frontend so the contract can't drift.
-
-### Non-Goals (v1)
-- No new backend endpoints unless explicitly called out (§9).
-- No on-device P&L recalculation as the source of truth — the server owns it.
-- **No offline support in v1.** The app requires connectivity (every write and
-  every calculation goes through the server). Offline read-cache is Phase 3 — see
-  §8 and the rationale in §16.
-- **No biometric lock in v1.** Phase 3.
-- No tablet-optimized layouts. Phone portrait first.
-- No Android/iOS widgets, no watchOS. (Noted as future work in §15.)
+> **Product invariants**
+>
+> - The Flask backend owns P&L, subsidy netting, currency conversion, and all
+>   other authoritative financial calculations.
+> - The app collects input and renders server-derived financial results. It does
+>   not fork the backend formula.
+> - Every rendered money value includes an ISO currency code.
+> - React Compiler owns memoization. Components stay pure and do not introduce
+>   `useMemo`, `useCallback`, or `React.memo`.
 
 ---
 
-## 2. Tech Stack
+## 1. Product Scope
 
-| Concern | Choice | Rationale |
-|---|---|---|
-| Framework | **Expo (SDK 54+) + React Native** | Managed workflow, OTA updates, EAS Build/Submit. Avoids native toolchain friction. |
-| Language | **TypeScript** (strict) | Share types with web (`src/types`). |
-| Navigation | **Expo Router** (file-based) | Mirrors the Next.js mental model the team already uses. |
-| Server state | **@tanstack/react-query v5** | Same library/version as web — reuse query patterns and `api` client shape. |
-| Auth | **@supabase/supabase-js** + `expo-auth-session` | Same Supabase project; Google OAuth via native flow. |
-| Secure storage | **expo-secure-store** | Supabase session token (never AsyncStorage for tokens). |
-| Local cache | **AsyncStorage** | Cached profile so the app opens to the dashboard without a round-trip. (No offline read-mirror in v1 — Phase 3.) |
-| Styling | **NativeWind v4** (Tailwind for RN) | Reuse the web design tokens (profit/loss/warning colors, spacing scale). |
-| Icons | **lucide-react-native** | Same icon set as web (`lucide-react`). |
-| Forms | **react-hook-form** + **zod** | `zod` already a web dep; share validation schemas. |
-| Dates | Native `Intl` + **date-fns** | Lightweight formatting/parsing. |
-| Push (optional) | **expo-notifications** | Tournament reminders, break-even alerts. |
+The app supports the core athlete workflow:
 
-> **React Compiler note:** RN supports the React Compiler via the Babel plugin.
-> Follow the global guidance — write straightforward components, skip manual
-> `useMemo`/`useCallback`/`memo` for ~95% of cases, and keep render functions pure
-> so the compiler can memoize safely.
+1. Sign in with Google through Supabase Auth.
+2. Create or load an athlete profile.
+3. Search for a known tournament or start one from scratch.
+4. Create, edit, and delete tournament projections.
+5. Review server-generated worst, realistic, and best scenarios, break-even,
+   tax-adjusted prize values, expenses, season totals, and runway.
 
----
+The shipped app is phone-portrait first. It requires the API for tournament
+reads, writes, FX conversion, and P&L. It does not provide a persisted offline
+tournament mirror, biometric lock, widgets, or push reminders.
 
-## 3. Architecture
+## 2. Shipped Technology
 
-```
-┌─────────────────────────────┐         ┌──────────────────────────┐
-│   React Native App (Expo)   │         │   Supabase (Auth + DB)   │
-│                             │  OAuth  │                          │
-│  Expo Router screens        │◄───────►│  Google sign-in          │
-│  React Query cache          │         │  Postgres (via Flask)    │
-│  api client (fetch)         │         └──────────────────────────┘
-│  SecureStore (session)      │                    ▲
-│  AsyncStorage (profile)     │                    │ SQLAlchemy
-└──────────────┬──────────────┘                    │
-               │ HTTPS JSON                ┌────────┴──────────┐
-               └──────────────────────────►│   Flask API       │
-                                           │  /api/profile     │
-                                           │  /api/tournaments │
-                                           │  /api/fx          │
-                                           │  /api/.../search  │
-                                           │  utils/pnl.py ◄── single source of P&L
-                                           │  utils/currency.py│
-                                           └───────────────────┘
+`package.json` and `pnpm-lock.yaml` are the dependency authorities. The main
+runtime choices are:
+
+| Concern | Shipped choice |
+|---|---|
+| Framework | Expo SDK 54, React Native 0.81, React 19 |
+| Language | Strict TypeScript |
+| Navigation | Expo Router 6 with native tabs and stack routes |
+| Server state | TanStack React Query 5 |
+| Authentication | Supabase JS, Expo AuthSession, and Expo WebBrowser |
+| Session storage | Expo SecureStore through the Supabase storage adapter |
+| Local profile and draft storage | `expo-sqlite/localStorage/install` |
+| Forms and validation | React Hook Form is installed; the tournament form uses local state and zod schemas |
+| Styling | React Native style objects and `StyleSheet`, using tokens from `constants/theme.ts` |
+| Dates and money | date-fns plus `Intl.NumberFormat` helpers in `lib/utils.ts` |
+| Icons | lucide-react-native and native tab icons |
+| Tests | Jest, jest-expo, and React Native Testing Library |
+| Memoization | React Compiler via `babel-plugin-react-compiler` |
+
+The app does not depend on a utility-class styling runtime. Colors, radii, and
+spacing are defined in `constants/theme.ts`; components apply those tokens with
+React Native style objects.
+
+## 3. Current Architecture
+
+```text
+Expo Router screens and components
+        |
+        +-- AuthProvider --------------------> Supabase Auth
+        |      |                                  |
+        |      +-- SecureStore session            +-- Google OAuth
+        |      +-- SQLite-backed profile cache
+        |
+        +-- TanStack Query --> lib/api.ts --> Flask /api and /health
+        |                                      |
+        |                                      +-- trusted P&L and FX logic
+        |                                      +-- database persistence
+        |
+        +-- TournamentDraftProvider --> SQLite-backed per-user draft
 ```
 
-- The app talks to the **same Flask base URL** as the web app
-  (`EXPO_PUBLIC_API_URL`, default `http://localhost:5000` in dev).
-- Auth is identical: Supabase issues the session; the app reads the signed-in
-  email and uses it to load/save the athlete profile via `/api/profile`.
-- All monetary values are stored in the athlete's **home currency** server-side.
-  The app displays both home and tournament currency side-by-side (project rule #4).
+- `EXPO_PUBLIC_API_URL` selects the Flask base URL and defaults to
+  `http://localhost:5000` for local development.
+- `lib/api.ts` attaches a Supabase bearer token when a session is available,
+  applies a 15-second request deadline, preserves caller cancellation, and
+  validates successful JSON responses with zod.
+- The backend must authorize from the bearer token. The client still sends
+  legacy `email` and `user_id` query values because the shipped `/api` contract
+  requires them, but those values are not trusted identity proofs.
+- Supabase is used directly for authentication, not for tournament data access.
+- The app renders nested `pnl` values returned by Flask. Dashboard aggregation
+  consumes those server results instead of reconstructing P&L from raw inputs.
 
-### CORS
-The Flask app reads `CORS_ORIGINS` (see `backend/app.py`). Native apps don't send
-a browser `Origin`, so requests from the device generally bypass CORS — but for
-Expo web preview and tooling, add the Expo dev origin if needed. No code change
-required for native builds.
+## 4. Authentication and Profile Bootstrap
 
----
+The implementation lives in `lib/supabase.ts` and `context/auth.tsx`.
 
-## 4. Authentication Flow
+1. The Supabase client persists and refreshes its session through an Expo
+   SecureStore adapter. URL detection is disabled because native callback
+   handling is explicit.
+2. `AuthProvider` calls `supabase.auth.getSession()` and subscribes to auth state
+   changes.
+3. Google sign-in requests a Supabase OAuth URL and opens it with
+   `WebBrowser.openAuthSessionAsync`. The callback is
+   `athletetracker://auth/callback`.
+4. The Supabase client uses PKCE. The callback handler exchanges a one-time
+   authorization `code` and rejects access-token or refresh-token URL fragments.
+5. Once a session has both a user ID and email, the provider loads the cached
+   profile only when it belongs to that Supabase user, then refreshes it through
+   `GET /api/profile?email=`.
+6. Missing profiles route to onboarding; resolved profiles route to the
+   dashboard.
+7. Sign-out clears session/profile state, the per-user profile cache, and the
+   React Query cache before calling Supabase sign-out.
 
-Reuse the existing Supabase project (`NEXT_PUBLIC_SUPABASE_URL` /
-`..._ANON_KEY` → `EXPO_PUBLIC_SUPABASE_URL` / `..._ANON_KEY`).
+### OAuth hardening status
 
-1. **Splash / bootstrap** — read session from SecureStore via Supabase client
-   configured with a custom `storage` adapter backed by `expo-secure-store`.
-2. **Login screen** — "Continue with Google" button → `expo-auth-session` opens
-   the system browser → Supabase OAuth callback via a deep link
-   (`athletetracker://auth/callback`).
-3. **Profile gate** — after auth, `GET /api/profile?email=<session email>`:
-   - `null` → route to **Onboarding / Profile setup**.
-   - profile object → cache it (mirrors web's `localStorage` user) and route to
-     **Dashboard**.
-4. **Sign out** — `supabase.auth.signOut()` + clear SecureStore + clear React
-   Query cache + clear cached profile.
+**Shipped locally; external verification pending:** the client configures
+`flowType: "pkce"` and accepts code-only callbacks. The live Supabase redirect
+allow-list and signed iOS/Android login, cancellation, cold-start, and relaunch
+flows have not been verified. Local implementation therefore does not by itself
+establish production OAuth readiness.
 
-> **One provider, not two.** The web app splits `AuthContext` / `UserContext` and
-> uses a `useSyncExternalStore` + localStorage + module-cache dance — but that
-> machinery exists *only* to avoid Next.js SSR hydration mismatches. React Native
-> has no SSR, so collapse it into a single `AuthProvider` holding
-> `{ session, profile }` with plain `useState`. Persist the resolved profile in
-> AsyncStorage so the app opens straight to the dashboard while the session
-> rehydrates. (See §16 for why this simplification is safe to make.)
+The app never records provider IDs, access tokens, refresh tokens, or private
+environment values in documentation or local profile storage.
 
-Biometric app-lock (expo-local-authentication) is **Phase 3**, not v1.
+## 5. Navigation
 
----
-
-## 5. Navigation Map (Expo Router)
-
-```
+```text
 app/
-  _layout.tsx               # Root: providers (Auth, Profile, QueryClient, theme)
-  index.tsx                 # Bootstrap/splash → redirect by auth+profile state
-  login.tsx                 # Google sign-in
-  onboarding.tsx            # First-run profile setup (name, country, currency, sport, savings…)
+  _layout.tsx                       providers and root Stack
+  index.tsx                         auth/profile bootstrap redirect
+  login.tsx                         Google sign-in
+  onboarding.tsx                    first profile setup
   (tabs)/
-    _layout.tsx             # Bottom tab navigator
-    dashboard.tsx           # Tab 1 — season overview, runway, tournament list
-    add.tsx                 # Tab 2 — entry point to the add-tournament flow
-    profile.tsx             # Tab 3 — edit athlete profile, sign out
+    _layout.tsx                     Dashboard, Add, Profile native tabs
+    dashboard.tsx                   season overview and tournament list
+    add.tsx                         start-from-scratch or search choices
+    profile.tsx                     profile editing and sign-out
+  search.tsx                        known/live tournament search and prefill
   tournaments/
-    [id].tsx                # Tournament detail — scenarios, break-even, edit
+    [id].tsx                        detail, scenarios, edit, and delete
     new/
-      _layout.tsx           # Stepped wizard container (5 steps, §7)
-      details.tsx           # Step 1
-      prizes.tsx            # Step 2
-      travel.tsx            # Step 3
-      subsidy.tsx           # Step 4
-      spending.tsx          # Step 5 → submit → projection
-  search.tsx                # Tournament search (PSA live + known) → prefill new
+      _layout.tsx                   draft provider and Stack
+      index.tsx                     redirect to details
+      details.tsx                   canonical progressive form route
+      prizes.tsx                    legacy redirect
+      travel.tsx                    legacy redirect
+      subsidy.tsx                   legacy redirect
+      spending.tsx                  legacy redirect
 ```
 
-**Bottom tabs:** Dashboard · Add (center, prominent) · Profile.
+The old step paths remain only for compatibility with saved links and navigation
+history. `LegacyTournamentRedirect` sends each one to the canonical details
+route and preserves an edit ID when present.
 
----
+Protected routes mount their query-owning content only after auth bootstrap is
+ready. Loading preserves the current deep link; signed-out users route to login,
+and signed-in users without a profile route to onboarding.
 
-## 6. Data Layer
+## 6. Data and Cache Behavior
 
-Port the web `src/lib/api.ts` almost verbatim — same endpoints, same shapes.
-Only difference: base URL env var name and using `expo-constants`/`process.env`.
+### API client
+
+The shipped client calls the unversioned compatibility API:
 
 ```ts
-// lib/api.ts (RN)
-const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:5000";
-
-export const api = {
-  profile: {
-    get:  (email: string) => request<AthleteProfile | null>(`/api/profile?email=${encodeURIComponent(email)}`),
-    save: (data) => request<AthleteProfile>("/api/profile", { method: "POST", body: JSON.stringify(data) }),
-  },
-  tournaments: {
-    list:   (user_id: string) => request<TournamentWithPnL[]>(`/api/tournaments?user_id=${user_id}`),
-    get:    (id: string)      => request<TournamentWithPnL>(`/api/tournaments/${id}`),
-    create: (data)            => request<TournamentWithPnL>("/api/tournaments", { method: "POST", body: JSON.stringify(data) }),
-    update: (id, data)        => request<TournamentWithPnL>(`/api/tournaments/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-    delete: (id)              => request<{ success: boolean }>(`/api/tournaments/${id}`, { method: "DELETE" }),
-    search: (q, sport?)       => request<KnownTournament[]>(`/api/tournaments/search?q=${encodeURIComponent(q)}${sport ? `&sport=${sport}` : ""}`),
-  },
-  fx: {
-    convert: (from, to, amount) => request(`/api/fx?from=${from}&to=${to}&amount=${amount}`),
-  },
-};
+api.profile.get(email);             // GET /api/profile?email=
+api.profile.save(profile);          // POST /api/profile
+api.tournaments.list(userId);       // GET /api/tournaments?user_id=
+api.tournaments.get(id);            // GET /api/tournaments/:id
+api.tournaments.create(payload);    // POST /api/tournaments
+api.tournaments.update(id, payload);// PATCH /api/tournaments/:id
+api.tournaments.delete(id);         // DELETE /api/tournaments/:id
+api.tournaments.search(query, sport);// GET /api/tournaments/search
+api.fx.convert(from, to, amount);   // GET /api/fx
+api.health();                       // GET /health
 ```
 
-**Shared types:** publish `src/types/index.ts` (`AthleteProfile`, `Tournament`,
-`PrizeRounds`, `PnLResult`, `ScenarioResult`, `SubsidyCovers`) to a shared
-location. Options, simplest first:
-- Copy the file into the RN project and keep it in sync (acceptable for v1).
-- Or extract a tiny `@athlete/types` workspace package consumed by both web and
-  mobile (preferred long-term — kills contract drift).
+Successful responses pass through the schemas in `lib/api-schemas.ts`. Invalid
+responses fail with `INVALID_RESPONSE`; network, timeout, and caller-abort
+failures use distinct API error codes.
 
-**React Query keys** match web: `["tournaments", userId]`, `["tournament", id]`,
-`["profile", email]`. Configure `staleTime` (~60s). In v1 the cache lives in
-memory only — persisting it to AsyncStorage for offline reads is Phase 3 (§8).
+### React Query
 
----
+- The shared `QueryClient` retries queries once and uses a 60-second default
+  `staleTime`.
+- Tournament lists use `['tournaments', profile.id]`; detail uses
+  `['tournament', id]`; search uses
+  `['tournament-search', debouncedQuery, profile.sport]`.
+- Display FX uses one normalized `['fx-rate', from, to]` unit-rate query per
+  currency pair with a one-hour `staleTime`; `MoneyPair` applies the returned
+  server rate and target-currency rounding to each displayed amount.
+- Query functions forward TanStack Query's cancellation signal to the API
+  client for lists, search, detail, edit hydration, and FX rates.
+- Profile saves, tournament saves, deletes, auth identity changes, and sign-out
+  invalidate or clear the relevant caches.
+- Tournament writes capture the initiating user, profile, and bearer token.
+  Completion effects are ignored if the authenticated user changes before the
+  request settles.
+- React Query data remains in memory. It is not restored after process exit.
 
-## 7. Screen Specs
+### Local persistence
 
-Each screen maps to an existing web page. Behavior and rules are inherited from
-the web app and `CLAUDE.md`; below are the mobile-specific notes.
+`lib/storage.ts` installs Expo SQLite's `localStorage` implementation.
 
-### 7.1 Dashboard (`(tabs)/dashboard.tsx`)
-Mirrors `src/app/dashboard/page.tsx`.
-- **Header:** "Welcome back", athlete name, `{year} Season Overview`.
-- **Stats grid (2×2):** YTD Earnings (green), YTD Expenses (red), Net Result
-  (green/red + "Profitable season" / "In the red"), Tournaments count
-  (`{ytd} this year`). Compute identically to web from the `pnl` on each
-  tournament — do **not** recompute net from raw fields.
-- **Runway banner** (project rule #3): `Math.floor(savings / avg_net_spend)`.
-  - `avg_net_spend` = mean of realistic-scenario losses across tournaments.
-  - No losses → "Profitable on average" (green).
-  - `runway <= 3` → warning style.
-- **Tournament list:** card per tournament with name, profit/loss badge (realistic
-  net), location, start date, a **scenario bar** (worst/realistic/best), and
-  break-even round. Tap → detail.
-- **Mobile extras:** pull-to-refresh (refetch list), skeleton loaders, empty state
-  ("No tournaments yet" → Add).
+- Profiles are stored in a versioned envelope keyed to the Supabase user ID.
+  A cache from another account is removed instead of reused.
+- Tournament drafts are stored in a runtime-validated, versioned envelope under
+  a per-user key. Known legacy partial drafts migrate through defaults; corrupt
+  or unknown data falls back safely. Successful saves clear the draft, and
+  abandoned edit drafts are guarded against reuse.
+- Supabase session material is separate and remains in SecureStore.
 
-### 7.2 Tournament Detail (`tournaments/[id].tsx`)
-Mirrors `src/app/tournaments/[id]/page.tsx`.
-- **Three scenario cards** — worst (R1 exit) / realistic / best (title), each
-  showing prize money, net result, profitable flag. Project rule #1: never a
-  single number.
-- **Break-even round** prominently (project rule #2).
-- **Currency:** show home + tournament currency side-by-side (rule #4). Use
-  `/api/fx` for the tournament-currency view; cache rates 1h (server already does).
-- **Expense breakdown:** flights, accommodation, daily × days, coaching, entry,
-  misc, with subsidy netting applied (the server returns adjusted figures).
-- **Edit:** opens the same wizard pre-filled; `PATCH` on save; P&L recalculates
-  server-side and the card updates. Debounce inline edits 300ms (rule from
-  CLAUDE.md "Editing a tournament").
-- **Delete:** confirm sheet → `DELETE` → back to dashboard, invalidate list.
+## 7. Screens
 
-### 7.3 Add Tournament Wizard (`tournaments/new/*`)
-Five steps (matches CLAUDE.md "Adding a new tournament"):
-1. **Details** — name, location, country, currency, start/end date, duration
-   (auto-derive `duration_days` from dates), entry fee.
-2. **Prizes** — per-round amounts (`r1, r2, r3, qf, sf, f, w`) in tournament
-   currency. Optional fields.
-3. **Travel** — flight cost, accommodation total (nightly × nights helper).
-4. **Subsidy & Sponsorship** — **subsidy fields hidden behind an "I am subsidized"
-   toggle** (project rule #5). When on: `subsidy_by`, `subsidy_amount`,
-   `subsidy_covers` ∈ {flights, accommodation, full_expenses, flat_stipend}.
-   Plus `sponsorship_allocated`.
-5. **Spending plan** — `daily_spending_cap`, coaching/physio, misc. Warn if planned
-   daily spend exceeds cap. Optionally auto-suggest a cap from destination COL
-   (future; static table fallback).
-6. **Submit** → `POST /api/tournaments` → show generated projection across all
-   scenarios.
+### Dashboard
 
-Wizard UX: progress indicator, per-step validation (zod), back/next, save draft
-locally so a backgrounded app doesn't lose input. Values entered in tournament
-currency; server converts to home currency on create (see
-`backend/routes/tournaments.py:_to_home_currency`).
+`app/(tabs)/dashboard.tsx` ships:
 
-### 7.4 Tournament Search (`search.tsx`)
-Mirrors `src/components/tournaments/TournamentSearch.tsx` →
-`GET /api/tournaments/search?q=&sport=`.
-- Debounced search input (~300ms). Results show name, tier/tour level, location,
-  dates, estimated prize total.
-- Tap a result → prefill the Add wizard with name, location, country, currency,
-  duration, and estimated `prize_rounds`.
-- Squash gets PSA live results merged server-side; the client just renders.
+- athlete greeting and current-season net;
+- earned, spent, and tournament-count cards;
+- profitable/loss or neutral unavailable season status, including partial
+  projection coverage;
+- runway derived from server-returned realistic scenarios;
+- tournament cards with realistic result, scenario bar, and break-even round;
+- pull-to-refresh through `RefreshControl`;
+- loading, retryable error, and empty states.
 
-### 7.5 Profile / Onboarding (`onboarding.tsx`, `(tabs)/profile.tsx`)
-Mirrors `src/app/profile/page.tsx` → `/api/profile`.
-- Fields: name, home_country, home_currency (3-letter, validated), sport,
-  monthly_income, savings_balance, monthly_sponsorship.
-- Server validation: required name/country/currency/sport; currency must be 3
-  chars (mirror client-side with zod for instant feedback).
-- On save, cache the returned profile (used as `user.id` for tournament queries
-  and `home_currency` for all display).
-- Profile screen also hosts **Sign out**. (Biometric-lock toggle: Phase 3.)
+All dashboard money is formatted with the athlete's `home_currency` code.
 
----
+### Tournament detail
 
-## 8. Offline & Caching
+`app/tournaments/[id].tsx` renders the server response:
 
-**v1: online-only.** Every screen needs the server — writes require the
-conversion+P&L pipeline, and reads come from `/api/tournaments` with the `pnl`
-already computed. The only thing cached locally is the **profile** (AsyncStorage),
-so the app opens to the dashboard while the session rehydrates instead of flashing
-a loader. No data-mirror, no offline banner, no FX cache. When the network is
-down, show standard React Query error/retry states.
+- worst, realistic, and best scenario cards when supplied;
+- pre-tax and `prize_money_after_tax` values when a tax rate applies;
+- server-provided break-even round;
+- server-adjusted income, expense, and net values;
+- home-currency values with a tournament-currency FX view when the codes differ;
+- edit navigation and confirmed delete with query invalidation;
+- neutral projection-unavailable UI when scenarios are absent;
+- exact deleted-detail cache eviction before list invalidation and navigation;
+- loading and retryable error states.
 
-**Phase 3 — offline read (deferred):** persist the React Query cache (tournaments
-list + detail) to AsyncStorage with `@tanstack/query-async-storage-persister`,
-add an "offline — last synced" banner, and cache the last `/api/fx` response per
-pair for dual-currency display. Writes stay online-only even then; an optimistic
-offline queue is explicitly out of scope.
+The response schema permits either no scenarios or exactly one of each scenario
+kind. Partial or duplicate scenario sets are rejected before reaching the UI.
 
-This deferral is deliberate — see §16.
+### Progressive tournament form
 
----
+`app/tournaments/new/details.tsx` mounts one `TournamentForm`; there is no active
+stepped wizard. Required details stay visible. Prize/tax, travel, funding, and
+spending are collapsible sections with summaries.
 
-## 9. Backend Changes Required
+The form:
 
-**v1 target: none.** Every screen is served by existing endpoints
-(`/api/profile`, `/api/tournaments`, `/api/tournaments/<id>`,
-`/api/tournaments/search`, `/api/fx`, `/health`).
+- derives inclusive duration from validated date-only values;
+- collects entry, prize, travel, accommodation, spending, subsidy,
+  sponsorship, and prize-tax inputs;
+- computes an accommodation total helper locally for form input only;
+- hides subsidy details until "I am subsidized" is enabled;
+- warns when planned extras per day exceed the daily cap;
+- expands the first invalid financial section on submit;
+- persists a per-user draft and clears it after a successful create/update;
+- supports known-tournament prefill and server-backed edit prefill.
 
-Nice-to-have (only if push notifications ship):
-- A small endpoint to register an Expo push token per user, and a scheduled job to
-  send tournament-start and break-even reminders. Gate behind a feature flag.
-- If added, follow the project testing rule: **Python unit tests required for any
-  new backend logic**, and keep `backend/utils/` coverage ≥ 80%.
+Creating or updating returns a server projection and navigates to tournament
+detail. The backend remains authoritative for conversion and P&L.
 
----
+### Tournament search
+
+`app/search.tsx` ships a 300ms-debounced search after two entered characters.
+It displays server-provided name, location, date, tier/tour level, and estimated
+prize total when available. Selecting a result prefills known details, currency,
+dates, prize rounds, and prize tax rate into the progressive form. The screen
+includes initial, loading, empty-result, and retryable error states.
+
+### Profile and onboarding
+
+Profile fields are name, home country, three-letter home currency, sport,
+monthly income, savings balance, and monthly sponsorship. Saves are bearer-bound,
+normalize the currency code to uppercase, update the user-bound local cache, and
+invalidate the profile query key. An actual normalized home-currency change also
+invalidates tournament list, detail, and shared FX-rate caches. The Profile tab
+provides sign-out.
+
+## 8. Currency and Financial Contract
+
+### Shipped `/api` compatibility semantics
+
+Plan 016 is deferred. The mobile app therefore continues to use the legacy,
+unversioned `/api` tournament routes; it does not call or imply a migration to a
+newer versioned contract.
+
+The current unit model is asymmetric and must be understood when maintaining the
+client:
+
+- Monetary inputs sent to `POST /api/tournaments` are in tournament currency.
+- The returned flat tournament monetary fields are in the athlete's home
+  currency, while `currency` remains the tournament-currency label.
+- Monetary inputs sent to `PATCH /api/tournaments/:id` are expected in home
+  currency.
+- Nested `pnl` amounts are in `home_currency`.
+- `/api/fx` supplies display-only conversions from home currency to tournament
+  currency in `MoneyPair`.
+
+This compatibility model has a known edit-path limitation: the current edit form
+prefills returned flat home-currency amounts while its labels continue to show
+the tournament currency. The spec records that shipped behavior; it does not
+silently redefine the units or promise a contract migration.
+
+Regardless of that compatibility limitation, these rules remain mandatory:
+
+- The backend owns P&L and conversion.
+- `pnl.total_expenses`, `pnl.total_income_base`, scenario prize/net values, and
+  `break_even_round` are server-derived.
+- The UI formats each monetary value with an explicit currency code.
+- Secrets and provider credentials never enter the mobile financial payload.
+
+## 9. Offline Behavior
+
+Tournament and FX data are online-only. When connectivity fails, server-backed
+screens show their existing error/retry UI. The profile cache may let the auth
+gate resolve without waiting for a fresh profile, and a draft survives process
+restart, but neither is an offline tournament read model.
+
+Writes are never queued for later synchronization.
 
 ## 10. Design System
 
-Reuse web tokens via NativeWind so the two clients look like one product.
+`constants/theme.ts` defines the shipped palette, radii, and spacing:
 
-| Token | Use |
-|---|---|
-| `profit` / `profit-soft` | Positive net, profitable badges, runway-OK banner |
-| `loss` | Negative net, loss badges |
-| `warning` | Runway ≤ 3, over-cap spend warnings |
-| `foreground` / `muted-foreground` | Text hierarchy |
-| `secondary` / `border` | Surfaces, dividers |
+- `profit` / `profitSoft` for positive outcomes;
+- `loss` / `lossSoft` for negative outcomes;
+- `warning` / `warningSoft` for runway and spending warnings;
+- `foreground` / `mutedForeground` for text hierarchy;
+- `surface`, `surfaceMuted`, and `border` for structure;
+- `accent` / `accentSoft` for primary actions.
 
-- **Typography:** mirror web — serif for display headings, mono for the small
-  uppercase eyebrow labels ("WELCOME BACK", section headers), sans for body.
-- **Money formatting:** port `formatMoney(value, currency)` and `formatDate` from
-  `src/lib/utils.ts`. **Never render a monetary value without its currency code**
-  (project rule #4 — e.g. `$4,800 USD`, `₦7,200,000 NGN`).
-- **Layout:** designed for 375px portrait first (project rule #6); tab bar + safe
-  areas via `react-native-safe-area-context`.
-- Optional: lean on the `frontend-design` skill for high-polish screens.
+Layouts use React Native style objects, safe areas, flexible rows, and wrapping
+for narrow phone screens. `formatMoney` always appends the uppercase ISO code,
+including when `Intl.NumberFormat` also prints a symbol.
 
----
+## 11. Repository Structure
 
-## 11. Project Structure
-
-```
-mobile/
-  app/                      # Expo Router screens (see §5)
-  components/
-    ui/                     # Card, Badge, Button, Input — RN ports of src/components/ui
-    dashboard/              # StatCard, RunwayBanner, ScenarioBar, TournamentCard
-    tournament/             # Scenario cards, expense breakdown, wizard steps
-  context/
-    auth.tsx                # Single provider: { session, profile } — plain useState + AsyncStorage
-  lib/
-    api.ts                  # fetch client (§6)
-    supabase.ts             # Supabase client w/ SecureStore storage adapter
-    utils.ts                # formatMoney, formatDate (ported from web)
-    queryClient.ts          # React Query client (in-memory; persister added in Phase 3)
-  types/                    # shared types (copied from web for v1)
-  app.json / app.config.ts  # Expo config, deep link scheme, env wiring
-  eas.json                  # Build/submit profiles
-  __tests__/                # Jest + RNTL
+```text
+app/                         Expo Router screens
+components/
+  dashboard/                cards, scenario bar, runway
+  tournament/               form, scenario, FX, expense components
+  ui/                       shared controls and screen states
+constants/theme.ts           design tokens
+context/auth.tsx             session and profile lifecycle
+context/tournament-draft.tsx per-user persisted form draft
+hooks/use-debounced-value.ts search debounce
+lib/
+  api.ts                     authenticated request client
+  api-schemas.ts             runtime response validation
+  dashboard.ts               aggregation of server P&L results
+  query-client.ts            shared in-memory query cache
+  storage.ts                 SQLite-backed profile/draft persistence
+  supabase.ts                Supabase client and SecureStore adapter
+  tournament-draft.ts        draft schemas and payload mapping
+  utils.ts                   date, money, and scenario helpers
+types/index.ts               current mobile domain types
+__tests__/                   Jest and RNTL coverage
+.github/workflows/ci.yml     dependency, Expo, typecheck, and test gate
+docs/production-readiness.md release evidence and known gaps
+app.json / eas.json          Expo identity and EAS profiles
 ```
 
----
+## 12. Environment and Build Configuration
 
-## 12. Environment & Config
+The app reads these public build-time values:
 
-`.env` (Expo reads `EXPO_PUBLIC_*` at build time):
-
-```
-EXPO_PUBLIC_API_URL=http://localhost:5000      # Flask base (prod: deployed URL)
-EXPO_PUBLIC_SUPABASE_URL=                       # same project as web
-EXPO_PUBLIC_SUPABASE_ANON_KEY=
+```text
+EXPO_PUBLIC_API_URL
+EXPO_PUBLIC_SUPABASE_URL
+EXPO_PUBLIC_SUPABASE_ANON_KEY
 ```
 
-- **Never** ship the Open Exchange Rates key or Supabase service-role key in the
-  app — FX stays server-side (project "Important Notes"). The app only ever calls
-  `/api/fx`.
-- Deep link scheme: `athletetracker://` (register in `app.json`, add to Supabase
-  redirect allow-list).
-- Dev: point `EXPO_PUBLIC_API_URL` at the LAN IP of the machine running Flask
-  (e.g. `http://192.168.x.x:5000`) so a physical device can reach it.
+The Supabase anon key is designed for public clients; a service-role key, FX
+provider key, or other server secret must never ship in the app. Physical-device
+development must use an API host reachable by that device rather than assuming
+its `localhost` points to the development machine.
 
----
+`app.json` defines the `athletetracker` scheme and phone-portrait app identity.
+`eas.json` contains development, preview, and production build profiles; preview
+and production provide the deployed API URL. Current release evidence and gaps
+belong in `docs/production-readiness.md`.
 
-## 13. Testing
+## 13. Testing and CI
 
-Inherit the project's testing posture (CLAUDE.md "Testing & CI"):
-- **Domain math stays server-tested** — `backend/tests/test_pnl.py` and
-  `test_currency.py` remain the authority; the app must not fork the formula, so
-  there's nothing new to test there.
-- **App tests (Jest + React Native Testing Library):**
-  - Components render P&L/scenario data correctly (worst/realistic/best present,
-    currency code always shown, break-even displayed).
-  - Runway banner thresholds (profitable / normal / ≤3 warning).
-  - Subsidy toggle hides/shows fields (rule #5).
-  - Wizard validation (zod) and date→duration derivation.
-  - API client request shapes (mocked fetch).
-- **CI:** extend `.github/workflows/ci.yml` (or a new workflow) with a mobile job:
-  `tsc --noEmit`, ESLint, and Jest. Keep the existing Python + web jobs unchanged.
-- **E2E (optional):** Maestro flows for login → add tournament → see projection.
+The mobile repository tests client behavior, not a duplicate P&L formula.
+Coverage includes API request/response handling, auth/profile cache isolation,
+runtime schemas, draft lifecycle and validation, progressive form behavior,
+legacy redirects, money input, dashboard aggregation, scenario rendering, and
+date/currency helpers.
 
----
+Local gates use pnpm:
 
-## 14. Build & Release
+```sh
+pnpm typecheck
+pnpm test --runInBand
+```
 
-- **EAS Build** for iOS/Android binaries; **EAS Submit** to the stores.
-- **EAS Update** (OTA) for JS-only fixes between store releases.
-- Profiles in `eas.json`: `development` (dev client), `preview` (internal
-  TestFlight / internal track), `production`.
-- Versioning: tie to web release cadence; document in repo `README.md`.
+The merge-blocking CI workflow installs from the frozen lockfile, runs
+`pnpm exec expo install --check`, typechecks, and runs Jest. React Doctor is a
+separate workflow. No test result should be claimed current unless that command
+or its CI run was actually observed.
 
----
+## 14. Architecture Decisions
 
-## 15. Phased Roadmap
+### Flask remains the financial boundary — rejected alternative
 
-**Phase 1 — Foundation**
-Expo + Router scaffold, NativeWind tokens, Supabase auth (Google), profile
-onboarding, API client, shared types. Exit: sign in → create/load profile.
+Direct tournament CRUD against Supabase is rejected. It would bypass the
+backend's trusted P&L, subsidy, authorization, and FX boundary or require those
+rules to be reimplemented elsewhere.
 
-**Phase 2 — Core loop**
-Dashboard (stats, runway, list), tournament detail (scenarios, break-even,
-dual-currency), add-tournament wizard, edit/delete. Exit: full feature parity with
-web for a single athlete.
+### One native auth/profile provider — shipped
 
-**Phase 3 — Mobile delight**
-Tournament search prefill, offline read cache, pull-to-refresh, polish, empty/
-loading/error states, biometric lock. Exit: store-ready beta.
+React Native has no server-rendered hydration boundary, so a single
+`AuthProvider` owns the Supabase session and athlete profile lifecycle. Identity
+and request-version guards prevent stale async work from crossing account
+changes.
 
-**Phase 4 — Beyond web (optional)**
-Push reminders (needs the §9 backend endpoint + tests), home-screen widget for
-runway, offline write queue, season export (PDF/CSV).
+### Thin online client — shipped
 
----
+Server state stays in React Query memory. Only the user-bound profile and
+tournament draft persist locally. Server writes remain online-only.
 
-## 16. Architecture Decisions & Rejected Alternatives
+### Copied mobile types — shipped
 
-The system is deliberately three tiers (RN client → Flask → Supabase/Postgres),
-and the v1 client is deliberately thin. Both are choices, recorded here so they
-aren't "simplified" away by mistake.
+`types/index.ts` is the mobile contract copy. A shared package may be considered
+later, but the current app validates response shapes at runtime to catch drift.
 
-### Keep Flask — do **not** go direct-to-Supabase
-The tempting simplification is to drop Flask and have the app talk straight to
-Supabase (auth + Postgres + auto-REST/RLS), removing a service. **Rejected**, because:
-- `backend/utils/pnl.py` is the single source of truth for P&L, and `CLAUDE.md`
-  forbids client-side money math. Going direct forces the P&L + subsidy-netting +
-  currency logic into Postgres functions or Edge Functions — a rewrite of `pnl.py`
-  that **forks the formula** and abandons the Python test suite + 80% coverage gate.
-- The Open Exchange Rates key must stay server-side, so you'd *still* need a
-  server-side function for `/api/fx` regardless.
-- Net result: you don't remove server code, you re-implement it elsewhere and
-  break an invariant. That's more complexity, not less. The three tiers are earned
-  — Flask is where the trusted math and the secret key live.
+## 15. Roadmap Status
 
-### Collapse the two web providers into one
-The web app's `AuthContext` / `UserContext` split, the `useSyncExternalStore`,
-the localStorage module-cache — all of it exists to survive Next.js SSR hydration.
-RN has no SSR, so a single `AuthProvider` with plain `useState` + AsyncStorage is
-correct and strictly simpler (§4). Carrying the web pattern over would be cargo-cult.
-
-### Thin v1 client — offline, biometrics, MMKV deferred
-- **Offline read-cache, FX caching, offline banner → Phase 3 (§8).** v1 is
-  online-only. The app needs the server for every write (conversion + P&L) and
-  reads come back with `pnl` precomputed, so an offline mirror buys little for real
-  upfront cost (cache hydration, staleness, invalidation). Not worth it for v1.
-- **Biometric lock → Phase 3.** Nice for financial data, not core to the loop.
-- **Storage: AsyncStorage, not MMKV.** One library, and it's what the Phase 3
-  React Query persister integrates with out of the box. Revisit MMKV only if
-  profiling shows a real bottleneck.
-- **Shared types: copy the file for v1**, extract `@athlete/types` later if drift
-  becomes a problem.
-
-### Kept as-is (already the simple option)
-Expo + Expo Router, React Query (same version/patterns as web), the ported `fetch`
-`api` client, SecureStore for the token only, NativeWind for shared tokens,
-react-hook-form for the 5-step wizard. None of these add a tier or a concept the
-web app doesn't already have.
-
----
-
-## Appendix A — Endpoint Reference (existing)
-
-| Method | Path | Purpose |
+| Capability | Status | Notes |
 |---|---|---|
-| GET | `/api/profile?email=` | Load athlete profile (or `null`) |
-| POST | `/api/profile` | Create/update profile (upsert by email) |
-| GET | `/api/tournaments?user_id=` | List tournaments **with `pnl` + `home_currency`** |
-| POST | `/api/tournaments` | Create (server converts to home currency, computes P&L) |
-| GET | `/api/tournaments/:id` | Single tournament with `pnl` |
-| PATCH | `/api/tournaments/:id` | Update fields, recompute P&L |
-| DELETE | `/api/tournaments/:id` | Delete |
-| GET | `/api/tournaments/search?q=&sport=` | Known + PSA-live results |
-| GET | `/api/fx?from=&to=&amount=` | Convert; returns `{converted, rate}` |
-| GET | `/health` | Liveness |
+| Expo/Router foundation, Supabase sign-in, profile lifecycle | **Shipped** | Current app foundation |
+| Dashboard, tournament detail, create/edit/delete | **Shipped** | Uses server-derived projections |
+| Progressive single-page tournament form | **Shipped** | Old step routes redirect |
+| Search and known-tournament prefill | **Shipped** | Includes tax-rate prefill |
+| Pull-to-refresh and standard loading/error/empty states | **Shipped** | Present on relevant server-backed screens |
+| Explicit PKCE-only OAuth callback | **Shipped locally** | Live allow-list and signed iOS/Android callbacks remain unverified |
+| Persisted offline tournament reads and last-synced UI | **Deferred** | No implementation commitment yet |
+| Biometric app lock | **Deferred** | Not installed or exposed in UI |
+| Push reminders | **Deferred** | Would require client and backend work |
+| Home-screen widgets and season export | **Deferred** | Optional product ideas only |
+| Shared cross-repository type package | **Deferred** | Current mobile copy remains authoritative here |
+| Offline write queue | **Rejected** | Conflicts with the online server-authoritative write model |
+| Direct tournament access to Supabase | **Rejected** | Would bypass the financial boundary |
 
-## Appendix B — Core Types (shared with web, `src/types/index.ts`)
+---
 
-`AthleteProfile`, `Tournament`, `PrizeRounds` (`r1 r2 r3 qf sf f w`),
-`SubsidyCovers` (`flights | accommodation | full_expenses | flat_stipend`),
-`Scenario` (`worst | realistic | best`), `ScenarioResult`
-(`{ scenario, round, prize_money, net_result, profitable }`), `PnLResult`
-(`{ total_expenses, total_income_base, scenarios[], break_even_round }`).
+## Appendix A — Shipped Endpoint Reference
 
-The list/detail endpoints return `TournamentWithPnL = Tournament & { pnl: PnLResult; home_currency: string }`.
+| Method | Path | Mobile use |
+|---|---|---|
+| GET | `/health` | API health response |
+| GET | `/api/profile?email=` | Load athlete profile or `null` |
+| POST | `/api/profile` | Create/update the signed-in athlete profile |
+| GET | `/api/tournaments?user_id=` | List tournaments with `pnl` and `home_currency` |
+| POST | `/api/tournaments` | Create from tournament-currency input; return legacy flat/home units plus P&L |
+| GET | `/api/tournaments/:id` | Load one tournament with P&L |
+| PATCH | `/api/tournaments/:id` | Update using legacy home-currency monetary inputs |
+| DELETE | `/api/tournaments/:id` | Delete one tournament |
+| GET | `/api/tournaments/search?q=&sport=` | Search known and live server records |
+| GET | `/api/fx?from=&to=&amount=` | Return `{ converted, rate }` for display conversion |
+
+## Appendix B — Current Core Types
+
+`types/index.ts` defines:
+
+- `AthleteProfile`, including `home_currency`, income, savings, and sponsorship;
+- `Tournament`, including flat costs, `prize_rounds`, and `prize_tax_rate`;
+- `KnownTournament`, including optional prize rounds and prize tax rate;
+- `ScenarioResult`, including `prize_money`, `prize_money_after_tax`,
+  `net_result`, and `profitable`;
+- `PnLResult`, including total expenses, total income, scenarios, and nullable
+  break-even round;
+- `TournamentWithPnL = Tournament & { pnl: PnLResult; home_currency: string }`.
+
+Runtime schemas in `lib/api-schemas.ts` are intentionally loose about unknown
+fields for compatibility but strict about every field the UI consumes.

@@ -12,16 +12,21 @@ export function ScenarioBar({ tournament }: { tournament: TournamentWithPnL }) {
       <View style={{ flexDirection: "row", gap: 3 }}>
         {scenarios.map((scenario) => {
           const result = getScenario(tournament, scenario);
-          const profitable = (result?.net_result ?? 0) >= 0;
+          const backgroundColor = result
+            ? result.net_result >= 0
+              ? colors.profit
+              : colors.loss
+            : colors.surfaceMuted;
 
           return (
             <View
               key={scenario}
+              testID={`scenario-segment-${scenario}`}
               style={{
                 flex: 1,
                 height: 8,
                 borderRadius: radii.sm,
-                backgroundColor: profitable ? colors.profit : colors.loss,
+                backgroundColor,
                 opacity: scenario === "realistic" ? 1 : 0.65,
               }}
             />

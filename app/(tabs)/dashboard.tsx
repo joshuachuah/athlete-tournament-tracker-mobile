@@ -1,20 +1,21 @@
-import { Link, Redirect } from "expo-router";
+import { Link } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { RefreshControl, ScrollView, Text, View } from "react-native";
 
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/state";
 import { RunwayBanner } from "@/components/dashboard/runway-banner";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { TournamentCard } from "@/components/dashboard/tournament-card";
-import { colors, radii, spacing } from "@/constants/theme";
+import { colors, spacing } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
 import { api } from "@/lib/api";
 import { buildDashboardStats } from "@/lib/dashboard";
 import { formatMoney } from "@/lib/utils";
 
 export default function DashboardScreen() {
-  const { profile, session } = useAuth();
+  const { profile } = useAuth();
   const {
     data: tournaments = [],
     error,
@@ -24,21 +25,19 @@ export default function DashboardScreen() {
     refetch,
   } = useQuery({
     queryKey: ["tournaments", profile?.id],
-    queryFn: () => api.tournaments.list(profile?.id ?? ""),
+    queryFn: ({ signal }) =>
+      api.tournaments.list(profile?.id ?? "", { signal }),
     enabled: Boolean(profile?.id),
   });
 
-  if (!session) {
-    return <Redirect href="/login" />;
-  }
-
   if (!profile) {
-    return <Redirect href="/onboarding" />;
+    return null;
   }
 
   const stats = buildDashboardStats(tournaments, profile);
   const currentYear = new Date().getFullYear();
-  const seasonProfitable = stats.netResult >= 0;
+  const hasProjections = stats.projectedCount > 0;
+  const hasIncompleteCoverage = hasProjections && stats.unavailableCount > 0;
 
   return (
     <ScrollView
@@ -92,29 +91,31 @@ export default function DashboardScreen() {
               adjustsFontSizeToFit
               selectable
             >
-              {formatMoney(stats.netResult, profile.home_currency)}
+              {hasProjections
+                ? formatMoney(stats.netResult, profile.home_currency)
+                : "Projection unavailable"}
             </Text>
-            <View
-              style={{
-                alignSelf: "flex-start",
-                borderRadius: radii.sm,
-                borderCurve: "continuous",
-                paddingHorizontal: spacing.sm,
-                paddingVertical: 6,
-                backgroundColor: seasonProfitable ? colors.profitSoft : colors.lossSoft,
-              }}
-            >
-              <Text
-                style={{
-                  color: seasonProfitable ? colors.profit : colors.loss,
-                  fontSize: 13,
-                  fontWeight: "600",
-                }}
-                selectable
-              >
-                {seasonProfitable ? "Profitable season" : "In the red"}
-              </Text>
-            </View>
+            {!hasProjections ? (
+              <Badge label="Projection unavailable" tone="neutral" />
+            ) : hasIncompleteCoverage ? (
+              <>
+                <Text style={{ color: colors.mutedForeground, fontSize: 13 }} selectable>
+                  Based on {stats.projectedCount} of {stats.tournamentCount} events
+                </Text>
+                <Badge label="Projection coverage incomplete" tone="neutral" />
+              </>
+            ) : (
+              <Badge
+                label={
+                  stats.netResult > 0
+                    ? "Profitable season"
+                    : stats.netResult === 0
+                      ? "Break-even season"
+                      : "In the red"
+                }
+                tone={stats.netResult >= 0 ? "profit" : "loss"}
+              />
+            )}
           </View>
 
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.md }}>
@@ -137,11 +138,13 @@ export default function DashboardScreen() {
             />
           </View>
 
-          <RunwayBanner
-            runway={stats.runway}
-            averageNetSpend={stats.averageNetSpend}
-            currency={profile.home_currency}
-          />
+          {hasProjections ? (
+            <RunwayBanner
+              runway={stats.runway}
+              averageNetSpend={stats.averageNetSpend}
+              currency={profile.home_currency}
+            />
+          ) : null}
 
           <View style={{ gap: spacing.md }}>
             <Text

@@ -6,6 +6,7 @@ import {
   parseDateOnly,
   roundCurrencyAmount,
 } from "@/lib/utils";
+import type { ApiRequestOptions } from "@/lib/api";
 
 export type TournamentDraft = {
   editId?: string;
@@ -29,21 +30,25 @@ export type TournamentDraft = {
   subsidy_enabled: boolean;
   subsidy_by: string;
   subsidy_amount: number;
-  subsidy_covers: Tournament["subsidy_covers"];
+  subsidy_covers: NonNullable<Tournament["subsidy_covers"]>;
   sponsorship_allocated: number;
 };
 
+type TournamentDraftPrefillParam = string | string[];
+
 export type TournamentDraftPrefill = {
-  name?: string;
-  location?: string;
-  country?: string;
-  currency?: string;
-  start_date?: string;
-  end_date?: string;
-  duration_days?: string;
-  prize_rounds?: string;
-  prize_tax_rate?: string;
+  name?: TournamentDraftPrefillParam;
+  location?: TournamentDraftPrefillParam;
+  country?: TournamentDraftPrefillParam;
+  currency?: TournamentDraftPrefillParam;
+  start_date?: TournamentDraftPrefillParam;
+  end_date?: TournamentDraftPrefillParam;
+  duration_days?: TournamentDraftPrefillParam;
+  prize_rounds?: TournamentDraftPrefillParam;
+  prize_tax_rate?: TournamentDraftPrefillParam;
 };
+
+const prizeRoundKeys = ["r1", "r2", "r3", "qf", "sf", "f", "w"] as const;
 
 function localDateOnly(date: Date): string {
   const year = String(date.getFullYear()).padStart(4, "0");
@@ -198,47 +203,172 @@ export function resumableDraft(stored: TournamentDraft): TournamentDraft {
   return stored.editId ? createDefaultTournamentDraft() : stored;
 }
 
-type StoredTournamentDraft = Partial<Omit<TournamentDraft, "prize_rounds">> & {
-  prize_rounds?: Partial<TournamentDraft["prize_rounds"]>;
-};
+const finiteNonNegativeNumber = z.number().finite().min(0);
+const nonNegativeInteger = finiteNonNegativeNumber.int();
+const persistedDateOnly = z.string().refine(
+  (value) => parseDateOnly(value) !== null,
+);
+const persistedPrizeRoundsSchema = z.strictObject({
+  r1: finiteNonNegativeNumber,
+  r2: finiteNonNegativeNumber,
+  r3: finiteNonNegativeNumber,
+  qf: finiteNonNegativeNumber,
+  sf: finiteNonNegativeNumber,
+  f: finiteNonNegativeNumber,
+  w: finiteNonNegativeNumber,
+});
+const persistedTournamentDraftSchema = z.strictObject({
+  editId: z.string().min(1).optional(),
+  name: z.string(),
+  location: z.string(),
+  country: z.string(),
+  currency: z.string().length(3),
+  start_date: persistedDateOnly,
+  end_date: persistedDateOnly,
+  duration_days: nonNegativeInteger,
+  entry_fee: finiteNonNegativeNumber,
+  prize_rounds: persistedPrizeRoundsSchema,
+  prize_tax_rate: finiteNonNegativeNumber.max(100),
+  flight_cost: finiteNonNegativeNumber,
+  accommodation_nightly: finiteNonNegativeNumber,
+  accommodation_nights: nonNegativeInteger,
+  accommodation_total: finiteNonNegativeNumber,
+  daily_spending_cap: finiteNonNegativeNumber,
+  coaching_cost: finiteNonNegativeNumber,
+  misc_cost: finiteNonNegativeNumber,
+  subsidy_enabled: z.boolean(),
+  subsidy_by: z.string(),
+  subsidy_amount: finiteNonNegativeNumber,
+  subsidy_covers: z.enum([
+    "flights",
+    "accommodation",
+    "full_expenses",
+    "flat_stipend",
+  ]),
+  sponsorship_allocated: finiteNonNegativeNumber,
+});
+const storedTournamentDraftSchema = z.strictObject({
+  version: z.literal(1),
+  draft: persistedTournamentDraftSchema,
+});
+const legacyTournamentDraftSchema = persistedTournamentDraftSchema.extend({
+  prize_rounds: persistedPrizeRoundsSchema.partial().optional(),
+}).partial();
 
-export function normalizeTournamentDraft(stored: StoredTournamentDraft): TournamentDraft {
+export function persistedTournamentDraft(draft: TournamentDraft) {
+  return { version: 1 as const, draft };
+}
+
+export function normalizeTournamentDraft(stored: unknown): TournamentDraft {
   const defaults = createDefaultTournamentDraft();
+  const current = storedTournamentDraftSchema.safeParse(stored);
+
+  if (current.success) {
+    return current.data.draft;
+  }
+
+  const legacy = legacyTournamentDraftSchema.safeParse(stored);
+
+  if (!legacy.success) {
+    return defaults;
+  }
 
   return {
     ...defaults,
-    ...stored,
+    ...legacy.data,
     prize_rounds: {
       ...defaults.prize_rounds,
-      ...stored.prize_rounds,
+      ...legacy.data.prize_rounds,
     },
-    prize_tax_rate: stored.prize_tax_rate ?? defaults.prize_tax_rate,
+    prize_tax_rate: legacy.data.prize_tax_rate ?? defaults.prize_tax_rate,
   };
 }
+
+const prefillNumber = z.preprocess(
+  (value) =>
+    typeof value === "string" && value.trim() !== ""
+      ? Number(value)
+      : value,
+  finiteNonNegativeNumber,
+);
+const prefillInteger = z.preprocess(
+  (value) =>
+    typeof value === "string" && value.trim() !== ""
+      ? Number(value)
+      : value,
+  nonNegativeInteger,
+);
+const prefillTaxRate = z.preprocess(
+  (value) =>
+    typeof value === "string" && value.trim() !== ""
+      ? Number(value)
+      : value,
+  finiteNonNegativeNumber.max(100),
+);
+const optionalPrefillMoney = prefillNumber.optional().catch(undefined);
+const prefillPrizeRoundsSchema = z.strictObject({
+  r1: optionalPrefillMoney,
+  r2: optionalPrefillMoney,
+  r3: optionalPrefillMoney,
+  qf: optionalPrefillMoney,
+  sf: optionalPrefillMoney,
+  f: optionalPrefillMoney,
+  w: optionalPrefillMoney,
+});
+const prefillParamsSchema = z.object({
+  name: z.string().min(1).optional().catch(undefined),
+  location: z.string().min(1).optional().catch(undefined),
+  country: z.string().min(1).optional().catch(undefined),
+  currency: z
+    .string()
+    .length(3)
+    .transform((value) => value.toUpperCase())
+    .optional()
+    .catch(undefined),
+  start_date: persistedDateOnly.optional().catch(undefined),
+  end_date: persistedDateOnly.optional().catch(undefined),
+  duration_days: prefillInteger.optional().catch(undefined),
+  prize_rounds: z.string().optional().catch(undefined),
+  prize_tax_rate: prefillTaxRate.optional().catch(undefined),
+});
 
 export function tournamentDraftFromPrefill(
   params: TournamentDraftPrefill,
 ): TournamentDraft {
   const defaults = createDefaultTournamentDraft();
-  const next = {
+  const parsedParams = prefillParamsSchema.parse(params);
+  const next: TournamentDraft = {
     ...defaults,
     prize_rounds: { ...defaults.prize_rounds },
   };
 
-  if (params.name) next.name = String(params.name);
-  if (params.location) next.location = String(params.location);
-  if (params.country) next.country = String(params.country);
-  if (params.currency) next.currency = String(params.currency).toUpperCase();
-  if (params.start_date) next.start_date = String(params.start_date);
-  if (params.end_date) next.end_date = String(params.end_date);
-  if (params.duration_days) next.duration_days = Number(params.duration_days);
-  if (params.prize_tax_rate) next.prize_tax_rate = Number(params.prize_tax_rate);
-  if (params.prize_rounds) {
+  if (parsedParams.name) next.name = parsedParams.name;
+  if (parsedParams.location) next.location = parsedParams.location;
+  if (parsedParams.country) next.country = parsedParams.country;
+  if (parsedParams.currency) next.currency = parsedParams.currency;
+  if (parsedParams.start_date) next.start_date = parsedParams.start_date;
+  if (parsedParams.end_date) next.end_date = parsedParams.end_date;
+  if (parsedParams.duration_days !== undefined) {
+    next.duration_days = parsedParams.duration_days;
+  }
+  if (parsedParams.prize_tax_rate !== undefined) {
+    next.prize_tax_rate = parsedParams.prize_tax_rate;
+  }
+  if (parsedParams.prize_rounds) {
     try {
-      next.prize_rounds = {
-        ...next.prize_rounds,
-        ...JSON.parse(String(params.prize_rounds)),
-      };
+      const parsedPrizeRounds = prefillPrizeRoundsSchema.safeParse(
+        JSON.parse(parsedParams.prize_rounds) as unknown,
+      );
+
+      if (parsedPrizeRounds.success) {
+        for (const round of prizeRoundKeys) {
+          const amount = parsedPrizeRounds.data[round];
+
+          if (amount !== undefined) {
+            next.prize_rounds[round] = amount;
+          }
+        }
+      }
     } catch {
       // Ignore malformed prefill data from navigation params.
     }
@@ -326,10 +456,12 @@ export function toTournamentPayload(
 type TournamentWriter = {
   create: (
     payload: Omit<Tournament, "id" | "created_at">,
+    options?: ApiRequestOptions,
   ) => Promise<{ id: string }>;
   update: (
     id: string,
     payload: Omit<Tournament, "id" | "created_at">,
+    options?: ApiRequestOptions,
   ) => Promise<{ id: string }>;
 };
 
@@ -337,14 +469,17 @@ export function saveTournamentDraft(
   draft: TournamentDraft,
   userId: string,
   writer: TournamentWriter,
+  options?: ApiRequestOptions,
 ) {
   const payload = toTournamentPayload(draft, userId);
 
   if (draft.editId) {
-    return writer.update(draft.editId, payload);
+    return options
+      ? writer.update(draft.editId, payload, options)
+      : writer.update(draft.editId, payload);
   }
 
-  return writer.create(payload);
+  return options ? writer.create(payload, options) : writer.create(payload);
 }
 
 type TournamentSaveCompletion = {

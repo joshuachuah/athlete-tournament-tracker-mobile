@@ -6,6 +6,7 @@ import {
   deriveDraftDates,
   detailsSchema,
   normalizeTournamentDraft,
+  persistedTournamentDraft,
   prizesSchema,
   resumableDraft,
   toTournamentPayload,
@@ -323,6 +324,74 @@ describe("tournamentDraftFromPrefill", () => {
 
     expect(draft.prize_rounds).toEqual(defaultTournamentDraft.prize_rounds);
   });
+
+  it("stores parsed finite numbers from navigation JSON", () => {
+    const draft = tournamentDraftFromPrefill({
+      prize_rounds: JSON.stringify({ r1: "125.5", qf: 500 }),
+      prize_tax_rate: "30.5",
+    });
+
+    expect(draft.prize_rounds).toEqual(
+      expect.objectContaining({ r1: 125.5, qf: 500 }),
+    );
+    expect(typeof draft.prize_rounds.r1).toBe("number");
+    expect(draft.prize_tax_rate).toBe(30.5);
+  });
+
+  it.each([
+    JSON.stringify([]),
+    JSON.stringify(100),
+    JSON.stringify({ r1: { amount: 100 } }),
+    JSON.stringify({ r1: [100] }),
+    JSON.stringify({ r1: -1 }),
+    JSON.stringify({ r1: "not-a-number" }),
+  ])("ignores invalid prize round prefill %s", (prize_rounds) => {
+    const draft = tournamentDraftFromPrefill({ prize_rounds });
+
+    expect(draft.prize_rounds).toEqual(defaultTournamentDraft.prize_rounds);
+  });
+
+  it("ignores invalid scalar params independently", () => {
+    const draft = tournamentDraftFromPrefill({
+      name: "Known Open",
+      currency: "US",
+      start_date: "not-a-date",
+      prize_tax_rate: "Infinity",
+    });
+
+    expect(draft.name).toBe("Known Open");
+    expect(draft.currency).toBe(defaultTournamentDraft.currency);
+    expect(draft.start_date).toBe(createDefaultTournamentDraft().start_date);
+    expect(draft.prize_tax_rate).toBe(defaultTournamentDraft.prize_tax_rate);
+  });
+
+  it("ignores array-valued navigation params", () => {
+    const draft = tournamentDraftFromPrefill({
+      name: "Known Open",
+      currency: ["EUR"],
+      start_date: ["2026-05-01"],
+      duration_days: ["4"],
+      prize_rounds: [JSON.stringify({ qf: 500 })],
+      prize_tax_rate: ["30"],
+    });
+
+    expect(draft.name).toBe("Known Open");
+    expect(draft.currency).toBe(defaultTournamentDraft.currency);
+    expect(draft.start_date).toBe(createDefaultTournamentDraft().start_date);
+    expect(draft.prize_rounds).toEqual(defaultTournamentDraft.prize_rounds);
+    expect(draft.prize_tax_rate).toBe(defaultTournamentDraft.prize_tax_rate);
+  });
+
+  it("keeps valid prize fields when another prefill field is malformed", () => {
+    const draft = tournamentDraftFromPrefill({
+      prize_rounds: JSON.stringify({ r1: { amount: 100 }, qf: "500" }),
+    });
+
+    expect(draft.prize_rounds).toEqual({
+      ...defaultTournamentDraft.prize_rounds,
+      qf: 500,
+    });
+  });
 });
 
 describe("normalizeTournamentDraft", () => {
@@ -336,6 +405,52 @@ describe("normalizeTournamentDraft", () => {
     expect(draft.prize_tax_rate).toBe(0);
     expect(draft.prize_rounds).toEqual({
       r1: 100,
+      r2: 0,
+      r3: 0,
+      qf: 0,
+      sf: 0,
+      f: 0,
+      w: 0,
+    });
+  });
+
+  it("loads the current versioned persisted shape", () => {
+    const storedDraft = {
+      ...defaultTournamentDraft,
+      name: "Current stored draft",
+    };
+
+    expect(
+      normalizeTournamentDraft(persistedTournamentDraft(storedDraft)),
+    ).toEqual(storedDraft);
+  });
+
+  it.each([
+    null,
+    "stored draft",
+    [],
+    { name: null },
+    { entry_fee: "100" },
+    { entry_fee: -1 },
+    { entry_fee: Number.POSITIVE_INFINITY },
+    { accommodation_nights: 1.5 },
+    { subsidy_covers: "everything" },
+    { start_date: "2026-02-30" },
+    { prize_rounds: null },
+    { prize_rounds: { qf: "500" } },
+    { version: 99, draft: defaultTournamentDraft },
+  ])("falls back for corrupt or unknown persisted data %#", (stored) => {
+    const draft = normalizeTournamentDraft(stored);
+
+    expect(draft).toEqual(
+      expect.objectContaining({
+        name: "",
+        entry_fee: 0,
+        subsidy_covers: "flat_stipend",
+      }),
+    );
+    expect(draft.prize_rounds).toEqual({
+      r1: 0,
       r2: 0,
       r3: 0,
       qf: 0,

@@ -1,6 +1,7 @@
 import { createRef, useImperativeHandle, type RefObject } from "react";
 import { act, render, waitFor } from "@testing-library/react-native";
 import { Text, View } from "react-native";
+import * as WebBrowser from "expo-web-browser";
 import type { Session } from "@supabase/supabase-js";
 
 import { AuthProvider, useAuth } from "@/context/auth";
@@ -21,6 +22,7 @@ jest.mock("expo-auth-session", () => ({
 jest.mock("expo-web-browser", () => ({
   maybeCompleteAuthSession: jest.fn(),
   openAuthSessionAsync: jest.fn(),
+  WebBrowserResultType: { CANCEL: "cancel" },
 }));
 
 jest.mock("expo-sqlite/localStorage/install", () => {
@@ -112,7 +114,7 @@ const mockSignOut = mockAuth.signOut;
 
 type AuthProbe = Pick<
   ReturnType<typeof useAuth>,
-  "refreshProfile" | "saveProfile" | "signOut"
+  "refreshProfile" | "saveProfile" | "signInWithGoogle" | "signOut"
 >;
 
 function AuthState({ authRef }: { authRef: RefObject<AuthProbe | null> }) {
@@ -120,6 +122,7 @@ function AuthState({ authRef }: { authRef: RefObject<AuthProbe | null> }) {
   useImperativeHandle(authRef, () => ({
     refreshProfile: auth.refreshProfile,
     saveProfile: auth.saveProfile,
+    signInWithGoogle: auth.signInWithGoogle,
     signOut: auth.signOut,
   }));
 
@@ -146,6 +149,133 @@ function renderAuthProvider() {
   return { authRef, screen };
 }
 
+const mockOpenAuthSession =
+  WebBrowser.openAuthSessionAsync as jest.MockedFunction<
+    typeof WebBrowser.openAuthSessionAsync
+  >;
+const mockExchangeCodeForSession = supabase!.auth
+  .exchangeCodeForSession as jest.Mock;
+const mockSetSession = supabase!.auth.setSession as jest.Mock;
+const mockSignInWithOAuth = supabase!.auth.signInWithOAuth as jest.Mock;
+
+describe("AuthProvider OAuth callback", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    localStorage.clear();
+    queryClient.clear();
+    mockAuthStateCallback = undefined;
+    mockGetSession.mockResolvedValue({ data: { session: null }, error: null });
+    mockSignInWithOAuth.mockResolvedValue({
+      data: { provider: "google", url: "https://auth.example.test/authorize" },
+      error: null,
+    });
+    mockExchangeCodeForSession.mockResolvedValue({
+      data: { session: null, user: null },
+      error: null,
+    });
+  });
+
+  async function startSignIn() {
+    const { authRef, screen } = renderAuthProvider();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("status").props.children).toBe("ready");
+    });
+
+    await act(async () => {
+      await authRef.current!.signInWithGoogle();
+    });
+
+    return screen;
+  }
+
+  it("exchanges a one-time callback code exactly once", async () => {
+    mockOpenAuthSession.mockResolvedValue({
+      type: "success",
+      url: "athletetracker://auth/callback?code=one-time-code",
+    });
+
+    const screen = await startSignIn();
+
+    expect(mockExchangeCodeForSession).toHaveBeenCalledTimes(1);
+    expect(mockExchangeCodeForSession).toHaveBeenCalledWith("one-time-code");
+    expect(mockSetSession).not.toHaveBeenCalled();
+    expect(screen.getByTestId("auth-error").props.children).toBe("none");
+  });
+
+  it("leaves sign-in usable when the browser session is cancelled", async () => {
+    mockOpenAuthSession.mockResolvedValue({
+      type: WebBrowser.WebBrowserResultType.CANCEL,
+    });
+
+    const screen = await startSignIn();
+
+    expect(mockExchangeCodeForSession).not.toHaveBeenCalled();
+    expect(mockSetSession).not.toHaveBeenCalled();
+    expect(screen.getByTestId("auth-error").props.children).toBe("none");
+  });
+
+  it("reports a provider rejection without exposing callback details", async () => {
+    mockOpenAuthSession.mockResolvedValue({
+      type: "success",
+      url: "athletetracker://auth/callback?error=access_denied&error_description=sensitive-detail",
+    });
+
+    const screen = await startSignIn();
+
+    expect(mockExchangeCodeForSession).not.toHaveBeenCalled();
+    expect(mockSetSession).not.toHaveBeenCalled();
+    expect(screen.getByTestId("auth-error").props.children).toBe(
+      "OAuth sign-in was rejected by the provider.",
+    );
+  });
+
+  it("rejects a callback without a code", async () => {
+    mockOpenAuthSession.mockResolvedValue({
+      type: "success",
+      url: "athletetracker://auth/callback",
+    });
+
+    const screen = await startSignIn();
+
+    expect(mockExchangeCodeForSession).not.toHaveBeenCalled();
+    expect(mockSetSession).not.toHaveBeenCalled();
+    expect(screen.getByTestId("auth-error").props.children).toBe(
+      "OAuth callback did not include a session code.",
+    );
+  });
+
+  it("rejects a malformed callback URL", async () => {
+    mockOpenAuthSession.mockResolvedValue({
+      type: "success",
+      url: "not a callback URL",
+    });
+
+    const screen = await startSignIn();
+
+    expect(mockExchangeCodeForSession).not.toHaveBeenCalled();
+    expect(mockSetSession).not.toHaveBeenCalled();
+    expect(screen.getByTestId("auth-error").props.children).toBe(
+      "OAuth callback URL was invalid.",
+    );
+  });
+
+  it("rejects reusable bearer tokens in a callback fragment", async () => {
+    mockOpenAuthSession.mockResolvedValue({
+      type: "success",
+      url: "athletetracker://auth/callback#access_token=access-secret&refresh_token=refresh-secret",
+    });
+
+    const screen = await startSignIn();
+
+    expect(mockExchangeCodeForSession).not.toHaveBeenCalled();
+    expect(mockSetSession).not.toHaveBeenCalled();
+    expect(screen.getByTestId("auth-error").props.children).toBe(
+      "OAuth callback did not include a valid session code.",
+    );
+  });
+});
+
 describe("AuthProvider profile isolation", () => {
   const firstProfile = profile("athlete-1", "first@example.com");
   const secondProfile = profile("athlete-2", "second@example.com");
@@ -162,6 +292,10 @@ describe("AuthProvider profile isolation", () => {
     queryClient.clear();
     mockAuthStateCallback = undefined;
     mockSignOut.mockResolvedValue({ error: null });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it("clears a stale cache when bootstrap has no authenticated session", async () => {
@@ -524,6 +658,112 @@ describe("AuthProvider profile isolation", () => {
     expect(profileStorage.get()).toEqual(savedProfile);
   });
 
+  it("invalidates currency-derived query families after the home currency changes", async () => {
+    const savedProfile = { ...firstProfile, home_currency: "USD" };
+    profileStorage.set(firstUserId, firstProfile);
+    mockGetSession.mockResolvedValue({
+      data: { session: session(firstProfile.email, firstUserId) },
+      error: null,
+    });
+    getProfile.mockReturnValue(new Promise(() => undefined));
+    saveProfile.mockResolvedValue(savedProfile);
+
+    const { authRef, screen } = renderAuthProvider();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("profile-email").props.children).toBe(
+        firstProfile.email,
+      );
+    });
+
+    const tournamentListKey = ["tournaments", firstProfile.id];
+    const tournamentKey = ["tournament", "tournament-1"];
+    const fxKey = ["fx-rate", "MYR", "USD"];
+    const unrelatedKey = ["settings", firstProfile.id];
+    queryClient.setQueryData(tournamentListKey, [{ id: "tournament-1" }]);
+    queryClient.setQueryData(tournamentKey, { id: "tournament-1" });
+    queryClient.setQueryData(fxKey, 23.5);
+    queryClient.setQueryData(unrelatedKey, { notifications: true });
+    const invalidateQueries = jest.spyOn(queryClient, "invalidateQueries");
+
+    await act(async () => {
+      await authRef.current!.saveProfile({
+        name: savedProfile.name,
+        home_country: savedProfile.home_country,
+        home_currency: savedProfile.home_currency,
+        sport: savedProfile.sport,
+      });
+    });
+
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["profile", firstProfile.email],
+    });
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["tournaments"],
+    });
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["tournament"],
+    });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["fx-rate"] });
+    expect(invalidateQueries).toHaveBeenCalledTimes(4);
+    expect(queryClient.getQueryState(tournamentListKey)?.isInvalidated).toBe(
+      true,
+    );
+    expect(queryClient.getQueryState(tournamentKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(fxKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(unrelatedKey)?.isInvalidated).toBe(false);
+  });
+
+  it("does not invalidate currency-derived queries for the same normalized currency", async () => {
+    const savedProfile = { ...firstProfile, name: "Updated athlete" };
+    profileStorage.set(firstUserId, firstProfile);
+    mockGetSession.mockResolvedValue({
+      data: { session: session(firstProfile.email, firstUserId) },
+      error: null,
+    });
+    getProfile.mockReturnValue(new Promise(() => undefined));
+    saveProfile.mockResolvedValue(savedProfile);
+
+    const { authRef, screen } = renderAuthProvider();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("profile-email").props.children).toBe(
+        firstProfile.email,
+      );
+    });
+
+    const tournamentListKey = ["tournaments", firstProfile.id];
+    const tournamentKey = ["tournament", "tournament-1"];
+    const fxKey = ["fx-rate", "MYR", "USD"];
+    queryClient.setQueryData(tournamentListKey, [{ id: "tournament-1" }]);
+    queryClient.setQueryData(tournamentKey, { id: "tournament-1" });
+    queryClient.setQueryData(fxKey, 23.5);
+    const invalidateQueries = jest.spyOn(queryClient, "invalidateQueries");
+
+    await act(async () => {
+      await authRef.current!.saveProfile({
+        name: savedProfile.name,
+        home_country: savedProfile.home_country,
+        home_currency: "myr",
+        sport: savedProfile.sport,
+      });
+    });
+
+    expect(saveProfile).toHaveBeenCalledWith(
+      expect.objectContaining({ home_currency: "MYR" }),
+      { authToken: `token:${firstUserId}` },
+    );
+    expect(invalidateQueries).toHaveBeenCalledTimes(1);
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["profile", firstProfile.email],
+    });
+    expect(queryClient.getQueryState(tournamentListKey)?.isInvalidated).toBe(
+      false,
+    );
+    expect(queryClient.getQueryState(tournamentKey)?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryState(fxKey)?.isInvalidated).toBe(false);
+  });
+
   it("discards a refresh that completes after the account changes", async () => {
     const backgroundLoad = deferred<AthleteProfile | null>();
     const refresh = deferred<AthleteProfile | null>();
@@ -597,6 +837,8 @@ describe("AuthProvider profile isolation", () => {
       );
     });
 
+    const invalidateQueries = jest.spyOn(queryClient, "invalidateQueries");
+
     let savePromise!: Promise<AthleteProfile>;
     act(() => {
       savePromise = authRef.current!.saveProfile({
@@ -618,6 +860,7 @@ describe("AuthProvider profile isolation", () => {
 
     expect(screen.getByTestId("profile-email").props.children).toBe("none");
     expect(profileStorage.get()).toBeNull();
+    expect(invalidateQueries).not.toHaveBeenCalled();
   });
 
   it("keeps local sign-out isolated when a load and remote sign-out fail", async () => {

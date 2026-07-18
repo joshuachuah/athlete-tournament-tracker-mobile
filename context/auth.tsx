@@ -208,29 +208,31 @@ export function AuthProvider({ children }: PropsWithChildren) {
       return;
     }
 
-    const callback = new URL(result.url);
+    if (result.url.includes("#")) {
+      setAuthError("OAuth callback did not include a valid session code.");
+      return;
+    }
+
+    let callback: URL;
+
+    try {
+      callback = new URL(result.url);
+    } catch {
+      setAuthError("OAuth callback URL was invalid.");
+      return;
+    }
+
+    if (callback.searchParams.has("error")) {
+      setAuthError("OAuth sign-in was rejected by the provider.");
+      return;
+    }
+
     const code = callback.searchParams.get("code");
 
     if (code) {
       const exchange = await supabase.auth.exchangeCodeForSession(code);
       if (exchange.error) {
         setAuthError(exchange.error.message);
-      }
-      return;
-    }
-
-    const hash = new URLSearchParams(callback.hash.replace(/^#/, ""));
-    const accessToken = hash.get("access_token");
-    const refreshToken = hash.get("refresh_token");
-
-    if (accessToken && refreshToken) {
-      const nextSession = await supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken,
-      });
-
-      if (nextSession.error) {
-        setAuthError(nextSession.error.message);
       }
       return;
     }
@@ -267,6 +269,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     const userId = session?.user.id;
     const email = session?.user.email;
     const authToken = session?.access_token;
+    const previousHomeCurrency = profile?.home_currency.toUpperCase();
 
     if (!userId || !email || !authToken) {
       throw new Error("Sign in before saving a profile.");
@@ -281,6 +284,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       },
       { authToken },
     );
+    const savedHomeCurrency = savedProfile.home_currency.toUpperCase();
 
     if (
       mounted.current &&
@@ -292,7 +296,20 @@ export function AuthProvider({ children }: PropsWithChildren) {
       setProfile(savedProfile);
       setStatus("ready");
       profileStorage.set(userId, savedProfile);
-      queryClient.invalidateQueries({ queryKey: ["profile", email] });
+
+      const invalidations = [
+        queryClient.invalidateQueries({ queryKey: ["profile", email] }),
+      ];
+
+      if (previousHomeCurrency !== savedHomeCurrency) {
+        invalidations.push(
+          queryClient.invalidateQueries({ queryKey: ["tournaments"] }),
+          queryClient.invalidateQueries({ queryKey: ["tournament"] }),
+          queryClient.invalidateQueries({ queryKey: ["fx-rate"] }),
+        );
+      }
+
+      await Promise.all(invalidations);
     }
 
     return savedProfile;

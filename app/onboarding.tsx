@@ -1,20 +1,25 @@
-import { Redirect, router } from "expo-router";
+import { router } from "expo-router";
 import { useState } from "react";
 import { ScrollView, Text } from "react-native";
 
 import { Card } from "@/components/ui/card";
 import { ProfileForm, type ProfileFormValues } from "@/components/profile-form";
+import { ProtectedScreen } from "@/components/auth/protected-screen";
 import { colors, spacing } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
 
 export default function OnboardingScreen() {
-  const { session, saveProfile } = useAuth();
+  return (
+    <ProtectedScreen requireProfile={false}>
+      <OnboardingContent />
+    </ProtectedScreen>
+  );
+}
+
+function OnboardingContent() {
+  const { saveProfile } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-
-  if (!session) {
-    return <Redirect href="/login" />;
-  }
 
   async function handleSubmit(values: ProfileFormValues) {
     setSaving(true);

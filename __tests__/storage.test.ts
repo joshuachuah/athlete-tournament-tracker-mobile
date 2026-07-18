@@ -55,10 +55,18 @@ describe("tournament draft storage", () => {
 });
 
 describe("profile storage", () => {
-  const profile = {
+  const profile: AthleteProfile = {
     id: "athlete-1",
     email: "first@example.com",
-  } as AthleteProfile;
+    name: "First Athlete",
+    home_country: "Malaysia",
+    home_currency: "MYR",
+    sport: "Tennis",
+    monthly_income: 2_000,
+    savings_balance: 5_000,
+    monthly_sponsorship: 500,
+    created_at: "2026-01-01",
+  };
 
   beforeEach(() => {
     localStorage.clear();
@@ -93,4 +101,44 @@ describe("profile storage", () => {
       expect(localStorage.getItem("athlete-tracker:profile")).toBeNull();
     },
   );
+
+  it.each([
+    ["malformed JSON", "{"],
+    ["an array root", "[]"],
+    [
+      "a null profile field",
+      JSON.stringify({ version: 2, userId: "user-1", profile: null }),
+    ],
+    [
+      "a wrong-typed profile field",
+      JSON.stringify({
+        version: 2,
+        userId: "user-1",
+        profile: { ...profile, monthly_income: "2000" },
+      }),
+    ],
+    [
+      "an unknown wrapper version",
+      JSON.stringify({ version: 3, userId: "user-1", profile }),
+    ],
+  ])("clears %s", (_label, storedValue) => {
+    localStorage.setItem("athlete-tracker:profile", storedValue);
+
+    expect(profileStorage.getForUser("user-1")).toBeNull();
+    expect(localStorage.getItem("athlete-tracker:profile")).toBeNull();
+  });
+
+  it("validates profile data for unscoped reads too", () => {
+    localStorage.setItem(
+      "athlete-tracker:profile",
+      JSON.stringify({
+        version: 2,
+        userId: "user-1",
+        profile: { ...profile, home_currency: null },
+      }),
+    );
+
+    expect(profileStorage.get()).toBeNull();
+    expect(localStorage.getItem("athlete-tracker:profile")).toBeNull();
+  });
 });
