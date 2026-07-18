@@ -62,3 +62,24 @@ Reconsider production telemetry if repeated crashes cannot be reproduced, suppor
 volume makes manual diagnosis ineffective, or incident/compliance requirements need
 centralized evidence. Any future provider requires a new privacy review and an
 explicit implementation plan before collecting data.
+
+## Native OAuth callback migration
+
+The native Supabase client uses PKCE and accepts only a one-time authorization code
+from the browser callback. Reusable access and refresh tokens in URL fragments are
+rejected. The existing `athletetracker://auth/callback` target remains in place until
+the external redirect allow-list and signed migration builds can be verified; no
+callback target has been removed from Supabase as part of this local change.
+
+| Environment | Callback target | Supabase redirect allow-list | Signed iOS login, cancellation, cold start, and relaunch | Signed Android login, cancellation, cold start, and relaunch | Local review date |
+| --- | --- | --- | --- | --- | --- |
+| Preview | `athletetracker://auth/callback` | **NOT VERIFIED** - executor has no live project inspection in this task | **NOT VERIFIED** - no signed build ID available | **NOT VERIFIED** - no signed build ID available | 2026-07-17 |
+| Production | `athletetracker://auth/callback` | **NOT VERIFIED** - executor has no live project inspection in this task | **NOT VERIFIED** - no signed build ID available | **NOT VERIFIED** - no signed build ID available | 2026-07-17 |
+
+The private-use scheme can still be claimed by another installed app. PKCE prevents
+an intercepted authorization code from being exchanged without the verifier stored
+by this app, but the callback-denial risk remains. Before release, approve either a
+claimed HTTPS universal/app link with deployed association files or a reverse-domain
+private-use scheme, add the exact preview and production URLs to Supabase, and test
+both signed platforms. Keep the legacy callback allow-listed until the new builds and
+an old migration-window build pass. Expo Go is not sufficient evidence.

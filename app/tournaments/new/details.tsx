@@ -1,4 +1,4 @@
-import { Redirect, router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -22,10 +22,21 @@ type DetailsParams = TournamentDraftPrefill & {
   editId?: string;
 };
 
+type TournamentSaveVariables = {
+  draft: TournamentDraft;
+  userId: string;
+  profileId: string;
+};
+
+type SubmitError = {
+  userId: string;
+  message: string;
+};
+
 export default function DetailsStep() {
   const { profile, session } = useAuth();
   const { draft, resetDraft } = useTournamentDraft();
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<SubmitError | null>(null);
   const params = useLocalSearchParams<DetailsParams>();
   const editId = typeof params.editId === "string" ? params.editId : undefined;
   const {
@@ -36,33 +47,38 @@ export default function DetailsStep() {
     refetch: refetchEditTournament,
   } = useQuery({
     queryKey: ["tournament", editId],
-    queryFn: () => api.tournaments.get(editId ?? ""),
+    queryFn: ({ signal }) => api.tournaments.get(editId ?? "", { signal }),
     enabled: Boolean(editId),
   });
   const mutation = useMutation({
-    mutationFn: (nextDraft: TournamentDraft) => {
-      if (!profile) {
-        throw new Error("Save a profile before creating a tournament.");
+    mutationFn: (variables: TournamentSaveVariables) => {
+      return saveTournamentDraft(
+        variables.draft,
+        variables.profileId,
+        api.tournaments,
+        { authenticatedUserId: variables.userId },
+      );
+    },
+    onSuccess: (savedTournament, variables) => {
+      if (session?.user.id !== variables.userId) {
+        return;
       }
 
-      return saveTournamentDraft(nextDraft, profile.id, api.tournaments);
-    },
-    onSuccess: (savedTournament) => {
-      completeTournamentSave(savedTournament.id, profile?.id, {
+      completeTournamentSave(savedTournament.id, variables.profileId, {
         invalidate: (queryKey) => queryClient.invalidateQueries({ queryKey }),
         resetDraft,
         replace: (href) => router.replace(href),
       });
     },
-    onError: (error) => setSubmitError((error as Error).message),
+    onError: (error, variables) => {
+      if (session?.user.id === variables.userId) {
+        setSubmitError({ userId: variables.userId, message: error.message });
+      }
+    },
   });
 
-  if (!session) {
-    return <Redirect href="/login" />;
-  }
-
-  if (!profile) {
-    return <Redirect href="/onboarding" />;
+  if (!session || !profile) {
+    return null;
   }
 
   const hasPrefill = [
@@ -114,11 +130,28 @@ export default function DetailsStep() {
     <TournamentForm
       key={formKey}
       initialDraft={initialDraft}
-      loading={mutation.isPending}
-      submitError={submitError}
+      loading={
+        mutation.isPending && mutation.variables?.userId === session.user.id
+      }
+      submitError={
+        submitError?.userId === session.user.id ? submitError.message : null
+      }
       onSubmit={(nextDraft) => {
         setSubmitError(null);
-        mutation.mutate(nextDraft);
+
+        if (!session.user.id || !profile.id) {
+          setSubmitError({
+            userId: session.user.id,
+            message: "Sign in and save a profile before saving a tournament.",
+          });
+          return;
+        }
+
+        mutation.mutate({
+          draft: nextDraft,
+          userId: session.user.id,
+          profileId: profile.id,
+        });
       }}
     />
   ) : null;

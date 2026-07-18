@@ -1,12 +1,25 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render } from "@testing-library/react-native";
+import { render, waitFor } from "@testing-library/react-native";
 
 import { ScenarioCard } from "@/components/tournament/scenario-card";
+import { api } from "@/lib/api";
+import { formatMoney } from "@/lib/utils";
 import type { ScenarioResult } from "@/types";
+
+jest.mock("@/lib/api", () => ({
+  api: {
+    fx: {
+      convert: jest.fn(),
+    },
+  },
+}));
+
+const convert = api.fx.convert as jest.MockedFunction<typeof api.fx.convert>;
 
 function renderScenarioCard(
   result: ScenarioResult,
   prizeTaxRate?: number,
+  tournamentCurrency = "USD",
 ) {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -22,7 +35,7 @@ function renderScenarioCard(
       <ScenarioCard
         result={result}
         homeCurrency="USD"
-        tournamentCurrency="USD"
+        tournamentCurrency={tournamentCurrency}
         prizeTaxRate={prizeTaxRate}
       />
     </QueryClientProvider>,
@@ -39,6 +52,10 @@ const scenario: ScenarioResult = {
 };
 
 describe("ScenarioCard", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   it("annotates net results when prize tax is withheld", () => {
     const screen = renderScenarioCard(scenario, 30);
 
@@ -55,5 +72,26 @@ describe("ScenarioCard", () => {
     expect(
       screen.queryByText("Net is after 30% tax withholding on prize money."),
     ).toBeNull();
+  });
+
+  it("shares one rate request across tax-bearing scenario amounts", async () => {
+    convert.mockResolvedValue({ converted: 0.5, rate: 0.5 });
+
+    const screen = renderScenarioCard(scenario, 30, "EUR");
+
+    await waitFor(() => {
+      expect(screen.getByText(formatMoney(500, "EUR"))).toBeTruthy();
+    });
+
+    expect(screen.getByText(formatMoney(1000, "USD"))).toBeTruthy();
+    expect(screen.getByText(formatMoney(350, "EUR"))).toBeTruthy();
+    expect(screen.getByText(formatMoney(100, "EUR"))).toBeTruthy();
+    expect(convert).toHaveBeenCalledTimes(1);
+    expect(convert).toHaveBeenCalledWith(
+      "USD",
+      "EUR",
+      1,
+      expect.objectContaining({ signal: expect.any(Object) }),
+    );
   });
 });

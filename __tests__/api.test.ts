@@ -381,6 +381,68 @@ describe("api client", () => {
     expect(mockGetSession).not.toHaveBeenCalled();
   });
 
+  it("refreshes tournament mutation auth for the initiating user", async () => {
+    mockGetSession.mockResolvedValue({
+      data: {
+        session: {
+          access_token: "refreshed-account-a-token",
+          user: { id: "account-a" },
+        },
+      },
+      error: null,
+    });
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ invalid: "response" }),
+    } as Response);
+
+    const options = { authenticatedUserId: "account-a" };
+    const requests = [
+      api.tournaments.create(
+        {} as Parameters<typeof api.tournaments.create>[0],
+        options,
+      ),
+      api.tournaments.update("tournament-1", {}, options),
+      api.tournaments.delete("tournament-1", options),
+    ];
+
+    await Promise.all(
+      requests.map((request) =>
+        expect(request).rejects.toMatchObject({ code: "INVALID_RESPONSE" }),
+      ),
+    );
+
+    expect(mockGetSession).toHaveBeenCalledTimes(3);
+    for (const [, requestOptions] of fetchMock.mock.calls) {
+      expect(requestOptions?.headers).toMatchObject({
+        Authorization: "Bearer refreshed-account-a-token",
+      });
+    }
+  });
+
+  it("blocks a tournament mutation after the authenticated user changes", async () => {
+    mockGetSession.mockResolvedValue({
+      data: {
+        session: {
+          access_token: "account-b-token",
+          user: { id: "account-b" },
+        },
+      },
+      error: null,
+    });
+
+    await expect(
+      api.tournaments.delete("tournament-1", {
+        authenticatedUserId: "account-a",
+      }),
+    ).rejects.toMatchObject({
+      code: "AUTH_SESSION_CHANGED",
+      status: 401,
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("accepts the documented FX response shape", async () => {
     fetchMock.mockResolvedValue({
       ok: true,
