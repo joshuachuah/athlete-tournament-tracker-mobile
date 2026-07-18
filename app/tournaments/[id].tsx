@@ -28,7 +28,6 @@ type DeleteTournamentVariables = {
   tournamentId: string;
   userId: string;
   profileId: string;
-  authToken: string;
 };
 
 export default function TournamentDetailScreen() {
@@ -59,7 +58,7 @@ function TournamentDetailContent() {
   const deleteMutation = useMutation({
     mutationFn: (variables: DeleteTournamentVariables) =>
       api.tournaments.delete(variables.tournamentId, {
-        authToken: variables.authToken,
+        authenticatedUserId: variables.userId,
       }),
     onSuccess: (_result, variables) => {
       if (session?.user.id !== variables.userId) {
@@ -83,10 +82,9 @@ function TournamentDetailContent() {
 
   function confirmDelete() {
     const userId = session?.user.id;
-    const authToken = session?.access_token;
     const profileId = profile?.id;
 
-    if (!userId || !authToken || !profileId) {
+    if (!userId || !profileId) {
       return;
     }
 
@@ -94,7 +92,6 @@ function TournamentDetailContent() {
       tournamentId,
       userId,
       profileId,
-      authToken,
     };
 
     Alert.alert(

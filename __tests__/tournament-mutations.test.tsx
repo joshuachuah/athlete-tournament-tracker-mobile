@@ -254,7 +254,7 @@ afterAll(() => {
 describe.each(["create", "update"] as const)(
   "%s tournament auth isolation",
   (kind) => {
-    it("uses the initiating bearer and ignores late success after an account switch", async () => {
+    it("binds the request to the initiating user and ignores late success after an account switch", async () => {
       const request = deferred<{ id: string }>();
       const mutation =
         kind === "create" ? mockCreateTournament : mockUpdateTournament;
@@ -267,13 +267,13 @@ describe.each(["create", "update"] as const)(
       if (kind === "create") {
         expect(mutation).toHaveBeenCalledWith(
           expect.objectContaining({ user_id: "profile-a" }),
-          { authToken: "account-a-token" },
+          { authenticatedUserId: "account-a" },
         );
       } else {
         expect(mutation).toHaveBeenCalledWith(
           tournament.id,
           expect.objectContaining({ user_id: "profile-a" }),
-          { authToken: "account-a-token" },
+          { authenticatedUserId: "account-a" },
         );
       }
 
@@ -308,13 +308,13 @@ describe.each(["create", "update"] as const)(
 );
 
 describe("delete tournament auth isolation", () => {
-  it("uses the initiating bearer and ignores late success after an account switch", async () => {
+  it("binds the request to the initiating user and ignores late success after an account switch", async () => {
     const request = deferred<{ success: boolean }>();
     mockDeleteTournament.mockReturnValue(request.promise);
     const screen = await startDelete();
 
     expect(mockDeleteTournament).toHaveBeenCalledWith(tournament.id, {
-      authToken: "account-a-token",
+      authenticatedUserId: "account-a",
     });
 
     switchAccount(screen, <TournamentDetailScreen />);
@@ -354,7 +354,7 @@ it("allows same-user token refresh while a tournament save is pending", async ()
 
   expect(mockCreateTournament).toHaveBeenCalledWith(
     expect.objectContaining({ user_id: "profile-a" }),
-    { authToken: "account-a-token" },
+    { authenticatedUserId: "account-a" },
   );
   expect(mockInvalidateQueries).toHaveBeenCalledWith({
     queryKey: ["tournaments", "profile-a"],

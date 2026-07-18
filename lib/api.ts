@@ -28,11 +28,15 @@ export const API_REQUEST_TIMEOUT_MS = 15_000;
 export type ApiRequestOptions = {
   signal?: AbortSignal;
   authToken?: string;
+  authenticatedUserId?: string;
 };
 
 type RequestOptions = RequestInit & ApiRequestOptions;
 
-async function authHeaders(authToken?: string): Promise<Record<string, string>> {
+async function authHeaders(
+  authToken?: string,
+  authenticatedUserId?: string,
+): Promise<Record<string, string>> {
   if (authToken !== undefined) {
     return authToken ? { Authorization: `Bearer ${authToken}` } : {};
   }
@@ -46,14 +50,24 @@ async function authHeaders(authToken?: string): Promise<Record<string, string>> 
   // token and derive the caller's identity from it — query params like email or
   // user_id are attacker-controlled and must not be trusted for authorization.
   const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
+  const session = data.session;
+
+  if (authenticatedUserId && session?.user.id !== authenticatedUserId) {
+    throw new ApiError(
+      "Authentication session changed",
+      401,
+      "AUTH_SESSION_CHANGED",
+    );
+  }
+
+  const token = session?.access_token;
 
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 async function request<T>(path: string, options?: RequestOptions): Promise<T> {
   const url = path.startsWith("http") ? path : `${API_BASE}${path}`;
-  const { authToken, ...fetchOptions } = options ?? {};
+  const { authenticatedUserId, authToken, ...fetchOptions } = options ?? {};
   const callerSignal = fetchOptions.signal;
   let abortCause: "caller" | "timeout" | undefined;
   let cancelFromCaller: (() => void) | undefined;
@@ -62,7 +76,7 @@ async function request<T>(path: string, options?: RequestOptions): Promise<T> {
   try {
     const headers = {
       "Content-Type": "application/json",
-      ...(await authHeaders(authToken)),
+      ...(await authHeaders(authToken, authenticatedUserId)),
       ...fetchOptions.headers,
     };
     const controller = new AbortController();
@@ -188,6 +202,7 @@ export const api = {
         body: JSON.stringify(data),
         signal: options?.signal,
         authToken: options?.authToken,
+        authenticatedUserId: options?.authenticatedUserId,
       }),
     update: (
       id: string,
@@ -199,12 +214,14 @@ export const api = {
         body: JSON.stringify(data),
         signal: options?.signal,
         authToken: options?.authToken,
+        authenticatedUserId: options?.authenticatedUserId,
       }),
     delete: (id: string, options?: ApiRequestOptions) =>
       requestParsed(deleteResultSchema, `/api/tournaments/${id}`, {
         method: "DELETE",
         signal: options?.signal,
         authToken: options?.authToken,
+        authenticatedUserId: options?.authenticatedUserId,
       }),
     search: (
       query: string,

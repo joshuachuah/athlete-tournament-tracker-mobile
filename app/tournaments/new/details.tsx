@@ -26,7 +26,6 @@ type TournamentSaveVariables = {
   draft: TournamentDraft;
   userId: string;
   profileId: string;
-  authToken: string;
 };
 
 type SubmitError = {
@@ -57,7 +56,7 @@ export default function DetailsStep() {
         variables.draft,
         variables.profileId,
         api.tournaments,
-        { authToken: variables.authToken },
+        { authenticatedUserId: variables.userId },
       );
     },
     onSuccess: (savedTournament, variables) => {
@@ -140,7 +139,7 @@ export default function DetailsStep() {
       onSubmit={(nextDraft) => {
         setSubmitError(null);
 
-        if (!session.user.id || !session.access_token || !profile.id) {
+        if (!session.user.id || !profile.id) {
           setSubmitError({
             userId: session.user.id,
             message: "Sign in and save a profile before saving a tournament.",
@@ -152,7 +151,6 @@ export default function DetailsStep() {
           draft: nextDraft,
           userId: session.user.id,
           profileId: profile.id,
-          authToken: session.access_token,
         });
       }}
     />
