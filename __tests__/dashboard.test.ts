@@ -1,21 +1,26 @@
 import { createElement, type ReactNode } from "react";
-import { render } from "@testing-library/react-native";
+import { fireEvent, render } from "@testing-library/react-native";
+import { RefreshControl } from "react-native";
 
 import DashboardScreen from "@/app/(tabs)/dashboard";
 import { buildDashboardStats } from "@/lib/dashboard";
 import { formatMoney } from "@/lib/utils";
 import type { AthleteProfile, TournamentWithPnL } from "@/types";
 
-let mockTournaments: TournamentWithPnL[] = [];
+let mockTournaments: TournamentWithPnL[] | undefined = [];
+const mockRefetch = jest.fn();
+let mockQueryState = {
+  error: null as Error | null,
+  isError: false,
+  isLoading: false,
+  isRefetching: false,
+};
 
 jest.mock("@tanstack/react-query", () => ({
   useQuery: () => ({
     data: mockTournaments,
-    error: null,
-    isError: false,
-    isLoading: false,
-    isRefetching: false,
-    refetch: jest.fn(),
+    ...mockQueryState,
+    refetch: mockRefetch,
   }),
 }));
 
@@ -110,6 +115,18 @@ function tournament(
             ],
     },
   };
+}
+
+function dashboardTournament(
+  id: string,
+  realisticNet: number | null,
+  income: number,
+  expenses: number,
+) {
+  const item = tournament(id, realisticNet, income, expenses);
+  item.start_date = `${new Date().getFullYear()}-04-01`;
+  item.end_date = `${new Date().getFullYear()}-04-03`;
+  return item;
 }
 
 describe("dashboard stats", () => {
@@ -210,38 +227,161 @@ describe("dashboard stats", () => {
 
 describe("dashboard projection presentation", () => {
   beforeEach(() => {
+    jest.clearAllMocks();
     mockTournaments = [];
+    mockQueryState = {
+      error: null,
+      isError: false,
+      isLoading: false,
+      isRefetching: false,
+    };
   });
 
-  it("uses unavailable wording and never calls an all-missing season profitable", () => {
-    mockTournaments = [tournament("missing", null, 0, 600)];
-
-    const screen = render(createElement(DashboardScreen));
-
-    expect(screen.getAllByText("Projection unavailable")).not.toHaveLength(0);
-    expect(screen.queryByText("Profitable season")).toBeNull();
-    expect(screen.queryByText("Profitable on average")).toBeNull();
-  });
-
-  it("discloses mixed projection coverage alongside the aggregate", () => {
+  it("renders the compact header, full scorecard, and outcome-only rows", () => {
     mockTournaments = [
-      tournament("projected", 250, 700, 450),
-      tournament("missing", null, 0, 900),
+      dashboardTournament("profit", 500, 700, 200),
+      dashboardTournament("loss", -200, 100, 300),
     ];
 
     const screen = render(createElement(DashboardScreen));
 
-    expect(screen.getAllByText("$250 USD")).not.toHaveLength(0);
-    expect(screen.getByText("Based on 1 of 2 events")).toBeTruthy();
-    expect(screen.getByText("Projection coverage incomplete")).toBeTruthy();
+    expect(screen.getByText(`${new Date().getFullYear()} season`)).toBeTruthy();
+    expect(screen.getByRole("header", { name: "Dashboard" })).toBeTruthy();
+    expect(screen.queryByText("Welcome back")).toBeNull();
+    expect(screen.queryByText(profile.name)).toBeNull();
+
+    expect(screen.getByText("Profit · $300 USD")).toBeTruthy();
+    expect(screen.getByText("2 of 2")).toBeTruthy();
+    expect(screen.getByText("Earned $800 USD · Spent $500 USD")).toBeTruthy();
+    expect(screen.getByText("Profit · $500 USD")).toBeTruthy();
+    expect(screen.getByText("Loss · -$200 USD")).toBeTruthy();
+
+    expect(screen.queryByText("Runway")).toBeNull();
+    expect(screen.queryByText("Worst")).toBeNull();
+    expect(screen.queryByText("Realistic")).toBeNull();
+    expect(screen.queryByText(/Break-even:/)).toBeNull();
   });
 
-  it("labels a real numeric zero as break-even instead of unavailable", () => {
-    mockTournaments = [tournament("break-even", 0, 600, 600)];
+  it("qualifies an incomplete aggregate and marks the missing row", () => {
+    mockTournaments = [
+      dashboardTournament("projected", 250, 700, 450),
+      dashboardTournament("missing", null, 0, 900),
+    ];
 
     const screen = render(createElement(DashboardScreen));
 
-    expect(screen.getByText("Break-even season")).toBeTruthy();
-    expect(screen.queryByText("Projection unavailable")).toBeNull();
+    expect(screen.getAllByText("Profit · $250 USD")).toHaveLength(2);
+    expect(screen.getByText("1 of 2")).toBeTruthy();
+    expect(screen.getByText("Partial result from projected events")).toBeTruthy();
+    expect(screen.getByText("Needs projection")).toBeTruthy();
+  });
+
+  it("never turns an all-missing season into a fake zero outcome", () => {
+    mockTournaments = [
+      dashboardTournament("missing-a", null, 0, 600),
+      dashboardTournament("missing-b", null, 0, 800),
+    ];
+
+    const screen = render(createElement(DashboardScreen));
+
+    expect(screen.getByText("0 of 2")).toBeTruthy();
+    expect(screen.getAllByText("Needs projection")).toHaveLength(3);
+    expect(screen.queryByText("Break-even · $0 USD")).toBeNull();
+    expect(screen.queryByText(/^Profit ·/)).toBeNull();
+    expect(screen.queryByText(/^Loss ·/)).toBeNull();
+  });
+
+  it("keeps a real numeric zero visible and explicitly break-even", () => {
+    mockTournaments = [dashboardTournament("break-even", 0, 600, 600)];
+
+    const screen = render(createElement(DashboardScreen));
+
+    expect(screen.getAllByText("Break-even · $0 USD")).toHaveLength(2);
+    expect(screen.getByText("1 of 1")).toBeTruthy();
+    expect(screen.queryByText("Needs projection")).toBeNull();
+  });
+
+  it("keeps the empty state distinct from missing projections", () => {
+    const screen = render(createElement(DashboardScreen));
+
+    expect(screen.getByText("No result yet")).toBeTruthy();
+    expect(screen.getByText("0 of 0")).toBeTruthy();
+    expect(screen.getByText("No tournaments yet")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Add tournament" })).toBeTruthy();
+    expect(screen.queryByText("Needs projection")).toBeNull();
+  });
+
+  it("shows loading without scorecard or empty-state content", () => {
+    mockQueryState.isLoading = true;
+
+    const screen = render(createElement(DashboardScreen));
+
+    expect(screen.getByRole("progressbar", { name: "Loading tournaments" })).toBeTruthy();
+    expect(screen.queryByText("Net result")).toBeNull();
+    expect(screen.queryByText("No tournaments yet")).toBeNull();
+  });
+
+  it("announces an error and retries without showing stale dashboard states", () => {
+    mockTournaments = undefined;
+    mockQueryState = {
+      ...mockQueryState,
+      error: new Error("Network unavailable"),
+      isError: true,
+    };
+
+    const screen = render(createElement(DashboardScreen));
+
+    expect(screen.getByRole("alert")).toBeTruthy();
+    expect(screen.getByText("Network unavailable")).toBeTruthy();
+    expect(screen.queryByText("Net result")).toBeNull();
+    expect(screen.queryByText("No tournaments yet")).toBeNull();
+
+    fireEvent.press(screen.getByRole("button", { name: "Try again" }));
+    expect(mockRefetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps cached content visible after a failed refresh", () => {
+    mockTournaments = [dashboardTournament("projected", 250, 700, 450)];
+    mockQueryState = {
+      ...mockQueryState,
+      error: new Error("Refresh failed"),
+      isError: true,
+    };
+
+    const screen = render(createElement(DashboardScreen));
+
+    expect(screen.getAllByText("Profit · $250 USD")).toHaveLength(2);
+    expect(screen.getByText("1 of 1")).toBeTruthy();
+    expect(screen.getByText("Refresh failed")).toBeTruthy();
+    fireEvent.press(screen.getByRole("button", { name: "Try again" }));
+    expect(mockRefetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a cached empty result visible after a failed refresh", () => {
+    mockQueryState = {
+      ...mockQueryState,
+      error: new Error("Refresh failed"),
+      isError: true,
+    };
+
+    const screen = render(createElement(DashboardScreen));
+
+    expect(screen.getByText("No result yet")).toBeTruthy();
+    expect(screen.getByText("No tournaments yet")).toBeTruthy();
+    expect(screen.getByText("Refresh failed")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+  });
+
+  it("keeps content visible and wires pull-to-refresh while refetching", () => {
+    mockTournaments = [dashboardTournament("projected", 250, 700, 450)];
+    mockQueryState.isRefetching = true;
+
+    const screen = render(createElement(DashboardScreen));
+    const refreshControl = screen.UNSAFE_getByType(RefreshControl);
+
+    expect(refreshControl.props.refreshing).toBe(true);
+    expect(screen.getAllByText("Profit · $250 USD")).toHaveLength(2);
+    fireEvent(refreshControl, "refresh");
+    expect(mockRefetch).toHaveBeenCalledTimes(1);
   });
 });
