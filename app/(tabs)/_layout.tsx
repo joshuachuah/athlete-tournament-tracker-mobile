@@ -19,6 +19,10 @@ export default function TabLayout() {
           <Icon sf="person.crop.circle.fill" drawable="ic_menu_myplaces" />
           <Label>Profile</Label>
         </NativeTabs.Trigger>
+        <NativeTabs.Trigger name="account">
+          <Icon sf="person.text.rectangle.fill" drawable="ic_menu_manage" />
+          <Label>Account</Label>
+        </NativeTabs.Trigger>
       </NativeTabs>
     </ProtectedScreen>
   );
