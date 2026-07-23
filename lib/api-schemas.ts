@@ -72,7 +72,7 @@ const scenarioResultSchema = z.looseObject({
   profitable: z.boolean(),
 });
 
-const pnlResultSchema = z.looseObject({
+export const pnlResultSchema = z.looseObject({
   total_expenses: z.number(),
   total_income_base: z.number(),
   scenarios: z

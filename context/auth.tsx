@@ -34,6 +34,7 @@ type AuthContextValue = {
   refreshProfile: () => Promise<void>;
   saveProfile: (data: ProfileInput) => Promise<AthleteProfile>;
   signOut: () => Promise<void>;
+  isCurrentUser: (userId: string) => boolean;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -331,6 +332,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
   }
 
+  function isCurrentUser(userId: string) {
+    return currentUserId.current === userId;
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -342,6 +347,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         refreshProfile,
         saveProfile,
         signOut,
+        isCurrentUser,
       }}
     >
       {children}

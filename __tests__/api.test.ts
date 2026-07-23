@@ -50,6 +50,66 @@ afterEach(() => {
 });
 
 describe("api client", () => {
+  it("posts a cancellable normalized payload to the server P&L preview contract", async () => {
+    const controller = new AbortController();
+    const preview = {
+      total_expenses: 100,
+      total_income_base: 0,
+      scenarios: [
+        {
+          scenario: "worst",
+          round: "r1",
+          prize_money: 0,
+          prize_money_after_tax: 0,
+          net_result: -100,
+          profitable: false,
+        },
+        {
+          scenario: "realistic",
+          round: "qf",
+          prize_money: 100,
+          prize_money_after_tax: 100,
+          net_result: 0,
+          profitable: false,
+        },
+        {
+          scenario: "best",
+          round: "w",
+          prize_money: 500,
+          prize_money_after_tax: 500,
+          net_result: 400,
+          profitable: true,
+        },
+      ],
+      break_even_round: "qf",
+    };
+    fetchMock.mockResolvedValue({ ok: true, json: async () => preview } as Response);
+
+    await expect(
+      api.tournaments.preview(
+        { user_id: "athlete-1", name: "Open", prize_tax_rate: 30 },
+        { signal: controller.signal, authToken: "preview-token" },
+      ),
+    ).resolves.toEqual(preview);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${apiBase}/api/tournaments/pnl-preview`,
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          user_id: "athlete-1",
+          name: "Open",
+          prize_tax_rate: 30,
+        }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer preview-token",
+        },
+        signal: expect.any(AbortSignal),
+      }),
+    );
+  });
+
   it("returns successful responses without an authorization header", async () => {
     fetchMock.mockResolvedValue({
       ok: true,

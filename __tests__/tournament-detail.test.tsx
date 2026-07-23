@@ -161,6 +161,7 @@ describe("TournamentDetailScreen deletion", () => {
       refreshProfile: jest.fn(),
       saveProfile: jest.fn(),
       signOut: jest.fn(),
+      isCurrentUser: jest.fn(() => true),
     });
   });
 
