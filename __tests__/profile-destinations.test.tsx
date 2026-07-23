@@ -54,6 +54,7 @@ describe("split profile destinations", () => {
       session: {} as ReturnType<typeof useAuth>["session"],
       status: "ready",
       authError: null,
+      isCurrentUser: jest.fn(() => true),
       refreshProfile: jest.fn(),
       saveProfile: jest.fn(),
       signInWithGoogle: jest.fn(),
