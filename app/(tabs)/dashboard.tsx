@@ -232,7 +232,7 @@ export default function DashboardScreen() {
                 title="No tournaments yet"
                 body="Add a tournament to generate worst, realistic, and best-case projections."
                 action={
-                  <Link href="/tournaments/new/details" asChild>
+                  <Link href="/(tabs)/add" asChild>
                     <Button label="Add tournament" />
                   </Link>
                 }

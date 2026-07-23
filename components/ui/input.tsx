@@ -1,13 +1,20 @@
-import { Text, TextInput, View, type TextInputProps } from "react-native";
+import {
+  Text,
+  TextInput,
+  View,
+  type TextInputProps,
+} from "react-native";
+import type { Ref } from "react";
 
 import { colors, radii, spacing } from "@/constants/theme";
 
 type InputProps = TextInputProps & {
   label: string;
   error?: string;
+  inputRef?: Ref<TextInput>;
 };
 
-export function Input({ label, error, style, ...props }: InputProps) {
+export function Input({ label, error, inputRef, style, ...props }: InputProps) {
   return (
     <View style={{ gap: spacing.xs }}>
       <Text
@@ -20,6 +27,9 @@ export function Input({ label, error, style, ...props }: InputProps) {
         {label}
       </Text>
       <TextInput
+        ref={inputRef}
+        accessibilityLabel={props.accessibilityLabel ?? label}
+        accessibilityState={{ disabled: props.editable === false }}
         placeholderTextColor={colors.mutedForeground}
         style={[
           {

@@ -24,6 +24,7 @@ const mockGetTournament = jest.fn();
 const mockCreateTournament = jest.fn();
 const mockUpdateTournament = jest.fn();
 const mockDeleteTournament = jest.fn();
+const mockBuilderEdit = jest.fn();
 let mockParams: Record<string, string> = {};
 let mockAuthState = authState("account-a", "profile-a", "account-a-token");
 
@@ -63,13 +64,13 @@ jest.mock("@/context/tournament-draft", () => {
   };
 });
 
-jest.mock("@/components/tournament/tournament-form", () => {
+jest.mock("@/components/tournament/tournament-projection-builder", () => {
   const React = jest.requireActual("react");
   const { Pressable: NativePressable, Text: NativeText } =
     jest.requireActual("react-native");
 
   return {
-    TournamentForm: ({
+    TournamentProjectionBuilder: ({
       initialDraft,
       loading,
       onSubmit,
@@ -93,9 +94,53 @@ jest.mock("@/components/tournament/tournament-form", () => {
           },
           React.createElement(NativeText, null, "Submit tournament"),
         ),
+        React.createElement(
+          NativePressable,
+          {
+            disabled: loading,
+            testID: "edit-builder-while-saving",
+            onPress: mockBuilderEdit,
+          },
+          React.createElement(NativeText, null, "Edit builder"),
+        ),
         submitError
           ? React.createElement(NativeText, null, submitError)
           : null,
+      ),
+  };
+});
+
+jest.mock("@/components/tournament/projection-success-sheet", () => {
+  const React = jest.requireActual("react");
+  const { Pressable: NativePressable, Text: NativeText } =
+    jest.requireActual("react-native");
+
+  return {
+    ProjectionSuccessSheet: ({
+      onDismiss,
+      onView,
+      mode,
+      tournament: saved,
+    }: {
+      onDismiss: () => void;
+      onView: () => void;
+      mode: "create" | "edit";
+      tournament: TournamentWithPnL;
+    }) =>
+      React.createElement(
+        React.Fragment,
+        null,
+        React.createElement(NativeText, null, `${saved.name} ${mode}`),
+        React.createElement(
+          NativePressable,
+          { testID: "view-saved-projection", onPress: onView },
+          React.createElement(NativeText, null, "View projection"),
+        ),
+        React.createElement(
+          NativePressable,
+          { testID: "dismiss-saved-projection", onPress: onDismiss },
+          React.createElement(NativeText, null, "Dismiss"),
+        ),
       ),
   };
 });
@@ -158,6 +203,8 @@ function authState(userId: string, profileId: string, accessToken: string) {
     profile: {
       id: profileId,
     },
+    isCurrentUser: (candidateUserId: string) =>
+      mockAuthState.session.user.id === candidateUserId,
   };
 }
 
@@ -227,9 +274,11 @@ async function startDelete() {
   return screen;
 }
 
-function switchAccount(screen: ReturnType<typeof render>, element: ReactElement) {
+async function switchAccount(screen: ReturnType<typeof render>, element: ReactElement) {
   mockAuthState = authState("account-b", "profile-b", "account-b-token");
-  screen.rerender(element);
+  await act(async () => {
+    screen.rerender(element);
+  });
 }
 
 beforeEach(() => {
@@ -255,7 +304,7 @@ describe.each(["create", "update"] as const)(
   "%s tournament auth isolation",
   (kind) => {
     it("binds the request to the initiating user and ignores late success after an account switch", async () => {
-      const request = deferred<{ id: string }>();
+      const request = deferred<TournamentWithPnL>();
       const mutation =
         kind === "create" ? mockCreateTournament : mockUpdateTournament;
       mutation.mockReturnValue(request.promise);
@@ -277,8 +326,8 @@ describe.each(["create", "update"] as const)(
         );
       }
 
-      switchAccount(screen, <DetailsStep />);
-      await settleMutation(() => request.resolve({ id: tournament.id }));
+      await switchAccount(screen, <DetailsStep />);
+      await settleMutation(() => request.resolve(tournament));
 
       expect(mockInvalidateQueries).not.toHaveBeenCalled();
       expect(mockResetDraft).not.toHaveBeenCalled();
@@ -286,7 +335,7 @@ describe.each(["create", "update"] as const)(
     });
 
     it("does not expose a late failure to the replacement account", async () => {
-      const request = deferred<{ id: string }>();
+      const request = deferred<TournamentWithPnL>();
       const mutation =
         kind === "create" ? mockCreateTournament : mockUpdateTournament;
       mutation.mockReturnValue(request.promise);
@@ -294,7 +343,7 @@ describe.each(["create", "update"] as const)(
 
       fireEvent.press(screen.getByTestId("submit-tournament"));
       await waitFor(() => expect(mutation).toHaveBeenCalledTimes(1));
-      switchAccount(screen, <DetailsStep />);
+      await switchAccount(screen, <DetailsStep />);
       await settleMutation(() =>
         request.reject(new Error(`${kind} failed for A`)),
       );
@@ -317,7 +366,7 @@ describe("delete tournament auth isolation", () => {
       authenticatedUserId: "account-a",
     });
 
-    switchAccount(screen, <TournamentDetailScreen />);
+    await switchAccount(screen, <TournamentDetailScreen />);
     await settleMutation(() => request.resolve({ success: true }));
 
     expect(mockInvalidateQueries).not.toHaveBeenCalled();
@@ -329,7 +378,7 @@ describe("delete tournament auth isolation", () => {
     mockDeleteTournament.mockReturnValue(request.promise);
     const screen = await startDelete();
 
-    switchAccount(screen, <TournamentDetailScreen />);
+    await switchAccount(screen, <TournamentDetailScreen />);
     await settleMutation(() =>
       request.reject(new Error("delete failed for A")),
     );
@@ -341,7 +390,7 @@ describe("delete tournament auth isolation", () => {
 });
 
 it("allows same-user token refresh while a tournament save is pending", async () => {
-  const request = deferred<{ id: string }>();
+  const request = deferred<TournamentWithPnL>();
   mockCreateTournament.mockReturnValue(request.promise);
   const screen = await renderSaveScreen("create");
 
@@ -349,8 +398,13 @@ it("allows same-user token refresh while a tournament save is pending", async ()
   await waitFor(() => expect(mockCreateTournament).toHaveBeenCalledTimes(1));
   mockAuthState = authState("account-a", "profile-a", "refreshed-token");
   screen.rerender(<DetailsStep />);
-  await settleMutation(() => request.resolve({ id: tournament.id }));
-  await waitFor(() => expect(mockResetDraft).toHaveBeenCalledTimes(1));
+  await settleMutation(() => request.resolve(tournament));
+  await waitFor(() => expect(screen.getByTestId("view-saved-projection")).toBeTruthy());
+
+  expect(mockResetDraft).toHaveBeenCalledTimes(1);
+  expect(mockReplace).not.toHaveBeenCalled();
+  fireEvent.press(screen.getByTestId("view-saved-projection"));
+  fireEvent.press(screen.getByTestId("dismiss-saved-projection"));
 
   expect(mockCreateTournament).toHaveBeenCalledWith(
     expect.objectContaining({ user_id: "profile-a" }),
@@ -364,4 +418,20 @@ it("allows same-user token refresh while a tournament save is pending", async ()
   });
   expect(mockResetDraft).toHaveBeenCalledTimes(1);
   expect(mockReplace).toHaveBeenCalledWith(`/tournaments/${tournament.id}`);
+  expect(mockReplace).toHaveBeenCalledTimes(1);
+});
+
+it("locks builder editing while a save mutation is pending", async () => {
+  const request = deferred<TournamentWithPnL>();
+  mockCreateTournament.mockReturnValue(request.promise);
+  const screen = await renderSaveScreen("create");
+
+  fireEvent.press(screen.getByTestId("submit-tournament"));
+  await waitFor(() => expect(mockCreateTournament).toHaveBeenCalledTimes(1));
+  fireEvent.press(screen.getByTestId("edit-builder-while-saving"));
+
+  expect(mockBuilderEdit).not.toHaveBeenCalled();
+  await settleMutation(() => request.resolve(tournament));
+  expect(mockResetDraft).toHaveBeenCalledTimes(1);
+  expect(mockReplace).not.toHaveBeenCalled();
 });
