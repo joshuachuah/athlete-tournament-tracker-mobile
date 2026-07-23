@@ -10,6 +10,8 @@ import {
   prizesSchema,
   resumableDraft,
   toTournamentPayload,
+  toTournamentPreviewPayload,
+  tournamentDraftFromKnown,
   tournamentDraftFromPrefill,
   tournamentToDraft,
   travelSchema,
@@ -394,6 +396,59 @@ describe("tournamentDraftFromPrefill", () => {
   });
 });
 
+describe("tournamentDraftFromKnown", () => {
+  it("replaces event-owned and currency-sensitive values with the selected tournament", () => {
+    const draft = tournamentDraftFromKnown({
+      name: "Replacement Open",
+      location: "Paris",
+      country: "France",
+      currency: "EUR",
+      start_date: "2026-06-01",
+      duration_days: 4,
+      prize_rounds: { qf: 500 },
+      prize_tax_rate: 20,
+    });
+
+    expect(draft).toEqual(
+      expect.objectContaining({
+        name: "Replacement Open",
+        location: "Paris",
+        country: "France",
+        currency: "EUR",
+        start_date: "2026-06-01",
+        end_date: "2026-06-04",
+        duration_days: 4,
+        entry_fee: 0,
+        flight_cost: 0,
+        accommodation_total: 0,
+        prize_tax_rate: 20,
+      }),
+    );
+    expect(draft.prize_rounds).toEqual({
+      ...defaultTournamentDraft.prize_rounds,
+      qf: 500,
+    });
+  });
+
+  it("uses clean defaults when a known tournament omits optional event data", () => {
+    const draft = tournamentDraftFromKnown({
+      name: "Sparse Open",
+    });
+
+    expect(draft).toEqual(
+      expect.objectContaining({
+        name: "Sparse Open",
+        location: "",
+        country: "",
+        currency: "USD",
+        entry_fee: 0,
+        prize_tax_rate: 0,
+      }),
+    );
+    expect(draft.prize_rounds).toEqual(defaultTournamentDraft.prize_rounds);
+  });
+});
+
 describe("normalizeTournamentDraft", () => {
   it("backfills fields missing from older stored drafts", () => {
     const draft = normalizeTournamentDraft({
@@ -512,6 +567,20 @@ describe("toTournamentPayload", () => {
     );
 
     expect(payload.prize_tax_rate).toBe(30);
+  });
+});
+
+describe("toTournamentPreviewPayload", () => {
+  it("omits zero prize rounds so the server can return its empty scenario state", () => {
+    const payload = toTournamentPreviewPayload(
+      {
+        ...defaultTournamentDraft,
+        prize_rounds: { ...defaultTournamentDraft.prize_rounds, qf: 500 },
+      },
+      "athlete-1",
+    );
+
+    expect(payload.prize_rounds).toEqual({ qf: 500 });
   });
 });
 

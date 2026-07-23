@@ -3,11 +3,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
 
 import DashboardScreen from "@/app/(tabs)/dashboard";
-import SearchScreen from "@/app/search";
 import TournamentDetailScreen from "@/app/tournaments/[id]";
 import DetailsStep from "@/app/tournaments/new/details";
 import { MoneyPair } from "@/components/tournament/money-pair";
+import { TournamentIdentitySearch } from "@/components/tournament/tournament-identity-search";
 import { api } from "@/lib/api";
+import { createDefaultTournamentDraft } from "@/lib/tournament-draft";
 
 const mockUseAuth = jest.fn();
 const mockUseLocalSearchParams = jest.fn();
@@ -134,9 +135,17 @@ describe("TanStack query cancellation", () => {
     mockSearch
       .mockReturnValueOnce(firstRequest.promise)
       .mockReturnValueOnce(secondRequest.promise);
-    const { client, screen } = renderWithClient(<SearchScreen />);
+    const { client, screen } = renderWithClient(
+      <TournamentIdentitySearch
+        draft={createDefaultTournamentDraft(new Date(2026, 0, 1))}
+        inputRef={{ current: null }}
+        onChangeDraft={jest.fn()}
+        onResolutionChange={jest.fn()}
+        sport="tennis"
+      />,
+    );
 
-    fireEvent.changeText(screen.getByPlaceholderText("Search by tournament name"), "op");
+    fireEvent.changeText(screen.getByPlaceholderText("Search or enter a tournament"), "op");
     await act(async () => {
       await jest.advanceTimersByTimeAsync(300);
     });
@@ -147,7 +156,7 @@ describe("TanStack query cancellation", () => {
     });
 
     fireEvent.changeText(
-      screen.getByPlaceholderText("Search by tournament name"),
+      screen.getByPlaceholderText("Search or enter a tournament"),
       "open",
     );
     await act(async () => {
