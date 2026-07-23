@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-import type { PrizeRounds, Tournament, TournamentWithPnL } from "@/types";
+import type {
+  KnownTournament,
+  PrizeRounds,
+  Tournament,
+  TournamentWithPnL,
+} from "@/types";
 import {
   calculateDurationDays,
   parseDateOnly,
@@ -377,6 +382,42 @@ export function tournamentDraftFromPrefill(
   return deriveDraftDates(next);
 }
 
+export function tournamentDraftFromKnown(
+  tournament: KnownTournament,
+): TournamentDraft {
+  const defaults = createDefaultTournamentDraft();
+  const validStartDate =
+    tournament.start_date && parseDateOnly(tournament.start_date)
+      ? tournament.start_date
+      : undefined;
+  const validEndDate =
+    tournament.end_date && parseDateOnly(tournament.end_date)
+      ? tournament.end_date
+      : undefined;
+  const endDate =
+    validEndDate ??
+    (validStartDate && tournament.duration_days
+      ? addDateOnlyDays(validStartDate, tournament.duration_days - 1)
+      : null) ??
+    defaults.end_date;
+  const knownCurrency = tournament.currency?.toUpperCase();
+
+  return deriveDraftDates({
+    ...defaults,
+    name: tournament.name,
+    location: tournament.location ?? defaults.location,
+    country: tournament.country ?? defaults.country,
+    currency:
+      knownCurrency?.length === 3 ? knownCurrency : defaults.currency,
+    start_date: validStartDate ?? defaults.start_date,
+    end_date: endDate,
+    prize_rounds: tournament.prize_rounds
+      ? { ...defaults.prize_rounds, ...tournament.prize_rounds }
+      : defaults.prize_rounds,
+    prize_tax_rate: tournament.prize_tax_rate ?? defaults.prize_tax_rate,
+  });
+}
+
 export function tournamentToDraft(tournament: TournamentWithPnL): TournamentDraft {
   const accommodationNights = Math.max(0, tournament.duration_days - 1);
   const defaults = createDefaultTournamentDraft();
@@ -453,16 +494,30 @@ export function toTournamentPayload(
   };
 }
 
+export function toTournamentPreviewPayload(
+  draft: TournamentDraft,
+  userId: string,
+): Omit<Tournament, "id" | "created_at"> {
+  const payload = toTournamentPayload(draft, userId);
+
+  return {
+    ...payload,
+    prize_rounds: Object.fromEntries(
+      Object.entries(payload.prize_rounds).filter(([, amount]) => (amount ?? 0) > 0),
+    ),
+  };
+}
+
 type TournamentWriter = {
   create: (
     payload: Omit<Tournament, "id" | "created_at">,
     options?: ApiRequestOptions,
-  ) => Promise<{ id: string }>;
+  ) => Promise<TournamentWithPnL>;
   update: (
     id: string,
     payload: Omit<Tournament, "id" | "created_at">,
     options?: ApiRequestOptions,
-  ) => Promise<{ id: string }>;
+  ) => Promise<TournamentWithPnL>;
 };
 
 export function saveTournamentDraft(
@@ -482,19 +537,17 @@ export function saveTournamentDraft(
   return options ? writer.create(payload, options) : writer.create(payload);
 }
 
-type TournamentSaveCompletion = {
+type TournamentSaveDataCompletion = {
   invalidate: (queryKey: readonly unknown[]) => void;
   resetDraft: () => void;
-  replace: (href: `/tournaments/${string}`) => void;
 };
 
-export function completeTournamentSave(
+export function completeTournamentSaveData(
   tournamentId: string,
   athleteId: string | undefined,
-  completion: TournamentSaveCompletion,
+  completion: TournamentSaveDataCompletion,
 ): void {
   completion.invalidate(["tournaments", athleteId]);
   completion.invalidate(["tournament", tournamentId]);
   completion.resetDraft();
-  completion.replace(`/tournaments/${tournamentId}`);
 }
