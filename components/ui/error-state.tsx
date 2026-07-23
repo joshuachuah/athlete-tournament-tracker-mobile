@@ -18,7 +18,12 @@ export function ErrorState({
       >
         Something went wrong
       </Text>
-      <Text style={{ color: colors.mutedForeground, lineHeight: 20 }} selectable>
+      <Text
+        style={{ color: colors.mutedForeground, lineHeight: 20 }}
+        accessibilityRole="alert"
+        accessibilityLiveRegion="assertive"
+        selectable
+      >
         {message}
       </Text>
       {onRetry ? <Button label="Try again" variant="secondary" onPress={onRetry} /> : null}
