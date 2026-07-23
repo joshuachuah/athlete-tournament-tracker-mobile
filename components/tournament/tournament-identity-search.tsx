@@ -50,7 +50,9 @@ export function TournamentIdentitySearch({
   onResolutionChange: (resolved: boolean) => void;
   sport?: string;
 }) {
-  const [query, setQuery] = useState(draft.name);
+  // The parent keys this search by the selected identity, so the editable query
+  // deliberately captures its value once and resets on remount.
+  const [query, setQuery] = useState(() => draft.name);
   const [committed, setCommitted] = useState(Boolean(draft.name.trim()));
   const debouncedQuery = useDebouncedValue(query.trim(), 300);
   const canSearch = !committed && debouncedQuery.length >= 2;

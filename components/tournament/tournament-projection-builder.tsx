@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useReducer, useRef } from "react";
 import {
   Keyboard,
   Platform,
@@ -31,6 +31,35 @@ import {
 } from "@/lib/tournament-draft";
 
 const IOS_NATIVE_TAB_BAR_CLEARANCE = spacing.xxl * 2;
+
+type BuilderState = {
+  activeEditor: ProjectionEditor | null;
+  assumptionPickerOpen: boolean;
+  formDraft: TournamentDraft;
+  identityResetVersion: number;
+  identityResolved: boolean;
+  stage: "identity" | "projection";
+  submissionSummary: string | null;
+};
+
+function createBuilderState(initialDraft: TournamentDraft): BuilderState {
+  return {
+    activeEditor: null,
+    assumptionPickerOpen: false,
+    formDraft: initialDraft,
+    identityResetVersion: 0,
+    identityResolved: Boolean(initialDraft.name.trim()),
+    stage: initialDraft.name.trim() ? "projection" : "identity",
+    submissionSummary: null,
+  };
+}
+
+function builderReducer(
+  state: BuilderState,
+  changes: Partial<BuilderState>,
+): BuilderState {
+  return { ...state, ...changes };
+}
 
 function firstInvalidEditor(draft: TournamentDraft): ProjectionEditor | null {
   if (!detailsSchema.safeParse(draft).success) return "details";
@@ -86,16 +115,23 @@ export function TournamentProjectionBuilder({
   submitError?: string | null;
 }) {
   const { setDraft } = useTournamentDraft();
-  const [formDraft, setFormDraft] = useState(() => initialDraft);
-  const [activeEditor, setActiveEditor] = useState<ProjectionEditor | null>(null);
-  const [assumptionPickerOpen, setAssumptionPickerOpen] = useState(false);
-  const [submissionSummary, setSubmissionSummary] = useState<string | null>(null);
-  const [identityResolved, setIdentityResolved] = useState(Boolean(initialDraft.name.trim()));
-  const [identityResetVersion, setIdentityResetVersion] = useState(0);
-  const [stage, setStage] = useState<"identity" | "projection">(() =>
-    initialDraft.name.trim() ? "projection" : "identity",
+  const [builderState, updateBuilderState] = useReducer(
+    builderReducer,
+    initialDraft,
+    createBuilderState,
   );
+  const {
+    activeEditor,
+    assumptionPickerOpen,
+    formDraft,
+    identityResetVersion,
+    identityResolved,
+    stage,
+    submissionSummary,
+  } = builderState;
   const identityInputRef = useRef<TextInput>(null);
+  const initialDraftRef = useRef(initialDraft);
+  const setPersistedDraftRef = useRef(setDraft);
   const insets = useSafeAreaInsets();
   const actionAreaBottomPadding =
     Platform.OS === "ios"
@@ -103,38 +139,43 @@ export function TournamentProjectionBuilder({
       : Math.max(insets.bottom, spacing.md);
 
   useEffect(() => {
-    setDraft(initialDraft);
-  }, [initialDraft.editId]);
+    // The container keys the builder by create/edit identity. Seed persistence
+    // once per mount without re-syncing over the user's in-progress edits.
+    setPersistedDraftRef.current(initialDraftRef.current);
+  }, []);
 
   function updateDraft(next: TournamentDraft) {
-    setFormDraft(next);
+    updateBuilderState({ formDraft: next, submissionSummary: null });
     setDraft(next);
-    setSubmissionSummary(null);
   }
 
   function handlePrimaryAction() {
     if (!identityResolved || !formDraft.name.trim()) {
-      setSubmissionSummary("Choose a known tournament or enter a new tournament name.");
+      updateBuilderState({
+        submissionSummary:
+          "Choose a known tournament or enter a new tournament name.",
+      });
       identityInputRef.current?.focus();
       return;
     }
 
     if (stage === "identity") {
       Keyboard.dismiss();
-      setSubmissionSummary(null);
-      setStage("projection");
+      updateBuilderState({ stage: "projection", submissionSummary: null });
       return;
     }
 
     const invalidEditor = firstInvalidEditor(formDraft);
     if (invalidEditor) {
-      setSubmissionSummary("Complete the highlighted section before saving.");
-      setActiveEditor(invalidEditor);
+      updateBuilderState({
+        activeEditor: invalidEditor,
+        submissionSummary: "Complete the highlighted section before saving.",
+      });
       return;
     }
 
     Keyboard.dismiss();
-    setSubmissionSummary(null);
+    updateBuilderState({ submissionSummary: null });
     onSubmit(formDraft);
   }
 
@@ -148,10 +189,12 @@ export function TournamentProjectionBuilder({
         keyboardShouldPersistTaps="handled"
         importantForAccessibility={loading ? "no-hide-descendants" : "auto"}
         pointerEvents={loading ? "none" : "auto"}
+        contentInset={{ bottom: actionAreaBottomPadding }}
+        scrollIndicatorInsets={{ bottom: actionAreaBottomPadding }}
         contentContainerStyle={{
           gap: stage === "identity" ? spacing.xl : spacing.xxl,
           padding: spacing.xl,
-          paddingBottom: actionAreaBottomPadding,
+          paddingBottom: 0,
         }}
       >
         {stage === "identity" ? (
@@ -160,7 +203,9 @@ export function TournamentProjectionBuilder({
             draft={formDraft}
             inputRef={identityInputRef}
             onChangeDraft={updateDraft}
-            onResolutionChange={setIdentityResolved}
+            onResolutionChange={(identityResolved) =>
+              updateBuilderState({ identityResolved })
+            }
             sport={sport}
           />
         ) : (
@@ -191,8 +236,10 @@ export function TournamentProjectionBuilder({
                 <Pressable
                   accessibilityRole="button"
                   onPress={() => {
-                    setSubmissionSummary(null);
-                    setStage("identity");
+                    updateBuilderState({
+                      stage: "identity",
+                      submissionSummary: null,
+                    });
                   }}
                   style={({ pressed }) => ({
                     minHeight: 44,
@@ -218,13 +265,24 @@ export function TournamentProjectionBuilder({
 
             <ImpactLedger
               draft={formDraft}
-              onAddAssumption={() => setAssumptionPickerOpen(true)}
-              onOpenEditor={setActiveEditor}
+              onAddAssumption={() =>
+                updateBuilderState({ assumptionPickerOpen: true })
+              }
+              onOpenEditor={(activeEditor) =>
+                updateBuilderState({ activeEditor })
+              }
             />
           </>
         )}
 
-        <View testID="projection-action-area" style={{ gap: spacing.sm }}>
+        <View
+          testID="projection-action-area"
+          style={{
+            gap: spacing.sm,
+            paddingBottom:
+              Platform.OS === "android" ? actionAreaBottomPadding : 0,
+          }}
+        >
           {submissionSummary ? (
             <Text accessibilityLiveRegion="polite" style={{ color: colors.loss, lineHeight: 19 }}>
               {submissionSummary}
@@ -262,22 +320,30 @@ export function TournamentProjectionBuilder({
           onApply={(nextDraft) => {
             updateDraft(nextDraft);
             if (activeEditor === "details") {
-              setIdentityResolved(Boolean(nextDraft.name.trim()));
-              setIdentityResetVersion((current) => current + 1);
+              updateBuilderState({
+                activeEditor: null,
+                identityResolved: Boolean(nextDraft.name.trim()),
+                identityResetVersion: identityResetVersion + 1,
+              });
+              return;
             }
-            setActiveEditor(null);
+            updateBuilderState({ activeEditor: null });
           }}
-          onClose={() => setActiveEditor(null)}
+          onClose={() => updateBuilderState({ activeEditor: null })}
         />
       ) : null}
 
       {assumptionPickerOpen ? (
         <AssumptionPicker
           draft={formDraft}
-          onClose={() => setAssumptionPickerOpen(false)}
+          onClose={() =>
+            updateBuilderState({ assumptionPickerOpen: false })
+          }
           onSelect={(editor) => {
-            setAssumptionPickerOpen(false);
-            setActiveEditor(editor);
+            updateBuilderState({
+              activeEditor: editor,
+              assumptionPickerOpen: false,
+            });
           }}
         />
       ) : null}
