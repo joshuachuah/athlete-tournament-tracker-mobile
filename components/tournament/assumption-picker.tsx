@@ -2,10 +2,10 @@ import { Check, ChevronRight, X } from "lucide-react-native";
 import { useState } from "react";
 import {
   KeyboardAvoidingView,
+  FlatList,
   Modal,
   Platform,
   Pressable,
-  ScrollView,
   Text,
   View,
 } from "react-native";
@@ -139,12 +139,15 @@ export function AssumptionPicker({
             placeholder="Try sponsorship or coaching"
           />
 
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ gap: spacing.sm }}>
-            {filtered.map((assumption) => {
+          <FlatList
+            data={filtered}
+            keyExtractor={(assumption) => assumption.editor}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ gap: spacing.sm }}
+            renderItem={({ item: assumption }) => {
               const active = isActive(assumption.editor, draft);
               return (
                 <Pressable
-                  key={assumption.editor}
                   accessibilityLabel={`${assumption.title}. ${assumption.description}${active ? ". Already added" : ""}`}
                   accessibilityRole="button"
                   onPress={() => onSelect(assumption.editor)}
@@ -173,8 +176,8 @@ export function AssumptionPicker({
                   <ChevronRight color={colors.mutedForeground} size={20} />
                 </Pressable>
               );
-            })}
-            {filtered.length === 0 ? (
+            }}
+            ListEmptyComponent={
               <View style={{ paddingVertical: spacing.xl, gap: spacing.xs }}>
                 <Text style={{ color: colors.foreground, fontWeight: "800", textAlign: "center" }}>
                   No supported assumptions found
@@ -183,8 +186,8 @@ export function AssumptionPicker({
                   Try another term. Custom assumptions are not added unless they can be saved.
                 </Text>
               </View>
-            ) : null}
-          </ScrollView>
+            }
+          />
         </View>
       </KeyboardAvoidingView>
     </Modal>

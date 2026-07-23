@@ -145,7 +145,11 @@ describe("TournamentProjectionBuilder", () => {
   it("keeps the inline action clear of the iOS native tab bar", () => {
     const { screen } = renderBuilder(validDraft);
 
-    expect(screen.getByTestId("projection-builder-scroll").props.contentContainerStyle.paddingBottom).toBe(64);
+    expect(screen.getByTestId("projection-builder-scroll").props.contentInset.bottom).toBe(64);
+    expect(
+      screen.getByTestId("projection-builder-scroll").props.contentContainerStyle
+        .paddingBottom,
+    ).toBe(0);
     expect(screen.getByTestId("projection-action-area")).toBeTruthy();
   });
 

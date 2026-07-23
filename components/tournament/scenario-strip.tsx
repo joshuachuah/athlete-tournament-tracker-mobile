@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { colors, radii, spacing } from "@/constants/theme";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
@@ -17,6 +17,17 @@ import { formatMoney, roundLabels, scenarioLabel } from "@/lib/utils";
 import type { Scenario } from "@/types";
 
 const scenarios: Scenario[] = ["worst", "realistic", "best"];
+
+const styles = StyleSheet.create({
+  scenarioCard: {
+    minHeight: 126,
+    flex: 1,
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderRadius: radii.lg,
+  },
+});
 
 function canPreview(draft: TournamentDraft) {
   return [detailsSchema, prizesSchema, travelSchema, subsidySchema, spendingSchema].every(
@@ -189,25 +200,20 @@ export function ScenarioStrip({
                 key={scenario}
                 accessible
                 accessibilityLabel={`${scenarioLabel(scenario)} scenario. Outcome ${roundLabels[result.round]}. ${net.label} ${net.value}.`}
-                style={{
-                  minHeight: 126,
-                  flex: 1,
-                  gap: spacing.sm,
-                  padding: spacing.md,
-                  borderWidth: 1,
-                  borderColor: scenario === "realistic" ? colors.accent : colors.border,
-                  borderRadius: radii.lg,
-                  backgroundColor:
-                    scenario === "realistic" ? colors.accentSoft : colors.surface,
-                }}
+                style={[
+                  styles.scenarioCard,
+                  {
+                    borderColor: scenario === "realistic" ? colors.accent : colors.border,
+                    backgroundColor:
+                      scenario === "realistic" ? colors.accentSoft : colors.surface,
+                  },
+                ]}
               >
                 <Text
                   numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.8}
                   style={{
                     color: colors.mutedForeground,
-                    fontSize: 11,
+                    fontSize: 12,
                     fontWeight: "800",
                     letterSpacing: 0.5,
                     textTransform: "uppercase",
@@ -216,17 +222,17 @@ export function ScenarioStrip({
                   {scenarioLabel(scenario)}
                 </Text>
                 <View style={{ gap: 2 }}>
-                  <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>Outcome</Text>
+                  <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>Outcome</Text>
                   <Text style={{ color: colors.foreground, fontSize: 18, fontWeight: "900" }}>
                     {roundLabels[result.round]}
                   </Text>
                 </View>
                 <View style={{ gap: 2 }}>
-                  <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>{net.label}</Text>
+                  <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>{net.label}</Text>
                   <Text
                     numberOfLines={1}
                     adjustsFontSizeToFit
-                    minimumFontScale={0.7}
+                    minimumFontScale={0.86}
                     style={{
                       color: net.color,
                       fontSize: 14,
