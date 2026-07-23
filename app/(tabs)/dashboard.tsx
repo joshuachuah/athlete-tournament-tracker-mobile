@@ -3,12 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import { RefreshControl, ScrollView, Text, View } from "react-native";
 
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/state";
-import { RunwayBanner } from "@/components/dashboard/runway-banner";
-import { StatCard } from "@/components/dashboard/stat-card";
 import { TournamentCard } from "@/components/dashboard/tournament-card";
-import { colors, spacing } from "@/constants/theme";
+import { colors, radii, spacing } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
 import { api } from "@/lib/api";
 import { buildDashboardStats } from "@/lib/dashboard";
@@ -17,7 +15,7 @@ import { formatMoney } from "@/lib/utils";
 export default function DashboardScreen() {
   const { profile } = useAuth();
   const {
-    data: tournaments = [],
+    data: tournamentData,
     error,
     isError,
     isLoading,
@@ -34,10 +32,36 @@ export default function DashboardScreen() {
     return null;
   }
 
+  const tournaments = tournamentData ?? [];
+  const hasTournamentData = tournamentData !== undefined;
+  const hasBlockingError = isError && !hasTournamentData;
   const stats = buildDashboardStats(tournaments, profile);
   const currentYear = new Date().getFullYear();
   const hasProjections = stats.projectedCount > 0;
   const hasIncompleteCoverage = hasProjections && stats.unavailableCount > 0;
+  const isEmpty = stats.tournamentCount === 0;
+  const netTone = !hasProjections
+    ? "neutral"
+    : stats.netResult > 0
+      ? "profit"
+      : stats.netResult < 0
+        ? "loss"
+        : "neutral";
+  const netLabel = !hasProjections
+    ? isEmpty
+      ? "No result yet"
+      : "Needs projection"
+    : stats.netResult > 0
+      ? `Profit · ${formatMoney(stats.netResult, profile.home_currency)}`
+      : stats.netResult < 0
+        ? `Loss · ${formatMoney(stats.netResult, profile.home_currency)}`
+        : `Break-even · ${formatMoney(stats.netResult, profile.home_currency)}`;
+  const netBackgroundColor =
+    netTone === "profit"
+      ? colors.profitSoft
+      : netTone === "loss"
+        ? colors.lossSoft
+        : colors.surfaceMuted;
 
   return (
     <ScrollView
@@ -52,21 +76,27 @@ export default function DashboardScreen() {
       }}
     >
       <View style={{ gap: spacing.xs }}>
-        <Text style={{ color: colors.mutedForeground, fontSize: 15 }}>
-          Welcome back
+        <Text style={{ color: colors.mutedForeground, fontSize: 13 }} selectable>
+          {currentYear} season
         </Text>
         <Text
           style={{ color: colors.foreground, fontSize: 30, fontWeight: "700" }}
+          accessibilityRole="header"
           selectable
         >
-          {profile.name}
-        </Text>
-        <Text style={{ color: colors.mutedForeground }} selectable>
-          {currentYear} Season Overview
+          Dashboard
         </Text>
       </View>
 
-      {isLoading ? <LoadingState label="Loading tournaments" /> : null}
+      {isLoading ? (
+        <View
+          accessible
+          accessibilityRole="progressbar"
+          accessibilityLabel="Loading tournaments"
+        >
+          <LoadingState label="Loading tournaments" />
+        </View>
+      ) : null}
       {isError ? (
         <ErrorState
           message={(error as Error).message}
@@ -74,77 +104,121 @@ export default function DashboardScreen() {
         />
       ) : null}
 
-      {!isLoading && !isError ? (
+      {!isLoading && !hasBlockingError ? (
         <>
-          <View style={{ gap: spacing.md }}>
-            <Text style={{ color: colors.mutedForeground, fontSize: 13 }} selectable>
-              Season net · {currentYear}
-            </Text>
-            <Text
+          <Card
+            style={{
+              gap: spacing.lg,
+              padding: spacing.lg,
+              borderRadius: radii.lg,
+              boxShadow: "none",
+            }}
+          >
+            <View style={{ gap: spacing.sm }}>
+              <Text
+                style={{ color: colors.mutedForeground, fontSize: 13 }}
+                selectable
+              >
+                Net result
+              </Text>
+              <View
+                style={{
+                  alignSelf: "flex-start",
+                  maxWidth: "100%",
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: spacing.sm,
+                  borderRadius: radii.sm,
+                  backgroundColor: netBackgroundColor,
+                }}
+              >
+                <Text
+                  style={{
+                    color: colors.foreground,
+                    fontSize: 22,
+                    fontWeight: "700",
+                    fontVariant: ["tabular-nums"],
+                  }}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  selectable
+                >
+                  {netLabel}
+                </Text>
+              </View>
+              {hasIncompleteCoverage ? (
+                <Text
+                  style={{ color: colors.mutedForeground, fontSize: 12 }}
+                  selectable
+                >
+                  Partial result from projected events
+                </Text>
+              ) : null}
+            </View>
+
+            <View
               style={{
-                color: colors.foreground,
-                fontSize: 44,
-                fontWeight: "800",
-                fontVariant: ["tabular-nums"],
+                flexDirection: "row",
+                paddingTop: spacing.md,
+                borderTopWidth: 1,
+                borderTopColor: colors.border,
               }}
-              numberOfLines={1}
-              adjustsFontSizeToFit
+            >
+              <View style={{ flex: 1, gap: spacing.xs }}>
+                <Text
+                  style={{ color: colors.mutedForeground, fontSize: 12 }}
+                  selectable
+                >
+                  Events
+                </Text>
+                <Text
+                  style={{
+                    color: colors.foreground,
+                    fontSize: 20,
+                    fontWeight: "700",
+                    fontVariant: ["tabular-nums"],
+                  }}
+                  selectable
+                >
+                  {stats.tournamentCount}
+                </Text>
+              </View>
+              <View
+                style={{
+                  flex: 1,
+                  gap: spacing.xs,
+                  paddingLeft: spacing.lg,
+                  borderLeftWidth: 1,
+                  borderLeftColor: colors.border,
+                }}
+              >
+                <Text
+                  style={{ color: colors.mutedForeground, fontSize: 12 }}
+                  selectable
+                >
+                  Projected coverage
+                </Text>
+                <Text
+                  style={{
+                    color: colors.foreground,
+                    fontSize: 20,
+                    fontWeight: "700",
+                    fontVariant: ["tabular-nums"],
+                  }}
+                  selectable
+                >
+                  {stats.projectedCount} of {stats.tournamentCount}
+                </Text>
+              </View>
+            </View>
+
+            <Text
+              style={{ color: colors.mutedForeground, fontSize: 12, lineHeight: 18 }}
               selectable
             >
-              {hasProjections
-                ? formatMoney(stats.netResult, profile.home_currency)
-                : "Projection unavailable"}
+              Earned {formatMoney(stats.ytdEarnings, profile.home_currency)} · Spent{" "}
+              {formatMoney(stats.ytdExpenses, profile.home_currency)}
             </Text>
-            {!hasProjections ? (
-              <Badge label="Projection unavailable" tone="neutral" />
-            ) : hasIncompleteCoverage ? (
-              <>
-                <Text style={{ color: colors.mutedForeground, fontSize: 13 }} selectable>
-                  Based on {stats.projectedCount} of {stats.tournamentCount} events
-                </Text>
-                <Badge label="Projection coverage incomplete" tone="neutral" />
-              </>
-            ) : (
-              <Badge
-                label={
-                  stats.netResult > 0
-                    ? "Profitable season"
-                    : stats.netResult === 0
-                      ? "Break-even season"
-                      : "In the red"
-                }
-                tone={stats.netResult >= 0 ? "profit" : "loss"}
-              />
-            )}
-          </View>
-
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.md }}>
-            <StatCard
-              label="Earned"
-              value={formatMoney(stats.ytdEarnings, profile.home_currency)}
-              detail="Server income total"
-              tone="profit"
-            />
-            <StatCard
-              label="Spent"
-              value={formatMoney(stats.ytdExpenses, profile.home_currency)}
-              detail="Server-adjusted spend"
-              tone="loss"
-            />
-            <StatCard
-              label="Events"
-              value={String(stats.tournamentCount)}
-              detail={`${stats.tournamentCount} this year`}
-            />
-          </View>
-
-          {hasProjections ? (
-            <RunwayBanner
-              runway={stats.runway}
-              averageNetSpend={stats.averageNetSpend}
-              currency={profile.home_currency}
-            />
-          ) : null}
+          </Card>
 
           <View style={{ gap: spacing.md }}>
             <Text

@@ -1,21 +1,39 @@
 import { Pressable, Text, View } from "react-native";
 import { Link } from "expo-router";
 
-import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { ScenarioBar } from "@/components/dashboard/scenario-bar";
 import { colors, radii, spacing } from "@/constants/theme";
 import type { TournamentWithPnL } from "@/types";
-import { formatDate, formatMoney, getScenario, roundLabels } from "@/lib/utils";
+import { formatDate, formatMoney, getScenario } from "@/lib/utils";
 
 export function TournamentCard({ tournament }: { tournament: TournamentWithPnL }) {
   const realistic = getScenario(tournament, "realistic");
-  const breakEven = tournament.pnl.break_even_round;
-  const hasProjection = tournament.pnl.scenarios.length > 0;
+  const formattedDate = formatDate(tournament.start_date);
+  const outcomeLabel = !realistic
+    ? "Needs projection"
+    : realistic.net_result > 0
+      ? `Profit · ${formatMoney(realistic.net_result, tournament.home_currency)}`
+      : realistic.net_result < 0
+        ? `Loss · ${formatMoney(realistic.net_result, tournament.home_currency)}`
+        : `Break-even · ${formatMoney(realistic.net_result, tournament.home_currency)}`;
+  const outcomeBackgroundColor = !realistic
+    ? colors.surfaceMuted
+    : realistic.net_result > 0
+      ? colors.profitSoft
+      : realistic.net_result < 0
+        ? colors.lossSoft
+        : colors.surfaceMuted;
+  const accessibilityOutcome = !realistic
+    ? "needs projection"
+    : `realistic net ${outcomeLabel}`;
 
   return (
     <Link href={`/tournaments/${tournament.id}`} asChild>
-      <Pressable>
+      <Pressable
+        accessibilityRole="link"
+        accessibilityLabel={`${tournament.name}. ${tournament.location}, ${formattedDate}. ${accessibilityOutcome}.`}
+        accessibilityHint="Opens tournament details"
+      >
         {({ pressed }) => (
           <Card
             style={{
@@ -47,37 +65,34 @@ export function TournamentCard({ tournament }: { tournament: TournamentWithPnL }
                   numberOfLines={2}
                   selectable
                 >
-                  {tournament.location} · {formatDate(tournament.start_date)}
+                  {tournament.location} · {formattedDate}
                 </Text>
               </View>
-              {realistic ? (
-                <Badge
-                  label={formatMoney(realistic.net_result, tournament.home_currency)}
-                  tone={realistic.net_result >= 0 ? "profit" : "loss"}
-                  style={{ maxWidth: "42%" }}
-                />
-              ) : (
-                <Badge
-                  label="Projection unavailable"
-                  tone="neutral"
-                  style={{ maxWidth: "42%" }}
-                />
-              )}
+              <View
+                style={{
+                  alignSelf: "flex-start",
+                  maxWidth: "46%",
+                  paddingHorizontal: spacing.sm,
+                  paddingVertical: 5,
+                  borderRadius: radii.sm,
+                  backgroundColor: outcomeBackgroundColor,
+                }}
+              >
+                <Text
+                  style={{
+                    color: colors.foreground,
+                    fontSize: 13,
+                    fontWeight: "600",
+                    fontVariant: ["tabular-nums"],
+                  }}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  selectable
+                >
+                  {outcomeLabel}
+                </Text>
+              </View>
             </View>
-
-            <ScenarioBar tournament={tournament} />
-
-            <Text
-              style={{ color: colors.mutedForeground, fontSize: 13, lineHeight: 18 }}
-              selectable
-            >
-              Break-even:{" "}
-              {breakEven
-                ? roundLabels[breakEven]
-                : hasProjection
-                  ? "No break-even round"
-                  : "Projection unavailable"}
-            </Text>
           </Card>
         )}
       </Pressable>

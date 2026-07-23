@@ -61,37 +61,83 @@ const losingScenario: ScenarioResult = {
   profitable: false,
 };
 
+const profitableScenario: ScenarioResult = {
+  scenario: "realistic",
+  round: "qf",
+  prize_money: 900,
+  prize_money_after_tax: 900,
+  net_result: 300,
+  profitable: true,
+};
+
+const worstScenario: ScenarioResult = {
+  scenario: "worst",
+  round: "r1",
+  prize_money: 0,
+  prize_money_after_tax: 0,
+  net_result: -600,
+  profitable: false,
+};
+
+const bestScenario: ScenarioResult = {
+  scenario: "best",
+  round: "w",
+  prize_money: 1200,
+  prize_money_after_tax: 1200,
+  net_result: 600,
+  profitable: true,
+};
+
 describe("TournamentCard", () => {
-  it("labels a missing realistic projection with a neutral badge", () => {
-    const screen = render(<TournamentCard tournament={tournament([])} />);
-    const label = screen.getByText("Projection unavailable");
+  it("labels a missing realistic projection with a neutral pill", () => {
+    const screen = render(
+      <TournamentCard tournament={tournament([worstScenario, bestScenario])} />,
+    );
+    const label = screen.getByText("Needs projection");
 
     expect(label.props.style).toEqual(
-      expect.objectContaining({ color: colors.mutedForeground }),
+      expect.objectContaining({ color: colors.foreground }),
     );
     expect(screen.queryByText("$0 USD")).toBeNull();
-    expect(screen.getByText("Break-even: Projection unavailable")).toBeTruthy();
-    expect(screen.queryByText("Break-even: No break-even round")).toBeNull();
+    expect(screen.queryByText("Worst")).toBeNull();
+    expect(screen.queryByText("Best")).toBeNull();
+    expect(screen.queryByText(/Break-even:/)).toBeNull();
   });
 
-  it("keeps the no-break-even label when a real projection exists", () => {
+  it("uses an explicit loss outcome without the old detail stack", () => {
     const screen = render(
       <TournamentCard tournament={tournament([losingScenario])} />,
     );
 
-    expect(screen.getByText("Break-even: No break-even round")).toBeTruthy();
-    expect(screen.queryByText("Break-even: Projection unavailable")).toBeNull();
+    expect(screen.getByText("Loss · -$300 USD")).toBeTruthy();
+    expect(screen.queryByText(/Break-even:/)).toBeNull();
   });
 
-  it("keeps a real numeric zero as a non-loss badge", () => {
+  it("keeps a real numeric zero as an explicit break-even outcome", () => {
     const screen = render(
       <TournamentCard tournament={tournament([breakEvenScenario])} />,
     );
-    const label = screen.getByText("$0 USD");
+    const label = screen.getByText("Break-even · $0 USD");
 
     expect(label.props.style).toEqual(
-      expect.objectContaining({ color: colors.profit }),
+      expect.objectContaining({ color: colors.foreground }),
     );
-    expect(screen.queryByText("Projection unavailable")).toBeNull();
+    expect(screen.queryByText("Needs projection")).toBeNull();
+  });
+
+  it("renders the compact outcome row with accessible navigation context", () => {
+    const screen = render(
+      <TournamentCard tournament={tournament([profitableScenario])} />,
+    );
+
+    expect(screen.getByText("Open Championship")).toBeTruthy();
+    expect(screen.getByText("Detroit · Apr 1, 2026")).toBeTruthy();
+    expect(screen.getByText("Profit · $300 USD")).toBeTruthy();
+
+    const link = screen.getByRole("link");
+    expect(link.props.accessibilityLabel).toBe(
+      "Open Championship. Detroit, Apr 1, 2026. realistic net Profit · $300 USD.",
+    );
+    expect(link.props.accessibilityHint).toBe("Opens tournament details");
   });
 });
