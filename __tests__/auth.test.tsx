@@ -2,12 +2,17 @@ import { createRef, useImperativeHandle, type RefObject } from "react";
 import { act, render, waitFor } from "@testing-library/react-native";
 import { Text, View } from "react-native";
 import * as WebBrowser from "expo-web-browser";
+import { router } from "expo-router";
 import type { Session } from "@supabase/supabase-js";
 
 import { AuthProvider, useAuth } from "@/context/auth";
 import { api } from "@/lib/api";
 import { queryClient } from "@/lib/query-client";
-import { profileStorage } from "@/lib/storage";
+import {
+  draftStorage,
+  profileStorage,
+  tournamentDraftStorageKey,
+} from "@/lib/storage";
 import { supabase } from "@/lib/supabase";
 import type { AthleteProfile } from "@/types";
 
@@ -23,6 +28,12 @@ jest.mock("expo-web-browser", () => ({
   maybeCompleteAuthSession: jest.fn(),
   openAuthSessionAsync: jest.fn(),
   WebBrowserResultType: { CANCEL: "cancel" },
+}));
+
+jest.mock("expo-router", () => ({
+  router: {
+    replace: jest.fn(),
+  },
 }));
 
 jest.mock("expo-sqlite/localStorage/install", () => {
@@ -44,6 +55,7 @@ jest.mock("expo-sqlite/localStorage/install", () => {
 jest.mock("@/lib/api", () => ({
   api: {
     profile: {
+      delete: jest.fn(),
       get: jest.fn(),
       save: jest.fn(),
     },
@@ -114,12 +126,17 @@ const mockSignOut = mockAuth.signOut;
 
 type AuthProbe = Pick<
   ReturnType<typeof useAuth>,
-  "refreshProfile" | "saveProfile" | "signInWithGoogle" | "signOut"
+  | "deleteAccount"
+  | "refreshProfile"
+  | "saveProfile"
+  | "signInWithGoogle"
+  | "signOut"
 >;
 
 function AuthState({ authRef }: { authRef: RefObject<AuthProbe | null> }) {
   const auth = useAuth();
   useImperativeHandle(authRef, () => ({
+    deleteAccount: auth.deleteAccount,
     refreshProfile: auth.refreshProfile,
     saveProfile: auth.saveProfile,
     signInWithGoogle: auth.signInWithGoogle,
@@ -284,6 +301,9 @@ describe("AuthProvider profile isolation", () => {
   const getProfile = api.profile.get as jest.MockedFunction<typeof api.profile.get>;
   const saveProfile = api.profile.save as jest.MockedFunction<
     typeof api.profile.save
+  >;
+  const deleteProfile = api.profile.delete as jest.MockedFunction<
+    typeof api.profile.delete
   >;
 
   beforeEach(() => {
@@ -915,6 +935,83 @@ describe("AuthProvider profile isolation", () => {
     await expect(signOutPromise).rejects.toThrow("remote sign-out failed");
     expect(screen.getByTestId("profile-email").props.children).toBe("none");
     expect(profileStorage.get()).toBeNull();
+  });
+
+  it("preserves the session and private caches when remote deletion fails", async () => {
+    const draftKey = tournamentDraftStorageKey(firstUserId);
+    profileStorage.set(firstUserId, firstProfile);
+    draftStorage.set(draftKey, { private: "draft" });
+    mockGetSession.mockResolvedValue({
+      data: { session: session(firstProfile.email, firstUserId) },
+      error: null,
+    });
+    getProfile.mockReturnValue(new Promise(() => undefined));
+    deleteProfile.mockRejectedValue(new Error("Deletion service unavailable"));
+
+    const { authRef, screen } = renderAuthProvider();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("profile-email").props.children).toBe(
+        firstProfile.email,
+      );
+    });
+
+    queryClient.setQueryData(["tournament", "private"], { id: "private" });
+
+    await expect(authRef.current!.deleteAccount()).rejects.toThrow(
+      "Deletion service unavailable",
+    );
+
+    expect(deleteProfile).toHaveBeenCalledWith({
+      authenticatedUserId: firstUserId,
+    });
+    expect(screen.getByTestId("session-user-id").props.children).toBe(firstUserId);
+    expect(screen.getByTestId("profile-email").props.children).toBe(
+      firstProfile.email,
+    );
+    expect(profileStorage.getForUser(firstUserId)).toEqual(firstProfile);
+    expect(draftStorage.get(draftKey)).toEqual({ private: "draft" });
+    expect(queryClient.getQueryData(["tournament", "private"])).toEqual({
+      id: "private",
+    });
+    expect(mockSignOut).not.toHaveBeenCalled();
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it("clears private state and navigates after deletion even when local sign-out reports a stale user", async () => {
+    const draftKey = tournamentDraftStorageKey(firstUserId);
+    profileStorage.set(firstUserId, firstProfile);
+    draftStorage.set(draftKey, { private: "draft" });
+    mockGetSession.mockResolvedValue({
+      data: { session: session(firstProfile.email, firstUserId) },
+      error: null,
+    });
+    getProfile.mockReturnValue(new Promise(() => undefined));
+    deleteProfile.mockResolvedValue({ success: true });
+    mockSignOut.mockResolvedValue({ error: new Error("User not found") });
+
+    const { authRef, screen } = renderAuthProvider();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("profile-email").props.children).toBe(
+        firstProfile.email,
+      );
+    });
+
+    queryClient.setQueryData(["tournament", "private"], { id: "private" });
+
+    await act(async () => {
+      await authRef.current!.deleteAccount();
+    });
+
+    expect(screen.getByTestId("session-email").props.children).toBe("none");
+    expect(screen.getByTestId("profile-email").props.children).toBe("none");
+    expect(screen.getByTestId("status").props.children).toBe("ready");
+    expect(profileStorage.get()).toBeNull();
+    expect(draftStorage.get(draftKey)).toBeNull();
+    expect(queryClient.getQueryData(["tournament", "private"])).toBeUndefined();
+    expect(mockSignOut).toHaveBeenCalledWith({ scope: "local" });
+    expect(router.replace).toHaveBeenCalledWith("/login");
   });
 
   it("does not write a pending profile after unmount", async () => {

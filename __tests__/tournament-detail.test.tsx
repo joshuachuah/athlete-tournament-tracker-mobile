@@ -160,6 +160,7 @@ describe("TournamentDetailScreen deletion", () => {
       signInWithGoogle: jest.fn(),
       refreshProfile: jest.fn(),
       saveProfile: jest.fn(),
+      deleteAccount: jest.fn(),
       signOut: jest.fn(),
       isCurrentUser: jest.fn(() => true),
     });

@@ -58,6 +58,7 @@ describe("split profile destinations", () => {
       refreshProfile: jest.fn(),
       saveProfile: jest.fn(),
       signInWithGoogle: jest.fn(),
+      deleteAccount: jest.fn(),
       signOut: jest.fn(),
     });
   });

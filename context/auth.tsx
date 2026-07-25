@@ -8,12 +8,18 @@ import {
 } from "react";
 import * as AuthSession from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
+import { router } from "expo-router";
 import type { Session } from "@supabase/supabase-js";
 
 import { api } from "@/lib/api";
 import { queryClient } from "@/lib/query-client";
 import { hasSupabaseConfig, supabase } from "@/lib/supabase";
-import { profileStorage } from "@/lib/storage";
+import {
+  clearLegacyTournamentDraft,
+  draftStorage,
+  profileStorage,
+  tournamentDraftStorageKey,
+} from "@/lib/storage";
 import type { AthleteProfile } from "@/types";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -33,6 +39,7 @@ type AuthContextValue = {
   signInWithGoogle: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   saveProfile: (data: ProfileInput) => Promise<AthleteProfile>;
+  deleteAccount: () => Promise<void>;
   signOut: () => Promise<void>;
   isCurrentUser: (userId: string) => boolean;
 };
@@ -52,6 +59,74 @@ function redirectUri(): string {
     scheme: "athletetracker",
     path: "auth/callback",
   });
+}
+
+async function startGoogleSignIn(
+  setAuthError: (error: string | null) => void,
+) {
+  if (!supabase) {
+    setAuthError(
+      "Supabase is not configured. Set Expo public Supabase environment variables.",
+    );
+    return;
+  }
+
+  setAuthError(null);
+  const callbackUrl = redirectUri();
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: callbackUrl,
+      skipBrowserRedirect: true,
+    },
+  });
+
+  if (error) {
+    setAuthError(error.message);
+    return;
+  }
+
+  if (!data.url) {
+    setAuthError("Supabase did not return an OAuth URL.");
+    return;
+  }
+
+  const result = await WebBrowser.openAuthSessionAsync(data.url, callbackUrl);
+
+  if (result.type !== "success") {
+    return;
+  }
+
+  if (result.url.includes("#")) {
+    setAuthError("OAuth callback did not include a valid session code.");
+    return;
+  }
+
+  let callback: URL;
+
+  try {
+    callback = new URL(result.url);
+  } catch {
+    setAuthError("OAuth callback URL was invalid.");
+    return;
+  }
+
+  if (callback.searchParams.has("error")) {
+    setAuthError("OAuth sign-in was rejected by the provider.");
+    return;
+  }
+
+  const code = callback.searchParams.get("code");
+
+  if (code) {
+    const exchange = await supabase.auth.exchangeCodeForSession(code);
+    if (exchange.error) {
+      setAuthError(exchange.error.message);
+    }
+    return;
+  }
+
+  setAuthError("OAuth callback did not include a session code.");
 }
 
 export function AuthProvider({ children }: PropsWithChildren) {
@@ -176,69 +251,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, []);
 
   async function signInWithGoogle() {
-    if (!supabase) {
-      setAuthError(
-        "Supabase is not configured. Set Expo public Supabase environment variables.",
-      );
-      return;
-    }
-
-    setAuthError(null);
-    const callbackUrl = redirectUri();
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: callbackUrl,
-        skipBrowserRedirect: true,
-      },
-    });
-
-    if (error) {
-      setAuthError(error.message);
-      return;
-    }
-
-    if (!data.url) {
-      setAuthError("Supabase did not return an OAuth URL.");
-      return;
-    }
-
-    const result = await WebBrowser.openAuthSessionAsync(data.url, callbackUrl);
-
-    if (result.type !== "success") {
-      return;
-    }
-
-    if (result.url.includes("#")) {
-      setAuthError("OAuth callback did not include a valid session code.");
-      return;
-    }
-
-    let callback: URL;
-
-    try {
-      callback = new URL(result.url);
-    } catch {
-      setAuthError("OAuth callback URL was invalid.");
-      return;
-    }
-
-    if (callback.searchParams.has("error")) {
-      setAuthError("OAuth sign-in was rejected by the provider.");
-      return;
-    }
-
-    const code = callback.searchParams.get("code");
-
-    if (code) {
-      const exchange = await supabase.auth.exchangeCodeForSession(code);
-      if (exchange.error) {
-        setAuthError(exchange.error.message);
-      }
-      return;
-    }
-
-    setAuthError("OAuth callback did not include a session code.");
+    await startGoogleSignIn(setAuthError);
   }
 
   async function refreshProfile() {
@@ -316,7 +329,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     return savedProfile;
   }
 
-  async function signOut() {
+  function clearLocalAuthState(userId: string | null) {
     ++identityVersion.current;
     ++profileLoadVersion.current;
     currentUserId.current = null;
@@ -325,11 +338,53 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setProfile(null);
     setStatus("ready");
     profileStorage.clear();
+    if (userId) {
+      draftStorage.clear(tournamentDraftStorageKey(userId));
+    }
+    clearLegacyTournamentDraft();
     queryClient.clear();
+  }
+
+  async function signOut() {
+    const userId = currentUserId.current;
+    clearLocalAuthState(userId);
 
     if (supabase) {
       await supabase.auth.signOut();
     }
+  }
+
+  async function deleteAccount() {
+    const userId = currentUserId.current;
+
+    if (!userId) {
+      throw new Error("Sign in before deleting your account.");
+    }
+
+    const identity = identityVersion.current;
+    await api.profile.delete({ authenticatedUserId: userId });
+
+    if (
+      !mounted.current ||
+      currentUserId.current !== userId ||
+      identityVersion.current !== identity
+    ) {
+      draftStorage.clear(tournamentDraftStorageKey(userId));
+      return;
+    }
+
+    clearLocalAuthState(userId);
+
+    if (supabase) {
+      try {
+        await supabase.auth.signOut({ scope: "local" });
+      } catch {
+        // The backend has already deleted the Auth user. Local application
+        // state is authoritative here, so a stale-session error cannot restore it.
+      }
+    }
+
+    router.replace("/login");
   }
 
   function isCurrentUser(userId: string) {
@@ -346,6 +401,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         signInWithGoogle,
         refreshProfile,
         saveProfile,
+        deleteAccount,
         signOut,
         isCurrentUser,
       }}
