@@ -98,6 +98,91 @@ describe("tournamentToDraft", () => {
     expect(draft.prize_tax_rate).toBe(30);
   });
 
+  it("round-trips tournament-currency fields without relabeling home-currency values", () => {
+    const source = tournament({
+      currency: "EUR",
+      home_currency: "USD",
+      entry_fee: 125,
+      flight_cost: 240,
+      accommodation_total: 360,
+      daily_spending_cap: 85,
+      coaching_cost: 45,
+      misc_cost: 15,
+      subsidy_amount: 50,
+      sponsorship_allocated: 30,
+      prize_rounds: { r1: 150, qf: 900, w: 2_500 },
+    });
+
+    const draft = tournamentToDraft(source);
+    const payload = toTournamentPayload(draft, source.user_id);
+
+    expect(draft).toEqual(
+      expect.objectContaining({
+        currency: "EUR",
+        entry_fee: 125,
+        flight_cost: 240,
+        accommodation_total: 360,
+        daily_spending_cap: 85,
+        coaching_cost: 45,
+        misc_cost: 15,
+        subsidy_amount: 50,
+        sponsorship_allocated: 30,
+      }),
+    );
+    expect(payload).toEqual(
+      expect.objectContaining({
+        currency: "EUR",
+        entry_fee: 125,
+        flight_cost: 240,
+        accommodation_total: 360,
+        daily_spending_cap: 85,
+        coaching_cost: 45,
+        misc_cost: 15,
+        subsidy_amount: 50,
+        sponsorship_allocated: 30,
+        prize_rounds: {
+          r1: 150,
+          r2: 0,
+          r3: 0,
+          qf: 900,
+          sf: 0,
+          f: 0,
+          w: 2_500,
+        },
+      }),
+    );
+  });
+
+  it("sends a complete monetary payload when an edit changes currency", () => {
+    const draft = {
+      ...tournamentToDraft(tournament()),
+      currency: "GBP",
+    };
+
+    expect(toTournamentPayload(draft, "athlete-1")).toEqual(
+      expect.objectContaining({
+        currency: "GBP",
+        entry_fee: expect.any(Number),
+        flight_cost: expect.any(Number),
+        accommodation_total: expect.any(Number),
+        daily_spending_cap: expect.any(Number),
+        coaching_cost: expect.any(Number),
+        misc_cost: expect.any(Number),
+        subsidy_amount: expect.any(Number),
+        sponsorship_allocated: expect.any(Number),
+        prize_rounds: {
+          r1: expect.any(Number),
+          r2: expect.any(Number),
+          r3: expect.any(Number),
+          qf: expect.any(Number),
+          sf: expect.any(Number),
+          f: expect.any(Number),
+          w: expect.any(Number),
+        },
+      }),
+    );
+  });
+
   it("enables subsidies when a provider or amount is present", () => {
     expect(
       tournamentToDraft(tournament({ subsidy_by: "Sponsor" }))

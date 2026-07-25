@@ -158,16 +158,17 @@ and signed-in users without a profile route to onboarding.
 
 ### API client
 
-The shipped client calls the unversioned compatibility API:
+The shipped client uses the currency-correct v2 tournament contract. Profile,
+search, FX, and health routes remain on their existing paths:
 
 ```ts
 api.profile.get(email);             // GET /api/profile?email=
 api.profile.save(profile);          // POST /api/profile
-api.tournaments.list(userId);       // GET /api/tournaments?user_id=
-api.tournaments.get(id);            // GET /api/tournaments/:id
-api.tournaments.create(payload);    // POST /api/tournaments
-api.tournaments.update(id, payload);// PATCH /api/tournaments/:id
-api.tournaments.delete(id);         // DELETE /api/tournaments/:id
+api.tournaments.list(userId);       // GET /api/v2/tournaments
+api.tournaments.get(id);            // GET /api/v2/tournaments/:id
+api.tournaments.create(payload);    // POST /api/v2/tournaments
+api.tournaments.update(id, payload);// PATCH /api/v2/tournaments/:id
+api.tournaments.delete(id);         // DELETE /api/v2/tournaments/:id
 api.tournaments.search(query, sport);// GET /api/tournaments/search
 api.fx.convert(from, to, amount);   // GET /api/fx
 api.health();                       // GET /health
@@ -282,30 +283,18 @@ provides sign-out.
 
 ## 8. Currency and Financial Contract
 
-### Shipped `/api` compatibility semantics
+### Shipped `/api/v2` tournament semantics
 
-Plan 016 is deferred. The mobile app therefore continues to use the legacy,
-unversioned `/api` tournament routes; it does not call or imply a migration to a
-newer versioned contract.
-
-The current unit model is asymmetric and must be understood when maintaining the
-client:
-
-- Monetary inputs sent to `POST /api/tournaments` are in tournament currency.
-- The returned flat tournament monetary fields are in the athlete's home
-  currency, while `currency` remains the tournament-currency label.
-- Monetary inputs sent to `PATCH /api/tournaments/:id` are expected in home
-  currency.
-- Nested `pnl` amounts are in `home_currency`.
-- `/api/fx` supplies display-only conversions from home currency to tournament
+- Tournament create, list, get, preview, update, and delete use `/api/v2`.
+- Flat monetary fields and `prize_rounds` are always denominated in the
+  tournament's `currency`, including v2 responses used to prefill edits.
+- Nested `pnl` amounts are always denominated in `home_currency`.
+- A currency-changing PATCH sends every flat monetary field and the complete
+  `prize_rounds` map, as required by the v2 contract.
+- `/api/fx` supplies display-only conversions from tournament currency to home
   currency in `MoneyPair`.
 
-This compatibility model has a known edit-path limitation: the current edit form
-prefills returned flat home-currency amounts while its labels continue to show
-the tournament currency. The spec records that shipped behavior; it does not
-silently redefine the units or promise a contract migration.
-
-Regardless of that compatibility limitation, these rules remain mandatory:
+These rules remain mandatory:
 
 - The backend owns P&L and conversion.
 - `pnl.total_expenses`, `pnl.total_income_base`, scenario prize/net values, and
@@ -457,11 +446,12 @@ later, but the current app validates response shapes at runtime to catch drift.
 | GET | `/health` | API health response |
 | GET | `/api/profile?email=` | Load athlete profile or `null` |
 | POST | `/api/profile` | Create/update the signed-in athlete profile |
-| GET | `/api/tournaments?user_id=` | List tournaments with `pnl` and `home_currency` |
-| POST | `/api/tournaments` | Create from tournament-currency input; return legacy flat/home units plus P&L |
-| GET | `/api/tournaments/:id` | Load one tournament with P&L |
-| PATCH | `/api/tournaments/:id` | Update using legacy home-currency monetary inputs |
-| DELETE | `/api/tournaments/:id` | Delete one tournament |
+| GET | `/api/v2/tournaments` | List currency-correct tournaments with `pnl` and `home_currency` |
+| POST | `/api/v2/tournaments` | Create from tournament-currency input |
+| POST | `/api/v2/tournaments/pnl-preview` | Preview server-converted outcomes in home currency |
+| GET | `/api/v2/tournaments/:id` | Load one currency-correct tournament with P&L |
+| PATCH | `/api/v2/tournaments/:id` | Update using tournament-currency monetary inputs |
+| DELETE | `/api/v2/tournaments/:id` | Delete one tournament |
 | GET | `/api/tournaments/search?q=&sport=` | Search known and live server records |
 | GET | `/api/fx?from=&to=&amount=` | Return `{ converted, rate }` for display conversion |
 
