@@ -17,7 +17,7 @@
     "@supabase/supabase-js": "^2.49.8",
     "@tanstack/react-query": "^5.80.6",
     "date-fns": "^4.1.0",
-    "expo": "~54.0.0",
+    "expo": "~54.0.36",
     "expo-auth-session": "~7.0.8",
     "expo-haptics": "~15.0.7",
     "expo-linking": "~8.0.8",
@@ -57,6 +57,12 @@
   },
   "pnpm": {
     "overrides": {
+      "@expo/cli>tar": "7.5.20",
+      "@expo/xcpretty>js-yaml": "4.3.0",
+      "minimatch@3.1.5>brace-expansion": "1.1.16",
+      "minimatch@9.0.9>brace-expansion": "2.1.2",
+      "minimatch@10.2.5>brace-expansion": "5.0.7",
+      "react-devtools-core>shell-quote": "1.9.0",
       "js-yaml@3.14.2": "3.15.0",
       "undici": "^6.27.0"
     }
