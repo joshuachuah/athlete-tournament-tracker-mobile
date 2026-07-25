@@ -1,6 +1,8 @@
+import { router } from "expo-router";
 import { Flag, Medal } from "lucide-react-native";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
+import { Button } from "@/components/ui/button";
 import { colors, radii, spacing } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
 
@@ -64,6 +66,12 @@ export default function ProfileScreen() {
           </View>
         </View>
       </View>
+
+      <Button
+        label="Edit profile"
+        variant="secondary"
+        onPress={() => router.push("/edit-profile")}
+      />
     </ScrollView>
   );
 }
