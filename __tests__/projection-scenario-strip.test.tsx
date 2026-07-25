@@ -114,14 +114,23 @@ it("cancels the stale preview request when the debounced draft changes", async (
   expect(mockPreview).toHaveBeenCalledTimes(2);
 });
 
-it("waits until save for server-converted cross-currency outcomes", async () => {
+it("previews cross-currency outcomes in the athlete's home currency", async () => {
+  mockPreview.mockResolvedValue({
+    total_expenses: 90,
+    total_income_base: 0,
+    break_even_round: "qf",
+    scenarios: [
+      { scenario: "worst", round: "r1", prize_money: 90, prize_money_after_tax: 90, net_result: 0, profitable: false },
+    ],
+  });
   const screen = renderStrip({ ...draft, currency: "EUR" });
   await settlePreview();
 
-  expect(mockPreview).not.toHaveBeenCalled();
-  expect(
-    screen.getByText("Create the projection to see outcomes converted from EUR to USD."),
-  ).toBeTruthy();
+  await waitFor(() => expect(screen.getByText("$0 USD")).toBeTruthy());
+  expect(mockPreview).toHaveBeenCalledWith(
+    expect.objectContaining({ currency: "EUR", user_id: "athlete-1" }),
+    expect.objectContaining({ authenticatedUserId: "account-1" }),
+  );
 });
 
 it("keys the preview cache by home currency", async () => {

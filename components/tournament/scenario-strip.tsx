@@ -61,9 +61,7 @@ export function ScenarioStrip({
   profileId: string;
 }) {
   const draftReady = canPreview(draft);
-  const crossCurrency =
-    draft.currency.toUpperCase() !== homeCurrency.toUpperCase();
-  const previewReady = identityResolved && draftReady && !crossCurrency;
+  const previewReady = identityResolved && draftReady;
   const serializedPayload = previewReady
     ? JSON.stringify(toTournamentPreviewPayload(draft, profileId))
     : "";
@@ -120,11 +118,9 @@ export function ScenarioStrip({
           }}
         >
           <Text style={{ color: colors.mutedForeground, lineHeight: 20 }}>
-            {crossCurrency
-              ? `Create the projection to see outcomes converted from ${draft.currency.toUpperCase()} to ${homeCurrency.toUpperCase()}.`
-              : identityResolved
-                ? "Complete the required tournament details to start a live preview."
-                : "Choose the searched tournament or create it before previewing outcomes."}
+            {identityResolved
+              ? "Complete the required tournament details to start a live preview."
+              : "Choose the searched tournament or create it before previewing outcomes."}
           </Text>
         </View>
       ) : loading ? (

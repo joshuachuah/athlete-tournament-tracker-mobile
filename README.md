@@ -51,7 +51,7 @@ For a physical device, put the device and development machine on the same networ
 
 The current native configuration uses the `athletetracker` app scheme and requests the callback URL `athletetracker://auth/callback`. Add that exact URL to the Supabase Auth redirect allow-list for the shared project before testing native Google sign-in. Do not broaden the allow-list with an unnecessary wildcard.
 
-The app implements PKCE and accepts only one-time authorization-code callbacks; it does not accept access or refresh tokens from callback URL fragments. Live allow-list inspection and signed iOS/Android callback verification remain external release prerequisites, so local implementation does not by itself establish production OAuth readiness. The app continues to use the legacy `/api` tournament contract and currency semantics; Plan 016 is intentionally deferred.
+The app implements PKCE and accepts only one-time authorization-code callbacks; it does not accept access or refresh tokens from callback URL fragments. Live allow-list inspection and signed iOS/Android callback verification remain external release prerequisites, so local implementation does not by itself establish production OAuth readiness. Tournament CRUD and P&L preview use the currency-correct `/api/v2` contract; tournament search, profile, FX, and health retain their existing routes.
 
 ## Run the app
 

@@ -93,7 +93,7 @@ describe("api client", () => {
     ).resolves.toEqual(preview);
 
     expect(fetchMock).toHaveBeenCalledWith(
-      `${apiBase}/api/tournaments/pnl-preview`,
+      `${apiBase}/api/v2/tournaments/pnl-preview`,
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({
@@ -441,6 +441,41 @@ describe("api client", () => {
     expect(mockGetSession).not.toHaveBeenCalled();
   });
 
+  it("uses the currency-correct v2 contract for tournament CRUD and preview", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ invalid: "response" }),
+    } as Response);
+
+    const options = { authToken: "account-token" };
+    const requests = [
+      api.tournaments.list("account-1", options),
+      api.tournaments.get("tournament-1", options),
+      api.tournaments.create(
+        {} as Parameters<typeof api.tournaments.create>[0],
+        options,
+      ),
+      api.tournaments.preview({}, options),
+      api.tournaments.update("tournament-1", {}, options),
+      api.tournaments.delete("tournament-1", options),
+    ];
+
+    await Promise.all(
+      requests.map((request) =>
+        expect(request).rejects.toMatchObject({ code: "INVALID_RESPONSE" }),
+      ),
+    );
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      `${apiBase}/api/v2/tournaments`,
+      `${apiBase}/api/v2/tournaments/tournament-1`,
+      `${apiBase}/api/v2/tournaments`,
+      `${apiBase}/api/v2/tournaments/pnl-preview`,
+      `${apiBase}/api/v2/tournaments/tournament-1`,
+      `${apiBase}/api/v2/tournaments/tournament-1`,
+    ]);
+  });
+
   it("refreshes tournament mutation auth for the initiating user", async () => {
     mockGetSession.mockResolvedValue({
       data: {
@@ -526,7 +561,7 @@ describe("api client", () => {
     await expect(request).rejects.toBeInstanceOf(ApiError);
     await expect(request).rejects.toMatchObject({
       name: "ApiError",
-      message: "Unexpected response shape from /api/tournaments/t1",
+      message: "Unexpected response shape from /api/v2/tournaments/t1",
       status: 0,
       code: "INVALID_RESPONSE",
     });
