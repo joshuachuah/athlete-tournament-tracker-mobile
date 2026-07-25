@@ -275,11 +275,14 @@ includes initial, loading, empty-result, and retryable error states.
 ### Profile and onboarding
 
 Profile fields are name, home country, three-letter home currency, sport,
-monthly income, savings balance, and monthly sponsorship. Saves are bearer-bound,
-normalize the currency code to uppercase, update the user-bound local cache, and
-invalidate the profile query key. An actual normalized home-currency change also
-invalidates tournament list, detail, and shared FX-rate caches. The Profile tab
-provides sign-out.
+monthly income, savings balance, and monthly sponsorship. Identity and home
+currency can be edited from Profile. Financial values can only be viewed or
+edited after biometric authentication in Private finances, and that destination
+re-locks when the app leaves the foreground. Saves are bearer-bound, normalize
+the currency code to uppercase, update the user-bound local cache, and invalidate
+the profile query key. An actual normalized home-currency change also invalidates
+tournament list, detail, and shared FX-rate caches. The Account tab provides
+sign-out.
 
 ## 8. Currency and Financial Contract
 
