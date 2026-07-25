@@ -4,6 +4,7 @@ import { AppState, type AppStateStatus } from "react-native";
 
 import AccountScreen from "@/app/(tabs)/account";
 import ProfileScreen from "@/app/(tabs)/profile";
+import EditProfileScreen from "@/app/edit-profile";
 import PrivateFinancesScreen from "@/app/private-finances";
 import { useAuth } from "@/context/auth";
 import { authenticatePrivateFinances } from "@/lib/private-finance-auth";
@@ -12,6 +13,7 @@ import type { AthleteProfile } from "@/types";
 jest.mock("expo-router", () => ({
   Redirect: () => null,
   router: {
+    back: jest.fn(),
     push: jest.fn(),
     replace: jest.fn(),
   },
@@ -32,6 +34,7 @@ const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockAuthenticate = authenticatePrivateFinances as jest.MockedFunction<
   typeof authenticatePrivateFinances
 >;
+const mockSaveProfile = jest.fn();
 
 const profile: AthleteProfile = {
   id: "athlete-1",
@@ -56,7 +59,7 @@ describe("split profile destinations", () => {
       authError: null,
       isCurrentUser: jest.fn(() => true),
       refreshProfile: jest.fn(),
-      saveProfile: jest.fn(),
+      saveProfile: mockSaveProfile,
       signInWithGoogle: jest.fn(),
       signOut: jest.fn(),
     });
@@ -71,6 +74,40 @@ describe("split profile destinations", () => {
     expect(screen.queryByText("Monthly income")).toBeNull();
     expect(screen.queryByText("Savings balance")).toBeNull();
     expect(screen.queryByText("Monthly sponsorship")).toBeNull();
+
+    fireEvent.press(screen.getByText("Edit profile"));
+
+    expect(router.push).toHaveBeenCalledWith("/edit-profile");
+  });
+
+  it("updates identity fields without rendering private finances", async () => {
+    mockSaveProfile.mockResolvedValue({
+      ...profile,
+      name: "Alexandra Morgan",
+      home_currency: "USD",
+    });
+    const screen = render(<EditProfileScreen />);
+
+    expect(screen.queryByText("Monthly income")).toBeNull();
+    expect(screen.queryByText("Savings")).toBeNull();
+    expect(screen.queryByText("Monthly sponsorship")).toBeNull();
+
+    fireEvent.changeText(screen.getByLabelText("Name"), "Alexandra Morgan");
+    fireEvent.changeText(screen.getByLabelText("Home currency"), "usd");
+    fireEvent.press(screen.getByText("Save profile"));
+
+    await waitFor(() => {
+      expect(mockSaveProfile).toHaveBeenCalledWith({
+        name: "Alexandra Morgan",
+        home_country: profile.home_country,
+        home_currency: "USD",
+        sport: profile.sport,
+        monthly_income: profile.monthly_income,
+        savings_balance: profile.savings_balance,
+        monthly_sponsorship: profile.monthly_sponsorship,
+      });
+      expect(router.back).toHaveBeenCalled();
+    });
   });
 
   it("renders one quiet locked row without financial values on Account", () => {
@@ -130,6 +167,57 @@ describe("split profile destinations", () => {
       expect(screen.queryByText("Monthly income")).toBeNull();
       expect(screen.getByText("Private finances locked")).toBeTruthy();
     });
+  });
+
+  it("edits financial values only after biometric authentication", async () => {
+    mockAuthenticate.mockResolvedValue({ success: true });
+    mockSaveProfile.mockResolvedValue({
+      ...profile,
+      monthly_income: 9_000,
+      savings_balance: 40_000,
+      monthly_sponsorship: 1_500,
+    });
+    const screen = render(<PrivateFinancesScreen />);
+
+    await screen.findByText("Edit private finances");
+    fireEvent.press(screen.getByText("Edit private finances"));
+
+    expect(screen.queryByLabelText("Name")).toBeNull();
+    expect(screen.queryByLabelText("Home country")).toBeNull();
+    expect(screen.queryByLabelText("Home currency")).toBeNull();
+    expect(screen.queryByLabelText("Sport")).toBeNull();
+
+    fireEvent.changeText(screen.getByLabelText("Monthly income"), "9000");
+    fireEvent.changeText(screen.getByLabelText("Savings"), "40000");
+    fireEvent.changeText(screen.getByLabelText("Monthly sponsorship"), "1500");
+    fireEvent.press(screen.getByText("Save private finances"));
+
+    await waitFor(() => {
+      expect(mockSaveProfile).toHaveBeenCalledWith({
+        name: profile.name,
+        home_country: profile.home_country,
+        home_currency: profile.home_currency,
+        sport: profile.sport,
+        monthly_income: 9_000,
+        savings_balance: 40_000,
+        monthly_sponsorship: 1_500,
+      });
+      expect(screen.getByText("Private finances updated.")).toBeTruthy();
+      expect(screen.queryByText("Save private finances")).toBeNull();
+    });
+  });
+
+  it("keeps the financial editor open when saving fails", async () => {
+    mockAuthenticate.mockResolvedValue({ success: true });
+    mockSaveProfile.mockRejectedValue(new Error("Profile update failed"));
+    const screen = render(<PrivateFinancesScreen />);
+
+    await screen.findByText("Edit private finances");
+    fireEvent.press(screen.getByText("Edit private finances"));
+    fireEvent.press(screen.getByText("Save private finances"));
+
+    expect(await screen.findByText("Profile update failed")).toBeTruthy();
+    expect(screen.getByText("Save private finances")).toBeTruthy();
   });
 
   it("stays locked when authentication is cancelled", async () => {

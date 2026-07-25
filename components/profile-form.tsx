@@ -20,13 +20,16 @@ const profileSchema = z.object({
 });
 
 export type ProfileFormValues = z.infer<typeof profileSchema>;
+type ProfileFormFields = "all" | "identity" | "finances";
 
 export function ProfileForm({
+  fields = "all",
   profile,
   onSubmit,
   submitLabel,
   loading,
 }: {
+  fields?: ProfileFormFields;
   profile?: AthleteProfile | null;
   onSubmit: (values: ProfileFormValues) => Promise<void>;
   submitLabel: string;
@@ -48,115 +51,128 @@ export function ProfileForm({
       monthly_sponsorship: profile?.monthly_sponsorship ?? 0,
     },
   });
+  const showIdentity = fields !== "finances";
+  const showFinances = fields !== "identity";
 
   return (
     <View style={{ gap: spacing.lg }}>
-      <Controller
-        control={control}
-        name="name"
-        render={({ field }) => (
-          <Input
-            label="Name"
-            value={field.value}
-            onBlur={field.onBlur}
-            onChangeText={field.onChange}
-            autoCapitalize="words"
-            error={errors.name?.message}
+      {showIdentity ? (
+        <>
+          <Controller
+            control={control}
+            name="name"
+            render={({ field }) => (
+              <Input
+                label="Name"
+                value={field.value}
+                onBlur={field.onBlur}
+                onChangeText={field.onChange}
+                autoCapitalize="words"
+                error={errors.name?.message}
+              />
+            )}
           />
-        )}
-      />
-      <Controller
-        control={control}
-        name="home_country"
-        render={({ field }) => (
-          <Input
-            label="Home country"
-            value={field.value}
-            onBlur={field.onBlur}
-            onChangeText={field.onChange}
-            autoCapitalize="words"
-            error={errors.home_country?.message}
+          <Controller
+            control={control}
+            name="home_country"
+            render={({ field }) => (
+              <Input
+                label="Home country"
+                value={field.value}
+                onBlur={field.onBlur}
+                onChangeText={field.onChange}
+                autoCapitalize="words"
+                error={errors.home_country?.message}
+              />
+            )}
           />
-        )}
-      />
-      <Controller
-        control={control}
-        name="home_currency"
-        render={({ field }) => (
-          <Input
-            label="Home currency"
-            value={field.value}
-            onBlur={field.onBlur}
-            onChangeText={(value) => field.onChange(value.toUpperCase())}
-            autoCapitalize="characters"
-            maxLength={3}
-            error={errors.home_currency?.message}
+          <Controller
+            control={control}
+            name="home_currency"
+            render={({ field }) => (
+              <Input
+                label="Home currency"
+                value={field.value}
+                onBlur={field.onBlur}
+                onChangeText={(value) => field.onChange(value.toUpperCase())}
+                autoCapitalize="characters"
+                maxLength={3}
+                error={errors.home_currency?.message}
+              />
+            )}
           />
-        )}
-      />
-      <Controller
-        control={control}
-        name="sport"
-        render={({ field }) => (
-          <Input
-            label="Sport"
-            value={field.value}
-            onBlur={field.onBlur}
-            onChangeText={field.onChange}
-            autoCapitalize="words"
-            error={errors.sport?.message}
+          <Controller
+            control={control}
+            name="sport"
+            render={({ field }) => (
+              <Input
+                label="Sport"
+                value={field.value}
+                onBlur={field.onBlur}
+                onChangeText={field.onChange}
+                autoCapitalize="words"
+                error={errors.sport?.message}
+              />
+            )}
           />
-        )}
-      />
+        </>
+      ) : null}
 
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.md }}>
-        <Controller
-          control={control}
-          name="monthly_income"
-          render={({ field }) => (
-            <MoneyInput
-              label="Monthly income"
-              value={field.value}
-              onBlur={field.onBlur}
-              onChangeValue={field.onChange}
-              error={errors.monthly_income?.message}
-              style={{ minWidth: 145 }}
+      {showFinances ? (
+        <>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.md }}>
+            <Controller
+              control={control}
+              name="monthly_income"
+              render={({ field }) => (
+                <MoneyInput
+                  label="Monthly income"
+                  value={field.value}
+                  onBlur={field.onBlur}
+                  onChangeValue={field.onChange}
+                  error={errors.monthly_income?.message}
+                  style={{ minWidth: 145 }}
+                />
+              )}
             />
-          )}
-        />
-        <Controller
-          control={control}
-          name="savings_balance"
-          render={({ field }) => (
-            <MoneyInput
-              label="Savings"
-              value={field.value}
-              onBlur={field.onBlur}
-              onChangeValue={field.onChange}
-              error={errors.savings_balance?.message}
-              style={{ minWidth: 145 }}
+            <Controller
+              control={control}
+              name="savings_balance"
+              render={({ field }) => (
+                <MoneyInput
+                  label="Savings"
+                  value={field.value}
+                  onBlur={field.onBlur}
+                  onChangeValue={field.onChange}
+                  error={errors.savings_balance?.message}
+                  style={{ minWidth: 145 }}
+                />
+              )}
             />
-          )}
-        />
-      </View>
+          </View>
 
-      <Controller
-        control={control}
-        name="monthly_sponsorship"
-        render={({ field }) => (
-          <MoneyInput
-            label="Monthly sponsorship"
-            value={field.value}
-            onBlur={field.onBlur}
-            onChangeValue={field.onChange}
-            error={errors.monthly_sponsorship?.message}
+          <Controller
+            control={control}
+            name="monthly_sponsorship"
+            render={({ field }) => (
+              <MoneyInput
+                label="Monthly sponsorship"
+                value={field.value}
+                onBlur={field.onBlur}
+                onChangeValue={field.onChange}
+                error={errors.monthly_sponsorship?.message}
+              />
+            )}
           />
-        )}
-      />
+        </>
+      ) : null}
 
       <Text style={{ color: colors.mutedForeground, lineHeight: 20 }} selectable>
-        Monetary values are stored in your home currency and converted by the
-        server when tournaments use another currency.
+        {fields === "identity"
+          ? "Changing your home currency refreshes tournament projections and converted values."
+          : fields === "finances"
+            ? `These values are stored in ${profile?.home_currency.toUpperCase() ?? "your home currency"} and remain hidden outside this authenticated view.`
+            : "Monetary values are stored in your home currency and converted by the server when tournaments use another currency."}
       </Text>
       <Button label={submitLabel} loading={loading} onPress={handleSubmit(onSubmit)} />
     </View>
