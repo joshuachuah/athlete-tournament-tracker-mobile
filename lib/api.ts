@@ -169,6 +169,26 @@ async function requestParsed<S extends z.ZodType>(
 export const api = {
   health: (options?: ApiRequestOptions) =>
     requestParsed(healthSchema, "/health", options),
+  auth: {
+    apple: {
+      storeCredential: (
+        authorizationCode: string,
+        options?: ApiRequestOptions,
+      ) =>
+        requestParsed(
+          deleteResultSchema,
+          "/api/v1/auth/apple/credential",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              authorization_code: authorizationCode,
+            }),
+            signal: options?.signal,
+            authToken: options?.authToken,
+          },
+        ),
+    },
+  },
   profile: {
     get: (email: string, options?: ApiRequestOptions) =>
       requestParsed(

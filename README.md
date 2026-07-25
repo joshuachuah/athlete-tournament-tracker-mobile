@@ -57,15 +57,19 @@ The app implements PKCE and accepts only one-time authorization-code callbacks; 
 
 ### Sign in with Apple
 
-The iOS app uses Expo's native Authentication Services integration and passes
-Apple's identity token to Supabase. Before a signed release:
+The iOS app uses Expo's native Authentication Services integration, passes
+Apple's identity token to Supabase, and sends the one-time authorization code
+to the authenticated API so it can retain an encrypted revocation token. Before
+a signed release:
 
 1. Enable Sign in with Apple for `com.athletetracker.mobile` in the Apple
    Developer portal.
 2. Enable the Apple provider in Supabase and include the bundle identifier in
    the provider's authorized client IDs.
-3. Verify first sign-in, returning sign-in, cancellation, relaunch, and account
-   deletion on a signed physical-device build.
+3. Configure the sibling API's Apple team, key, client, private-key, and token
+   encryption secrets.
+4. Verify first sign-in, returning sign-in, cancellation, relaunch, server-side
+   token revocation, and account deletion on a signed physical-device build.
 
 Apple only supplies the person's name on the first authorization. The app saves
 that name to Supabase metadata when available; onboarding remains the source of
@@ -74,9 +78,9 @@ the Athlete Tracker profile.
 ### Account deletion and legal URLs
 
 Account deletion calls the sibling API's authenticated `DELETE /api/profile`
-endpoint. The API deployment must have `SUPABASE_SERVICE_ROLE_KEY` configured
-server-side before this flow can succeed. Never place that key in an
-`EXPO_PUBLIC_*` variable.
+endpoint. The API deployment must have `SUPABASE_SERVICE_ROLE_KEY` plus its
+server-only Apple credentials configured before the full Apple flow can
+succeed. Never place those values in an `EXPO_PUBLIC_*` variable.
 
 The Account screen links to the public privacy policy and account-deletion
 instructions. The default URLs are `<EXPO_PUBLIC_API_URL>/privacy` and

@@ -104,25 +104,26 @@ The mobile app exposes permanent deletion from Account settings, requires an
 explicit confirmation phrase, and calls the authenticated backend before clearing
 the local profile, tournament draft, legacy draft, and query cache. The backend is
 responsible for deleting the Supabase Auth user and the cascading profile and
-tournament records. Failed remote deletion leaves the local session and data intact
-so the user can retry.
+tournament records. A failed API response leaves the device session and cached
+state intact so the user can retry the idempotent server flow; the API commits
+local database deletion before removing the Supabase Auth identity so a database
+failure cannot strand personal data behind an unusable login.
 
 The iOS target includes the Sign in with Apple capability and native button.
 Supabase exchanges Apple's identity token and the app preserves the first
 authorization's name metadata when available. These local checks do not prove the
 external provider configuration or entitlement:
 
-- deploy the backend with `SUPABASE_SERVICE_ROLE_KEY` and
-  `PRIVACY_CONTACT_EMAIL`;
+- deploy the backend with `SUPABASE_SERVICE_ROLE_KEY`,
+  `PRIVACY_CONTACT_EMAIL`, and all five `APPLE_*` server credentials;
 - enable Apple for `com.athletetracker.mobile` in Apple Developer and Supabase;
 - deploy and review the public `/privacy` and `/account-deletion` pages;
 - obtain legal/product approval for the privacy copy and app-store disclosures;
 - exercise Google and Apple deletion on signed preview and production builds.
 
-Supabase's native Apple ID-token exchange does not expose an Apple access or
-refresh token for server-side revocation. Following Apple's documented fallback
-for integrations without either token, Athlete Tracker deletes its own account
-data and tells Apple-authenticated users how to remove the remaining authorization
-under Apple Account Sign-In & Security. Revisit automated revocation if the auth
-architecture later stores an Apple authorization code or provider refresh token
-server-side.
+The app sends Apple's one-time authorization code to the authenticated API
+immediately after Supabase sign-in. The API exchanges it server-side and stores
+only an encrypted Apple refresh token. Account deletion revokes that token with
+Apple before deleting local data and the Supabase Auth identity. This exchange,
+storage, and revocation flow must be exercised on a signed physical-device build
+against preview and production Apple credentials before release.

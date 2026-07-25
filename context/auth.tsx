@@ -287,8 +287,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
         ],
       });
 
-      if (!credential.identityToken) {
-        throw new Error("Apple did not return an identity token.");
+      if (!credential.identityToken || !credential.authorizationCode) {
+        throw new Error(
+          "Apple did not return the credentials required to complete sign-in.",
+        );
       }
 
       const signIn = await supabase.auth.signInWithIdToken({
@@ -298,6 +300,21 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
       if (signIn.error) {
         throw signIn.error;
+      }
+
+      if (!signIn.data.session?.access_token) {
+        throw new Error("Apple sign-in did not return an authenticated session.");
+      }
+
+      try {
+        await api.auth.apple.storeCredential(credential.authorizationCode, {
+          authToken: signIn.data.session.access_token,
+        });
+      } catch {
+        await supabase.auth.signOut({ scope: "local" });
+        throw new Error(
+          "Apple sign-in could not be completed securely. Please try again.",
+        );
       }
 
       const nameParts = [

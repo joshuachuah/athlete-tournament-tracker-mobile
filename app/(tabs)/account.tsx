@@ -27,7 +27,7 @@ import { useAuth } from "@/context/auth";
 import { accountDeletionInfoUrl, privacyPolicyUrl } from "@/lib/legal";
 
 export default function AccountScreen() {
-  const { deleteAccount, profile, session, signOut } = useAuth();
+  const { deleteAccount, profile, signOut } = useAuth();
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
   const [deletionOpen, setDeletionOpen] = useState(false);
@@ -35,11 +35,6 @@ export default function AccountScreen() {
   if (!profile) {
     return null;
   }
-
-  const identityProviders = session?.user?.app_metadata?.providers;
-  const usesAppleSignIn =
-    session?.user?.app_metadata?.provider === "apple" ||
-    (Array.isArray(identityProviders) && identityProviders.includes("apple"));
 
   async function handleSignOut() {
     setSigningOut(true);
@@ -238,7 +233,6 @@ export default function AccountScreen() {
         <AccountDeletionDialog
           onClose={() => setDeletionOpen(false)}
           onDelete={deleteAccount}
-          usesAppleSignIn={usesAppleSignIn}
         />
       ) : null}
     </>

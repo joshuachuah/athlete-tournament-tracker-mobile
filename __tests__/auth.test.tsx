@@ -67,6 +67,11 @@ jest.mock("expo-sqlite/localStorage/install", () => {
 
 jest.mock("@/lib/api", () => ({
   api: {
+    auth: {
+      apple: {
+        storeCredential: jest.fn(),
+      },
+    },
     profile: {
       delete: jest.fn(),
       get: jest.fn(),
@@ -197,6 +202,10 @@ const mockAppleSignIn =
   AppleAuthentication.signInAsync as jest.MockedFunction<
     typeof AppleAuthentication.signInAsync
   >;
+const mockStoreAppleCredential = api.auth.apple
+  .storeCredential as jest.MockedFunction<
+  typeof api.auth.apple.storeCredential
+>;
 
 describe("AuthProvider OAuth callback", () => {
   beforeEach(() => {
@@ -324,9 +333,18 @@ describe("AuthProvider Apple sign-in", () => {
     mockAuthStateCallback = undefined;
     mockGetSession.mockResolvedValue({ data: { session: null }, error: null });
     mockSignInWithIdToken.mockResolvedValue({
-      data: { session: null, user: null },
+      data: {
+        session: session(
+          "athlete@privaterelay.appleid.com",
+          "apple-user",
+          "apple-session-token",
+        ),
+        user: null,
+      },
       error: null,
     });
+    mockStoreAppleCredential.mockResolvedValue({ success: true });
+    mockSignOut.mockResolvedValue({ error: null });
     mockUpdateUser.mockResolvedValue({
       data: { user: null },
       error: null,
@@ -371,6 +389,10 @@ describe("AuthProvider Apple sign-in", () => {
       provider: "apple",
       token: "apple-identity-token",
     });
+    expect(mockStoreAppleCredential).toHaveBeenCalledWith(
+      "authorization-code",
+      { authToken: "apple-session-token" },
+    );
     expect(mockUpdateUser).toHaveBeenCalledWith({
       data: {
         family_name: "Athlete",
@@ -405,7 +427,31 @@ describe("AuthProvider Apple sign-in", () => {
 
     expect(mockSignInWithIdToken).not.toHaveBeenCalled();
     expect(screen.getByTestId("auth-error").props.children).toBe(
-      "Apple did not return an identity token.",
+      "Apple did not return the credentials required to complete sign-in.",
+    );
+  });
+
+  it("clears the local Apple session when revocation storage fails", async () => {
+    mockAppleSignIn.mockResolvedValue({
+      authorizationCode: "authorization-code",
+      email: null,
+      fullName: null,
+      identityToken: "apple-identity-token",
+      realUserStatus:
+        AppleAuthentication.AppleAuthenticationUserDetectionStatus.UNKNOWN,
+      state: null,
+      user: "apple-user",
+    });
+    mockStoreAppleCredential.mockRejectedValue(
+      new Error("provider unavailable"),
+    );
+
+    const screen = await startAppleSignIn();
+
+    expect(mockSignOut).toHaveBeenCalledWith({ scope: "local" });
+    expect(mockUpdateUser).not.toHaveBeenCalled();
+    expect(screen.getByTestId("auth-error").props.children).toBe(
+      "Apple sign-in could not be completed securely. Please try again.",
     );
   });
 });

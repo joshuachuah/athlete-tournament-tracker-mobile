@@ -403,6 +403,34 @@ describe("api client", () => {
     );
   });
 
+  it("stores the one-time Apple authorization code with the new session", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true }),
+    } as Response);
+
+    await expect(
+      api.auth.apple.storeCredential("authorization-code", {
+        authToken: "apple-session-token",
+      }),
+    ).resolves.toEqual({ success: true });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${apiBase}/api/v1/auth/apple/credential`,
+      expect.objectContaining({
+        body: JSON.stringify({
+          authorization_code: "authorization-code",
+        }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer apple-session-token",
+        },
+        method: "POST",
+        signal: expect.any(AbortSignal),
+      }),
+    );
+  });
+
   it("keeps a profile mutation bound to its initiating bearer during an async session switch", async () => {
     const nextSession = deferred<{
       data: { session: { access_token: string } };
