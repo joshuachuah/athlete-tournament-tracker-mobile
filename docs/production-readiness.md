@@ -2,27 +2,41 @@
 
 ## Dependency risk register
 
-Reviewed on 2026-07-13 against Expo `54.0.35`, Expo CLI `54.0.25`,
-React `19.1.0`, React Native `0.81.5`, and pnpm `10.33.0`.
+Reviewed on 2026-07-25 against Expo `54.0.36`, Expo CLI `54.0.26`,
+React `19.1.0`, React Native `0.81.5`, and pnpm `10.33.0`. The live
+`pnpm audit --prod` baseline was 17 findings: 1 critical, 11 high, and 5
+moderate. The scoped, same-major overrides below reduce that to 8 findings:
+0 critical, 5 high, and 3 moderate.
 
-| Advisory / package | Owning chain | Reachability | Compatible patched version available | Action | Next review date |
-| --- | --- | --- | --- | --- | --- |
-| GHSA-vxpw-j846-p89q, GHSA-p88m-4jfj-68fv, GHSA-35p6-xmwp-9g52, GHSA-g8m3-5g58-fq7m / `undici` | `expo > @expo/cli > undici` | Build-time CLI only; no app JavaScript or native-runtime chain was printed by `pnpm why` | Yes. Expo CLI declares `^6.18.2`, which permits patched `6.27.0` | Resolved with a same-major pnpm override to `^6.27.0`; locked at `6.27.0` | 2026-08-13 |
-| GHSA-qx2v-qp2m-jg93 / `postcss` | `expo > @expo/metro-config > postcss` | Build-time Metro configuration; the app does not process untrusted CSS at runtime | No within the owner's `~8.4.32` range; patched release is `8.5.10` | Accept until Expo SDK 54 publishes a compatible Metro update; do not force an out-of-range override | 2026-08-13 |
-| GHSA-w5hq-g745-h8pq / `uuid` | `expo > @expo/config-plugins > xcode > uuid` | Native project generation only | No within `xcode`'s `^7.0.3` range; patched release is `11.1.1` | Accept until Expo/Xcode tooling upgrades its declared major range | 2026-08-13 |
-| GHSA-h67p-54hq-rp68 / `js-yaml` | Jest/Istanbul coverage configuration through `@istanbuljs/load-nyc-config` | Test-time only; the separate `js-yaml@4.2.0` used by Expo's Xcode formatter is not affected | Yes. Istanbul's loader declares `^3.13.1`, which permits patched `3.15.0` | Resolved with a targeted same-major pnpm override from `3.14.2` to `3.15.0` | 2026-08-13 |
+| Advisory / package | Owning chain | Reachability | Action / owner / trigger | Next review date |
+| --- | --- | --- | --- | --- |
+| GHSA-23hp-3jrh-7fpw and earlier `tar` advisories | `expo > @expo/cli > tar` | Expo CLI archive handling at build time | **Resolved through the critical/high floor.** Mobile dependency owner pins the CLI path from `7.5.16` to same-major `7.5.20`; this removes the critical and prior high findings. | 2026-07-28 |
+| GHSA-r292-9mhp-454m / `tar` | `expo > @expo/cli > tar` | Expo CLI archive handling at build time | **Time-gated moderate.** `7.5.21` is compatible with the CLI's `^7.5.2` range, but was published 2026-07-21 22:11 UTC and is blocked by the seven-day release-age policy until 2026-07-28 22:11 UTC. Mobile dependency owner retries after that time. | 2026-07-29 |
+| Earlier exponential-expansion advisories / `brace-expansion` | `expo > @expo/cli > minimatch`, plus the CLI's `glob` and React Native dev-middleware paths | CLI glob matching at build/development time | **Resolved where compatible.** Mobile dependency owner pins the three existing major lines to `1.1.16`, `2.1.2`, and `5.0.7`, all within their owning `minimatch` ranges. | 2026-07-30 |
+| GHSA-mh99-v99m-4gvg / `brace-expansion` | The same three CLI paths through `minimatch@3.1.5`, `9.0.9`, and `10.2.5` | CLI glob matching at build/development time | **Accepted high pending upstream.** The only patched release is `5.0.8`. It is time-gated until 2026-07-30 11:39 UTC for the `minimatch@10` path and is outside the declared major ranges of `minimatch@3` and `9`. Mobile dependency owner updates the 5.x path after the gate and removes the remaining acceptance when Expo/React Native tooling moves the older paths to a compatible major. No cross-major override. | 2026-07-30 |
+| GHSA-52cp-r559-cp3m / `js-yaml` | `expo > @expo/cli > @expo/xcpretty > js-yaml` | Xcode output formatting at build time | **Resolved.** Mobile dependency owner pins the permitted `^4.1.0` path from `4.2.0` to `4.3.0`. The existing Istanbul-only 3.x override remains independently scoped at `3.15.0`. | 2026-08-25 |
+| GHSA-395f-4hp3-45gv / `shell-quote` | `react-native > react-devtools-core > shell-quote` | React Native development tooling | **Resolved.** Mobile dependency owner pins the permitted `^1.6.1` path from `1.8.4` to `1.9.0`. | 2026-08-25 |
+| GHSA-qx2v-qp2m-jg93, GHSA-6g55-p6wh-862q, and GHSA-r28c-9q8g-f849 / `postcss` | `expo > @expo/metro-config > postcss` | Metro build configuration; the app does not process untrusted CSS at runtime | **Accepted: 2 high and 1 moderate.** Expo SDK 54 Metro declares `~8.4.32`, while the complete patched floor is `8.5.18`. Mobile dependency owner must not force an out-of-range override; remove the acceptance when Expo publishes a compatible Metro range or during the next SDK upgrade. | 2026-08-08 |
+| GHSA-w5hq-g745-h8pq / `uuid` | `expo > @expo/config-plugins > xcode > uuid` | Native project generation only | **Accepted moderate.** `xcode@3.0.1` declares `uuid@^7.0.3`, while the patch is `11.1.1`. Mobile dependency owner removes the acceptance when Expo/Xcode tooling updates its declared major. | 2026-08-08 |
+| Prior `undici` advisories | `expo > @expo/cli > undici` | Expo CLI networking at build time | **Resolved.** The existing same-major override remains locked at `6.27.0`, within Expo CLI's declared range. | 2026-08-25 |
 
-The final `pnpm audit --prod` report contains two moderate advisories and no high or
-critical advisory. Although pnpm labels these paths as production because
-Expo is an application dependency, graph inspection confines them to build or test
-tools rather than the shipped JavaScript/native runtime. Re-run the audit and graph
-review monthly and at every Expo SDK upgrade.
+Expo `54.0.36` and Expo CLI `54.0.26` cleared the release-age gate on
+2026-07-22. The supported `pnpm add expo@~54.0.36` workflow initially hit
+`ERR_PNPM_TRUST_DOWNGRADE` for `semver@6.3.1` under
+`expo@54.0.36 > babel-preset-expo@54.0.12 >
+@babel/plugin-transform-runtime@7.29.7`. The package was already locked and used
+before this update, and pnpm issue 10622 tracks the OIDC-provenance comparison as an
+open bug. The repository keeps `trustPolicy: no-downgrade` intact with no exception.
+Expo is locked at `54.0.36`; a clean frozen install from the reviewed lockfile
+succeeds and the compatibility check reports that dependencies are up to date.
+Any future command that resolves this graph again can still hit the upstream
+provenance comparison. Do not bypass the policy; rerun the supported update
+workflow when pnpm fixes the comparison.
 
-`pnpm update` was attempted on 2026-07-13. The repository's
-`trustPolicy: no-downgrade` correctly rejected `semver@6.3.1` because its trust
-evidence was weaker than an earlier release. The policy was not bypassed or weakened;
-only Expo's supported React Native correction and the range-compatible Undici and
-JS-YAML security patches were retained.
+Although pnpm reports these Expo/React Native chains as production dependencies,
+`pnpm why` confines the remaining advisories to CLI, Metro, native-project
+generation, and development tooling rather than shipped application logic. Re-run
+the live audit and graph review on every date above and at every Expo SDK upgrade.
 
 ## React health decisions
 
