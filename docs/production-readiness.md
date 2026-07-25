@@ -108,6 +108,8 @@ tournament records. A failed API response leaves the device session and cached
 state intact so the user can retry the idempotent server flow; the API commits
 local database deletion before removing the Supabase Auth identity so a database
 failure cannot strand personal data behind an unusable login.
+Profileless users can access the same deletion flow or sign out directly from
+onboarding without first providing profile or financial information.
 
 The iOS target includes the Sign in with Apple capability and native button.
 Supabase exchanges Apple's identity token and the app preserves the first

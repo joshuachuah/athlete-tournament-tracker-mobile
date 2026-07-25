@@ -81,6 +81,8 @@ Account deletion calls the sibling API's authenticated `DELETE /api/profile`
 endpoint. The API deployment must have `SUPABASE_SERVICE_ROLE_KEY` plus its
 server-only Apple credentials configured before the full Apple flow can
 succeed. Never place those values in an `EXPO_PUBLIC_*` variable.
+Newly authenticated users can sign out or delete directly from onboarding;
+profile or financial fields are never required before deletion is available.
 
 The Account screen links to the public privacy policy and account-deletion
 instructions. The default URLs are `<EXPO_PUBLIC_API_URL>/privacy` and
