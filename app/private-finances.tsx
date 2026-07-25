@@ -5,7 +5,7 @@ import {
   ScanFace,
   ShieldCheck,
 } from "lucide-react-native";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useReducer, useRef } from "react";
 import {
   AppState,
   Platform,
@@ -16,6 +16,10 @@ import {
 } from "react-native";
 
 import { ProtectedScreen } from "@/components/auth/protected-screen";
+import {
+  ProfileForm,
+  type ProfileFormValues,
+} from "@/components/profile-form";
 import { Button } from "@/components/ui/button";
 import { colors, radii, spacing } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
@@ -23,6 +27,21 @@ import { authenticatePrivateFinances } from "@/lib/private-finance-auth";
 import { formatMoney } from "@/lib/utils";
 
 type GateState = "authenticating" | "locked" | "unlocked";
+type PrivateFinanceViewState = {
+  editing: boolean;
+  gateState: GateState;
+  message: string | null;
+  saveError: string | null;
+  saveMessage: string | null;
+  saving: boolean;
+};
+
+function viewStateReducer(
+  state: PrivateFinanceViewState,
+  changes: Partial<PrivateFinanceViewState>,
+): PrivateFinanceViewState {
+  return { ...state, ...changes };
+}
 
 async function authenticateSafely() {
   try {
@@ -44,9 +63,17 @@ export default function PrivateFinancesScreen() {
 }
 
 function PrivateFinancesContent() {
-  const { profile } = useAuth();
-  const [gateState, setGateState] = useState<GateState>("authenticating");
-  const [message, setMessage] = useState<string | null>(null);
+  const { profile, saveProfile } = useAuth();
+  const [viewState, updateViewState] = useReducer(viewStateReducer, {
+    editing: false,
+    gateState: "authenticating",
+    message: null,
+    saveError: null,
+    saveMessage: null,
+    saving: false,
+  });
+  const { editing, gateState, message, saveError, saveMessage, saving } =
+    viewState;
   const authenticationAttempt = useRef(0);
   const isForeground = useRef(
     AppState.currentState !== "background" &&
@@ -67,11 +94,9 @@ function PrivateFinancesContent() {
       }
 
       if (result.success) {
-        setGateState("unlocked");
-        setMessage(null);
+        updateViewState({ gateState: "unlocked", message: null });
       } else {
-        setGateState("locked");
-        setMessage(result.message);
+        updateViewState({ gateState: "locked", message: result.message });
       }
     });
 
@@ -85,10 +110,15 @@ function PrivateFinancesContent() {
       isForeground.current = nextState === "active";
       if (nextState !== "active") {
         authenticationAttempt.current += 1;
-        setGateState("locked");
-        setMessage(
-          "Private finances locked when Athlete Tracker left the foreground.",
-        );
+        updateViewState({
+          editing: false,
+          gateState: "locked",
+          message:
+            "Private finances locked when Athlete Tracker left the foreground.",
+          saveError: null,
+          saveMessage: null,
+          saving: false,
+        });
       }
     });
 
@@ -97,8 +127,7 @@ function PrivateFinancesContent() {
 
   async function handleUnlock() {
     const attempt = ++authenticationAttempt.current;
-    setGateState("authenticating");
-    setMessage(null);
+    updateViewState({ gateState: "authenticating", message: null });
     const result = await authenticateSafely();
 
     if (attempt !== authenticationAttempt.current || !isForeground.current) {
@@ -106,12 +135,33 @@ function PrivateFinancesContent() {
     }
 
     if (result.success) {
-      setGateState("unlocked");
+      updateViewState({ gateState: "unlocked" });
       return;
     }
 
-    setGateState("locked");
-    setMessage(result.message);
+    updateViewState({ gateState: "locked", message: result.message });
+  }
+
+  async function handleFinancialSave(values: ProfileFormValues) {
+    updateViewState({
+      saveError: null,
+      saveMessage: null,
+      saving: true,
+    });
+
+    try {
+      await saveProfile(values);
+      updateViewState({
+        editing: false,
+        saveMessage: "Private finances updated.",
+        saving: false,
+      });
+    } catch (profileError) {
+      updateViewState({
+        saveError: (profileError as Error).message,
+        saving: false,
+      });
+    }
   }
 
   if (!profile) {
@@ -139,29 +189,83 @@ function PrivateFinancesContent() {
           </View>
 
           <View style={styles.heading}>
-            <Text style={styles.title}>Private finances</Text>
+            <Text accessibilityRole="header" style={styles.title}>
+              {editing ? "Edit private finances" : "Private finances"}
+            </Text>
             <Text style={styles.subtitle}>
-              Visible only for this authenticated view. Leaving the app locks these
-              values again.
+              {editing
+                ? "Update the financial assumptions used to calculate runway and tournament affordability."
+                : "Visible only for this authenticated view. Leaving the app locks these values again."}
             </Text>
           </View>
 
-          <View accessibilityLabel="Private financial details" style={styles.values}>
-            <FinanceValue
-              label="Monthly income"
-              value={formatMoney(profile.monthly_income, profile.home_currency)}
+          {saveError ? (
+            <Text accessibilityRole="alert" selectable style={styles.error}>
+              {saveError}
+            </Text>
+          ) : null}
+          {saveMessage ? (
+            <Text accessibilityLiveRegion="polite" selectable style={styles.success}>
+              {saveMessage}
+            </Text>
+          ) : null}
+
+          {editing ? (
+            <>
+              <ProfileForm
+                fields="finances"
+                loading={saving}
+                profile={profile}
+                submitLabel="Save private finances"
+                onSubmit={handleFinancialSave}
+              />
+              <Button
+                disabled={saving}
+                label="Cancel"
+                variant="ghost"
+                onPress={() => {
+                  updateViewState({ editing: false, saveError: null });
+                }}
+              />
+            </>
+          ) : (
+            <View
+              accessibilityLabel="Private financial details"
+              style={styles.values}
+            >
+              <FinanceValue
+                label="Monthly income"
+                value={formatMoney(profile.monthly_income, profile.home_currency)}
+              />
+              <View style={styles.separator} />
+              <FinanceValue
+                label="Savings balance"
+                value={formatMoney(profile.savings_balance, profile.home_currency)}
+              />
+              <View style={styles.separator} />
+              <FinanceValue
+                label="Monthly sponsorship"
+                value={formatMoney(
+                  profile.monthly_sponsorship,
+                  profile.home_currency,
+                )}
+              />
+            </View>
+          )}
+
+          {!editing ? (
+            <Button
+              label="Edit private finances"
+              variant="secondary"
+              onPress={() => {
+                updateViewState({
+                  editing: true,
+                  saveError: null,
+                  saveMessage: null,
+                });
+              }}
             />
-            <View style={styles.separator} />
-            <FinanceValue
-              label="Savings balance"
-              value={formatMoney(profile.savings_balance, profile.home_currency)}
-            />
-            <View style={styles.separator} />
-            <FinanceValue
-              label="Monthly sponsorship"
-              value={formatMoney(profile.monthly_sponsorship, profile.home_currency)}
-            />
-          </View>
+          ) : null}
 
           <View style={styles.sessionNote}>
             <ShieldCheck color={colors.mutedForeground} size={17} strokeWidth={2.2} />
@@ -175,8 +279,13 @@ function PrivateFinancesContent() {
             label="Lock private finances"
             variant="secondary"
             onPress={() => {
-              setGateState("locked");
-              setMessage("Private finances locked.");
+              updateViewState({
+                editing: false,
+                gateState: "locked",
+                message: "Private finances locked.",
+                saveError: null,
+                saveMessage: null,
+              });
             }}
           />
         </ScrollView>
@@ -253,6 +362,17 @@ const styles = StyleSheet.create({
     color: colors.mutedForeground,
     fontSize: 15,
     lineHeight: 22,
+  },
+  error: {
+    color: colors.loss,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  success: {
+    color: colors.profit,
+    fontSize: 14,
+    fontWeight: "700",
+    lineHeight: 20,
   },
   values: {
     overflow: "hidden",
