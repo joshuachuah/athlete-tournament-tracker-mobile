@@ -51,8 +51,8 @@ export function ExpenseBreakdown({ tournament }: { tournament: TournamentWithPnL
             </Text>
             <MoneyPair
               amount={amount}
-              fromCurrency={tournament.home_currency}
-              toCurrency={tournament.currency}
+              fromCurrency={tournament.currency}
+              toCurrency={tournament.home_currency}
             />
           </View>
         );
