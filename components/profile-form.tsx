@@ -1,5 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
+import { useEffect } from "react";
 import { z } from "zod";
 import { Text, View } from "react-native";
 
@@ -39,6 +40,7 @@ export function ProfileForm({
     control,
     formState: { errors },
     handleSubmit,
+    setValue,
   } = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
@@ -53,6 +55,25 @@ export function ProfileForm({
   });
   const showIdentity = fields !== "finances";
   const showFinances = fields !== "identity";
+
+  useEffect(() => {
+    if (!profile) {
+      return;
+    }
+
+    if (fields === "identity") {
+      setValue("monthly_income", profile.monthly_income);
+      setValue("savings_balance", profile.savings_balance);
+      setValue("monthly_sponsorship", profile.monthly_sponsorship);
+    }
+
+    if (fields === "finances") {
+      setValue("name", profile.name);
+      setValue("home_country", profile.home_country);
+      setValue("home_currency", profile.home_currency);
+      setValue("sport", profile.sport);
+    }
+  }, [fields, profile, setValue]);
 
   return (
     <View style={{ gap: spacing.lg }}>

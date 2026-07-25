@@ -1,3 +1,4 @@
+import { usePreventRemove } from "@react-navigation/native";
 import { Stack } from "expo-router";
 import {
   CircleCheck,
@@ -74,7 +75,15 @@ function PrivateFinancesContent() {
   });
   const { editing, gateState, message, saveError, saveMessage, saving } =
     viewState;
+  usePreventRemove(saving, () => {
+    updateViewState({
+      saveMessage: "Finish saving private finances before leaving this screen.",
+    });
+  });
   const authenticationAttempt = useRef(0);
+  const financialSaveAttempt = useRef(0);
+  const saveInFlight = useRef(false);
+  const mounted = useRef(true);
   const isForeground = useRef(
     AppState.currentState !== "background" &&
       AppState.currentState !== "inactive",
@@ -106,10 +115,12 @@ function PrivateFinancesContent() {
   }, []);
 
   useEffect(() => {
+    mounted.current = true;
     const subscription = AppState.addEventListener("change", (nextState) => {
       isForeground.current = nextState === "active";
       if (nextState !== "active") {
         authenticationAttempt.current += 1;
+        financialSaveAttempt.current += 1;
         updateViewState({
           editing: false,
           gateState: "locked",
@@ -117,12 +128,16 @@ function PrivateFinancesContent() {
             "Private finances locked when Athlete Tracker left the foreground.",
           saveError: null,
           saveMessage: null,
-          saving: false,
+          saving: saveInFlight.current,
         });
       }
     });
 
-    return () => subscription.remove();
+    return () => {
+      mounted.current = false;
+      financialSaveAttempt.current += 1;
+      subscription?.remove();
+    };
   }, []);
 
   async function handleUnlock() {
@@ -143,6 +158,12 @@ function PrivateFinancesContent() {
   }
 
   async function handleFinancialSave(values: ProfileFormValues) {
+    if (saveInFlight.current) {
+      return;
+    }
+
+    const attempt = ++financialSaveAttempt.current;
+    saveInFlight.current = true;
     updateViewState({
       saveError: null,
       saveMessage: null,
@@ -151,12 +172,28 @@ function PrivateFinancesContent() {
 
     try {
       await saveProfile(values);
+      saveInFlight.current = false;
+      if (!mounted.current) {
+        return;
+      }
+      if (attempt !== financialSaveAttempt.current) {
+        updateViewState({ saving: false });
+        return;
+      }
       updateViewState({
         editing: false,
         saveMessage: "Private finances updated.",
         saving: false,
       });
     } catch (profileError) {
+      saveInFlight.current = false;
+      if (!mounted.current) {
+        return;
+      }
+      if (attempt !== financialSaveAttempt.current) {
+        updateViewState({ saving: false });
+        return;
+      }
       updateViewState({
         saveError: (profileError as Error).message,
         saving: false,
@@ -181,6 +218,8 @@ function PrivateFinancesContent() {
       {gateState === "unlocked" ? (
         <ScrollView
           contentInsetAdjustmentBehavior="automatic"
+          keyboardDismissMode="interactive"
+          keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.content}
         >
           <View style={styles.verifiedBadge}>
@@ -256,6 +295,7 @@ function PrivateFinancesContent() {
           {!editing ? (
             <Button
               label="Edit private finances"
+              loading={saving}
               variant="secondary"
               onPress={() => {
                 updateViewState({
@@ -279,6 +319,7 @@ function PrivateFinancesContent() {
             label="Lock private finances"
             variant="secondary"
             onPress={() => {
+              financialSaveAttempt.current += 1;
               updateViewState({
                 editing: false,
                 gateState: "locked",
