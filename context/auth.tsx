@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
+import * as AppleAuthentication from "expo-apple-authentication";
 import * as AuthSession from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
 import { router } from "expo-router";
@@ -36,6 +37,7 @@ type AuthContextValue = {
   profile: AthleteProfile | null;
   status: "loading" | "ready";
   authError: string | null;
+  signInWithApple: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   saveProfile: (data: ProfileInput) => Promise<AthleteProfile>;
@@ -127,6 +129,19 @@ async function startGoogleSignIn(
   }
 
   setAuthError("OAuth callback did not include a session code.");
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Sign in failed.";
+}
+
+function isAppleCancellation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "ERR_REQUEST_CANCELED"
+  );
 }
 
 export function AuthProvider({ children }: PropsWithChildren) {
@@ -252,6 +267,65 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   async function signInWithGoogle() {
     await startGoogleSignIn(setAuthError);
+  }
+
+  async function signInWithApple() {
+    if (!supabase) {
+      setAuthError(
+        "Supabase is not configured. Set Expo public Supabase environment variables.",
+      );
+      return;
+    }
+
+    setAuthError(null);
+
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      if (!credential.identityToken) {
+        throw new Error("Apple did not return an identity token.");
+      }
+
+      const signIn = await supabase.auth.signInWithIdToken({
+        provider: "apple",
+        token: credential.identityToken,
+      });
+
+      if (signIn.error) {
+        throw signIn.error;
+      }
+
+      const nameParts = [
+        credential.fullName?.givenName,
+        credential.fullName?.middleName,
+        credential.fullName?.familyName,
+      ].filter((part): part is string => Boolean(part));
+
+      if (nameParts.length > 0) {
+        const metadata = await supabase.auth.updateUser({
+          data: {
+            full_name: nameParts.join(" "),
+            given_name: credential.fullName?.givenName,
+            family_name: credential.fullName?.familyName,
+          },
+        });
+
+        if (metadata.error) {
+          setAuthError(
+            "Signed in, but your Apple profile name could not be saved. You can enter it during setup.",
+          );
+        }
+      }
+    } catch (error) {
+      if (!isAppleCancellation(error)) {
+        setAuthError(errorMessage(error));
+      }
+    }
   }
 
   async function refreshProfile() {
@@ -398,6 +472,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         profile,
         status,
         authError,
+        signInWithApple,
         signInWithGoogle,
         refreshProfile,
         saveProfile,

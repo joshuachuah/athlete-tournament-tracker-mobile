@@ -1,4 +1,5 @@
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
+import { Linking } from "react-native";
 
 import AccountScreen from "@/app/(tabs)/account";
 import { useAuth } from "@/context/auth";
@@ -53,6 +54,7 @@ describe("Account deletion", () => {
       isCurrentUser: jest.fn(() => true),
       refreshProfile: jest.fn(),
       saveProfile: jest.fn(),
+      signInWithApple: jest.fn(),
       signInWithGoogle: jest.fn(),
       deleteAccount,
       signOut: jest.fn(),
@@ -82,6 +84,21 @@ describe("Account deletion", () => {
 
     expect(screen.queryByTestId("account-deletion-dialog")).toBeNull();
     expect(deleteAccount).not.toHaveBeenCalled();
+  });
+
+  it("links to public privacy and deletion information", () => {
+    const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+    const screen = render(<AccountScreen />);
+
+    fireEvent.press(screen.getByText("Privacy policy"));
+    fireEvent.press(screen.getByText("Account deletion information"));
+
+    expect(openURL).toHaveBeenNthCalledWith(1, "http://localhost:5000/privacy");
+    expect(openURL).toHaveBeenNthCalledWith(
+      2,
+      "http://localhost:5000/account-deletion",
+    );
+    openURL.mockRestore();
   });
 
   it("requires the exact confirmation phrase before deletion", async () => {

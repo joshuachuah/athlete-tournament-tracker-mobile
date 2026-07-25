@@ -2,6 +2,8 @@ import { router } from "expo-router";
 import {
   ChevronRight,
   Coins,
+  ExternalLink,
+  FileText,
   LockKeyhole,
   LogOut,
   Mail,
@@ -10,6 +12,7 @@ import {
 import { useState } from "react";
 import {
   ActivityIndicator,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -21,9 +24,10 @@ import {
 import { AccountDeletionDialog } from "@/components/account/account-deletion-dialog";
 import { colors, radii, spacing } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
+import { accountDeletionInfoUrl, privacyPolicyUrl } from "@/lib/legal";
 
 export default function AccountScreen() {
-  const { deleteAccount, profile, signOut } = useAuth();
+  const { deleteAccount, profile, session, signOut } = useAuth();
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
   const [deletionOpen, setDeletionOpen] = useState(false);
@@ -31,6 +35,11 @@ export default function AccountScreen() {
   if (!profile) {
     return null;
   }
+
+  const identityProviders = session?.user?.app_metadata?.providers;
+  const usesAppleSignIn =
+    session?.user?.app_metadata?.provider === "apple" ||
+    (Array.isArray(identityProviders) && identityProviders.includes("apple"));
 
   async function handleSignOut() {
     setSigningOut(true);
@@ -136,6 +145,53 @@ export default function AccountScreen() {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Legal</Text>
+          <View style={styles.list}>
+            <Pressable
+              accessibilityHint="Opens the privacy policy in your browser"
+              accessibilityRole="link"
+              onPress={() => Linking.openURL(privacyPolicyUrl)}
+              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+            >
+              <View style={styles.rowIcon}>
+                <FileText
+                  color={colors.mutedForeground}
+                  size={18}
+                  strokeWidth={2.1}
+                />
+              </View>
+              <Text style={styles.rowTitle}>Privacy policy</Text>
+              <ExternalLink
+                color={colors.mutedForeground}
+                size={17}
+                strokeWidth={2}
+              />
+            </Pressable>
+            <View style={styles.separator} />
+            <Pressable
+              accessibilityHint="Opens account deletion information in your browser"
+              accessibilityRole="link"
+              onPress={() => Linking.openURL(accountDeletionInfoUrl)}
+              style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+            >
+              <View style={styles.rowIcon}>
+                <Trash2
+                  color={colors.mutedForeground}
+                  size={18}
+                  strokeWidth={2.1}
+                />
+              </View>
+              <Text style={styles.rowTitle}>Account deletion information</Text>
+              <ExternalLink
+                color={colors.mutedForeground}
+                size={17}
+                strokeWidth={2}
+              />
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionLabel}>Session</Text>
           <View style={styles.list}>
             <Pressable
@@ -182,6 +238,7 @@ export default function AccountScreen() {
         <AccountDeletionDialog
           onClose={() => setDeletionOpen(false)}
           onDelete={deleteAccount}
+          usesAppleSignIn={usesAppleSignIn}
         />
       ) : null}
     </>

@@ -18,11 +18,13 @@ import { ACCOUNT_DELETION_CONFIRMATION } from "@/lib/api";
 type AccountDeletionDialogProps = {
   onClose: () => void;
   onDelete: () => Promise<void>;
+  usesAppleSignIn?: boolean;
 };
 
 export function AccountDeletionDialog({
   onClose,
   onDelete,
+  usesAppleSignIn = false,
 }: AccountDeletionDialogProps) {
   const [step, setStep] = useState<"details" | "confirm">("details");
   const [confirmation, setConfirmation] = useState("");
@@ -96,6 +98,14 @@ export function AccountDeletionDialog({
               </View>
 
               <Text style={styles.irreversibleNote}>This cannot be undone.</Text>
+
+              {usesAppleSignIn ? (
+                <Text style={styles.appleRevocationNote}>
+                  After deletion, remove Athlete Tracker under Apple Account,
+                  Sign-In & Security, Sign in with Apple to revoke the remaining
+                  Apple authorization.
+                </Text>
+              ) : null}
 
               <View style={styles.dialogActions}>
                 <Pressable
@@ -265,6 +275,11 @@ const styles = StyleSheet.create({
     color: colors.loss,
     fontSize: 14,
     fontWeight: "700",
+  },
+  appleRevocationNote: {
+    color: colors.mutedForeground,
+    fontSize: 13,
+    lineHeight: 19,
   },
   confirmationInput: {
     minHeight: 52,

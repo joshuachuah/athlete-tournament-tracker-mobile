@@ -1,9 +1,17 @@
 import { Redirect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import * as AppleAuthentication from "expo-apple-authentication";
 import * as Haptics from "expo-haptics";
 import { ArrowRight, ShieldCheck, TrendingUp } from "lucide-react-native";
 import { useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { GoogleLogo } from "@/components/ui/google-logo";
@@ -11,8 +19,17 @@ import { colors, radii, spacing } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
 
 export default function LoginScreen() {
-  const { authError, profile, session, signInWithGoogle, status } = useAuth();
-  const [isSigningIn, setIsSigningIn] = useState(false);
+  const {
+    authError,
+    profile,
+    session,
+    signInWithApple,
+    signInWithGoogle,
+    status,
+  } = useAuth();
+  const [signingInWith, setSigningInWith] = useState<"apple" | "google" | null>(
+    null,
+  );
 
   if (status === "ready" && session && profile) {
     return <Redirect href="/(tabs)/dashboard" />;
@@ -22,8 +39,8 @@ export default function LoginScreen() {
     return <Redirect href="/onboarding" />;
   }
 
-  function handleContinue() {
-    setIsSigningIn(true);
+  function handleGoogleContinue() {
+    setSigningInWith("google");
 
     const haptic =
       process.env.EXPO_OS === "ios"
@@ -32,10 +49,18 @@ export default function LoginScreen() {
           )
         : Promise.resolve();
 
-    return haptic.then(signInWithGoogle).finally(() => setIsSigningIn(false));
+    return haptic
+      .then(signInWithGoogle)
+      .finally(() => setSigningInWith(null));
   }
 
-  const isLoading = status === "loading" || isSigningIn;
+  function handleAppleContinue() {
+    setSigningInWith("apple");
+
+    return signInWithApple().finally(() => setSigningInWith(null));
+  }
+
+  const isLoading = status === "loading" || signingInWith !== null;
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -67,19 +92,38 @@ export default function LoginScreen() {
           </View>
         ) : null}
 
+        {Platform.OS === "ios" ? (
+          <View
+            pointerEvents={isLoading ? "none" : "auto"}
+            style={{ opacity: isLoading && signingInWith !== "apple" ? 0.6 : 1 }}
+          >
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonStyle={
+                AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+              }
+              buttonType={
+                AppleAuthentication.AppleAuthenticationButtonType.CONTINUE
+              }
+              cornerRadius={radii.lg}
+              onPress={handleAppleContinue}
+              style={styles.appleButton}
+            />
+          </View>
+        ) : null}
+
         <Pressable
           accessibilityLabel="Continue with Google"
           accessibilityRole="button"
           accessibilityHint="Opens Google sign in in a secure browser"
           accessibilityState={{ busy: isLoading, disabled: isLoading }}
           disabled={isLoading}
-          onPress={handleContinue}
+          onPress={handleGoogleContinue}
           style={({ pressed }) => [
             styles.googleButton,
             { opacity: isLoading ? 0.6 : pressed ? 0.9 : 1 },
           ]}
         >
-          {isLoading ? (
+          {signingInWith === "google" ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
             <View accessible={false} style={styles.googleMark}>
@@ -87,9 +131,11 @@ export default function LoginScreen() {
             </View>
           )}
           <Text style={styles.googleLabel}>
-            {isLoading ? "Just a moment…" : "Continue with Google"}
+            {signingInWith === "google"
+              ? "Just a moment…"
+              : "Continue with Google"}
           </Text>
-          {!isLoading ? (
+          {signingInWith !== "google" ? (
             <ArrowRight
               accessible={false}
               color="#FFFFFF"
@@ -185,6 +231,10 @@ const styles = StyleSheet.create({
     borderRadius: radii.lg,
     borderCurve: "continuous",
     backgroundColor: colors.foreground,
+  },
+  appleButton: {
+    width: "100%",
+    height: 56,
   },
   googleMark: {
     width: 24,

@@ -32,6 +32,8 @@ Fill in the three variables from the API and Supabase projects:
 | `EXPO_PUBLIC_API_URL` | Base URL of the sibling Flask API, without a trailing slash. |
 | `EXPO_PUBLIC_SUPABASE_URL` | Public URL of the shared Supabase project. |
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Public anonymous client key for that Supabase project. Never substitute a service-role key. |
+| `EXPO_PUBLIC_PRIVACY_POLICY_URL` | Optional public privacy-policy URL. Defaults to `<EXPO_PUBLIC_API_URL>/privacy`. |
+| `EXPO_PUBLIC_ACCOUNT_DELETION_URL` | Optional public account-deletion information URL. Defaults to `<EXPO_PUBLIC_API_URL>/account-deletion`. |
 
 Expo bundles every `EXPO_PUBLIC_*` value into the client. These variables are configuration, not secret storage. Never commit a real `.env` file, auth token, signing key, EAS token, provider credential, Supabase service-role key, or server-side FX credential.
 
@@ -52,6 +54,34 @@ For a physical device, put the device and development machine on the same networ
 The current native configuration uses the `athletetracker` app scheme and requests the callback URL `athletetracker://auth/callback`. Add that exact URL to the Supabase Auth redirect allow-list for the shared project before testing native Google sign-in. Do not broaden the allow-list with an unnecessary wildcard.
 
 The app implements PKCE and accepts only one-time authorization-code callbacks; it does not accept access or refresh tokens from callback URL fragments. Live allow-list inspection and signed iOS/Android callback verification remain external release prerequisites, so local implementation does not by itself establish production OAuth readiness. Tournament CRUD and P&L preview use the currency-correct `/api/v2` contract; tournament search, profile, FX, and health retain their existing routes.
+
+### Sign in with Apple
+
+The iOS app uses Expo's native Authentication Services integration and passes
+Apple's identity token to Supabase. Before a signed release:
+
+1. Enable Sign in with Apple for `com.athletetracker.mobile` in the Apple
+   Developer portal.
+2. Enable the Apple provider in Supabase and include the bundle identifier in
+   the provider's authorized client IDs.
+3. Verify first sign-in, returning sign-in, cancellation, relaunch, and account
+   deletion on a signed physical-device build.
+
+Apple only supplies the person's name on the first authorization. The app saves
+that name to Supabase metadata when available; onboarding remains the source of
+the Athlete Tracker profile.
+
+### Account deletion and legal URLs
+
+Account deletion calls the sibling API's authenticated `DELETE /api/profile`
+endpoint. The API deployment must have `SUPABASE_SERVICE_ROLE_KEY` configured
+server-side before this flow can succeed. Never place that key in an
+`EXPO_PUBLIC_*` variable.
+
+The Account screen links to the public privacy policy and account-deletion
+instructions. The default URLs are `<EXPO_PUBLIC_API_URL>/privacy` and
+`<EXPO_PUBLIC_API_URL>/account-deletion`; the optional public URL variables can
+point to approved hosted copies instead.
 
 ## Run the app
 

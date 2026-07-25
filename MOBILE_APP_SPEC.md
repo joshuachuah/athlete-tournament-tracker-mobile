@@ -164,6 +164,7 @@ search, FX, and health routes remain on their existing paths:
 ```ts
 api.profile.get(email);             // GET /api/profile?email=
 api.profile.save(profile);          // POST /api/profile
+api.profile.delete();               // DELETE /api/profile
 api.tournaments.list(userId);       // GET /api/v2/tournaments
 api.tournaments.get(id);            // GET /api/v2/tournaments/:id
 api.tournaments.create(payload);    // POST /api/v2/tournaments

@@ -1,6 +1,7 @@
 import { createRef, useImperativeHandle, type RefObject } from "react";
 import { act, render, waitFor } from "@testing-library/react-native";
 import { Text, View } from "react-native";
+import * as AppleAuthentication from "expo-apple-authentication";
 import * as WebBrowser from "expo-web-browser";
 import { router } from "expo-router";
 import type { Session } from "@supabase/supabase-js";
@@ -22,6 +23,18 @@ let mockAuthStateCallback:
 
 jest.mock("expo-auth-session", () => ({
   makeRedirectUri: jest.fn(() => "athletetracker://auth/callback"),
+}));
+
+jest.mock("expo-apple-authentication", () => ({
+  AppleAuthenticationScope: {
+    EMAIL: 0,
+    FULL_NAME: 1,
+  },
+  AppleAuthenticationUserDetectionStatus: {
+    LIKELY_REAL: 2,
+    UNKNOWN: 1,
+  },
+  signInAsync: jest.fn(),
 }));
 
 jest.mock("expo-web-browser", () => ({
@@ -77,8 +90,10 @@ jest.mock("@/lib/supabase", () => ({
         },
       ),
       setSession: jest.fn(),
+      signInWithIdToken: jest.fn(),
       signInWithOAuth: jest.fn(),
       signOut: jest.fn(),
+      updateUser: jest.fn(),
     },
   },
 }));
@@ -129,6 +144,7 @@ type AuthProbe = Pick<
   | "deleteAccount"
   | "refreshProfile"
   | "saveProfile"
+  | "signInWithApple"
   | "signInWithGoogle"
   | "signOut"
 >;
@@ -139,6 +155,7 @@ function AuthState({ authRef }: { authRef: RefObject<AuthProbe | null> }) {
     deleteAccount: auth.deleteAccount,
     refreshProfile: auth.refreshProfile,
     saveProfile: auth.saveProfile,
+    signInWithApple: auth.signInWithApple,
     signInWithGoogle: auth.signInWithGoogle,
     signOut: auth.signOut,
   }));
@@ -174,6 +191,12 @@ const mockExchangeCodeForSession = supabase!.auth
   .exchangeCodeForSession as jest.Mock;
 const mockSetSession = supabase!.auth.setSession as jest.Mock;
 const mockSignInWithOAuth = supabase!.auth.signInWithOAuth as jest.Mock;
+const mockSignInWithIdToken = supabase!.auth.signInWithIdToken as jest.Mock;
+const mockUpdateUser = supabase!.auth.updateUser as jest.Mock;
+const mockAppleSignIn =
+  AppleAuthentication.signInAsync as jest.MockedFunction<
+    typeof AppleAuthentication.signInAsync
+  >;
 
 describe("AuthProvider OAuth callback", () => {
   beforeEach(() => {
@@ -289,6 +312,100 @@ describe("AuthProvider OAuth callback", () => {
     expect(mockSetSession).not.toHaveBeenCalled();
     expect(screen.getByTestId("auth-error").props.children).toBe(
       "OAuth callback did not include a valid session code.",
+    );
+  });
+});
+
+describe("AuthProvider Apple sign-in", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    localStorage.clear();
+    queryClient.clear();
+    mockAuthStateCallback = undefined;
+    mockGetSession.mockResolvedValue({ data: { session: null }, error: null });
+    mockSignInWithIdToken.mockResolvedValue({
+      data: { session: null, user: null },
+      error: null,
+    });
+    mockUpdateUser.mockResolvedValue({
+      data: { user: null },
+      error: null,
+    });
+  });
+
+  async function startAppleSignIn() {
+    const { authRef, screen } = renderAuthProvider();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("status").props.children).toBe("ready");
+    });
+
+    await act(async () => {
+      await authRef.current!.signInWithApple();
+    });
+
+    return screen;
+  }
+
+  it("exchanges the native identity token and preserves the first Apple name", async () => {
+    mockAppleSignIn.mockResolvedValue({
+      authorizationCode: "authorization-code",
+      email: "athlete@privaterelay.appleid.com",
+      fullName: {
+        familyName: "Athlete",
+        givenName: "Alex",
+        middleName: null,
+        namePrefix: null,
+        nameSuffix: null,
+        nickname: null,
+      },
+      identityToken: "apple-identity-token",
+      realUserStatus: AppleAuthentication.AppleAuthenticationUserDetectionStatus.LIKELY_REAL,
+      state: null,
+      user: "apple-user",
+    });
+
+    const screen = await startAppleSignIn();
+
+    expect(mockSignInWithIdToken).toHaveBeenCalledWith({
+      provider: "apple",
+      token: "apple-identity-token",
+    });
+    expect(mockUpdateUser).toHaveBeenCalledWith({
+      data: {
+        family_name: "Athlete",
+        full_name: "Alex Athlete",
+        given_name: "Alex",
+      },
+    });
+    expect(screen.getByTestId("auth-error").props.children).toBe("none");
+  });
+
+  it("keeps Apple sign-in usable after user cancellation", async () => {
+    mockAppleSignIn.mockRejectedValue({ code: "ERR_REQUEST_CANCELED" });
+
+    const screen = await startAppleSignIn();
+
+    expect(mockSignInWithIdToken).not.toHaveBeenCalled();
+    expect(screen.getByTestId("auth-error").props.children).toBe("none");
+  });
+
+  it("rejects an Apple response without an identity token", async () => {
+    mockAppleSignIn.mockResolvedValue({
+      authorizationCode: null,
+      email: null,
+      fullName: null,
+      identityToken: null,
+      realUserStatus: AppleAuthentication.AppleAuthenticationUserDetectionStatus.UNKNOWN,
+      state: null,
+      user: "apple-user",
+    });
+
+    const screen = await startAppleSignIn();
+
+    expect(mockSignInWithIdToken).not.toHaveBeenCalled();
+    expect(screen.getByTestId("auth-error").props.children).toBe(
+      "Apple did not return an identity token.",
     );
   });
 });
