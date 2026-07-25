@@ -24,6 +24,7 @@ export class ApiError extends Error {
 }
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:5000";
+const TOURNAMENT_API_BASE = "/api/v2/tournaments";
 export const API_REQUEST_TIMEOUT_MS = 15_000;
 
 export type ApiRequestOptions = {
@@ -189,16 +190,19 @@ export const api = {
     list: (userId: string, options?: ApiRequestOptions) =>
       requestParsed(
         z.array(tournamentWithPnLSchema),
-        `/api/tournaments?user_id=${encodeURIComponent(userId)}`,
-        options,
+        TOURNAMENT_API_BASE,
+        {
+          ...options,
+          authenticatedUserId: userId,
+        },
       ),
     get: (id: string, options?: ApiRequestOptions) =>
-      requestParsed(tournamentWithPnLSchema, `/api/tournaments/${id}`, options),
+      requestParsed(tournamentWithPnLSchema, `${TOURNAMENT_API_BASE}/${id}`, options),
     create: (
       data: Omit<Tournament, "id" | "created_at">,
       options?: ApiRequestOptions,
     ) =>
-      requestParsed(tournamentWithPnLSchema, "/api/tournaments", {
+      requestParsed(tournamentWithPnLSchema, TOURNAMENT_API_BASE, {
         method: "POST",
         body: JSON.stringify(data),
         signal: options?.signal,
@@ -209,7 +213,7 @@ export const api = {
       data: Partial<Tournament>,
       options?: ApiRequestOptions,
     ) =>
-      requestParsed(pnlResultSchema, "/api/tournaments/pnl-preview", {
+      requestParsed(pnlResultSchema, `${TOURNAMENT_API_BASE}/pnl-preview`, {
         method: "POST",
         body: JSON.stringify(data),
         signal: options?.signal,
@@ -221,7 +225,7 @@ export const api = {
       data: Partial<Tournament>,
       options?: ApiRequestOptions,
     ) =>
-      requestParsed(tournamentWithPnLSchema, `/api/tournaments/${id}`, {
+      requestParsed(tournamentWithPnLSchema, `${TOURNAMENT_API_BASE}/${id}`, {
         method: "PATCH",
         body: JSON.stringify(data),
         signal: options?.signal,
@@ -229,7 +233,7 @@ export const api = {
         authenticatedUserId: options?.authenticatedUserId,
       }),
     delete: (id: string, options?: ApiRequestOptions) =>
-      requestParsed(deleteResultSchema, `/api/tournaments/${id}`, {
+      requestParsed(deleteResultSchema, `${TOURNAMENT_API_BASE}/${id}`, {
         method: "DELETE",
         signal: options?.signal,
         authToken: options?.authToken,
