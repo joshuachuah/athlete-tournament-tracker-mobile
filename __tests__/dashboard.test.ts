@@ -250,7 +250,13 @@ describe("dashboard projection presentation", () => {
     expect(screen.queryByText("Welcome back")).toBeNull();
     expect(screen.queryByText(profile.name)).toBeNull();
 
-    expect(screen.getByText("Profit · $300 USD")).toBeTruthy();
+    expect(screen.getByText("$300 USD")).toBeTruthy();
+    expect(screen.getByText("Profit")).toBeTruthy();
+    expect(
+      screen.getByLabelText(
+        "Net result. Profit, $300 USD. 2 events. Projected coverage 2 of 2.",
+      ),
+    ).toBeTruthy();
     expect(screen.getByText("2 of 2")).toBeTruthy();
     expect(screen.getByText("Earned $800 USD · Spent $500 USD")).toBeTruthy();
     expect(screen.getByText("Profit · $500 USD")).toBeTruthy();
@@ -270,7 +276,9 @@ describe("dashboard projection presentation", () => {
 
     const screen = render(createElement(DashboardScreen));
 
-    expect(screen.getAllByText("Profit · $250 USD")).toHaveLength(2);
+    expect(screen.getByText("$250 USD")).toBeTruthy();
+    expect(screen.getByText("Profit")).toBeTruthy();
+    expect(screen.getByText("Profit · $250 USD")).toBeTruthy();
     expect(screen.getByText("1 of 2")).toBeTruthy();
     expect(screen.getByText("Partial result from projected events")).toBeTruthy();
     expect(screen.getByText("Needs projection")).toBeTruthy();
@@ -296,7 +304,9 @@ describe("dashboard projection presentation", () => {
 
     const screen = render(createElement(DashboardScreen));
 
-    expect(screen.getAllByText("Break-even · $0 USD")).toHaveLength(2);
+    expect(screen.getByText("$0 USD")).toBeTruthy();
+    expect(screen.getByText("Break-even")).toBeTruthy();
+    expect(screen.getByText("Break-even · $0 USD")).toBeTruthy();
     expect(screen.getByText("1 of 1")).toBeTruthy();
     expect(screen.queryByText("Needs projection")).toBeNull();
   });
@@ -350,7 +360,9 @@ describe("dashboard projection presentation", () => {
 
     const screen = render(createElement(DashboardScreen));
 
-    expect(screen.getAllByText("Profit · $250 USD")).toHaveLength(2);
+    expect(screen.getByText("$250 USD")).toBeTruthy();
+    expect(screen.getByText("Profit")).toBeTruthy();
+    expect(screen.getByText("Profit · $250 USD")).toBeTruthy();
     expect(screen.getByText("1 of 1")).toBeTruthy();
     expect(screen.getByText("Refresh failed")).toBeTruthy();
     fireEvent.press(screen.getByRole("button", { name: "Try again" }));
@@ -380,7 +392,9 @@ describe("dashboard projection presentation", () => {
     const refreshControl = screen.UNSAFE_getByType(RefreshControl);
 
     expect(refreshControl.props.refreshing).toBe(true);
-    expect(screen.getAllByText("Profit · $250 USD")).toHaveLength(2);
+    expect(screen.getByText("$250 USD")).toBeTruthy();
+    expect(screen.getByText("Profit")).toBeTruthy();
+    expect(screen.getByText("Profit · $250 USD")).toBeTruthy();
     fireEvent(refreshControl, "refresh");
     expect(mockRefetch).toHaveBeenCalledTimes(1);
   });
