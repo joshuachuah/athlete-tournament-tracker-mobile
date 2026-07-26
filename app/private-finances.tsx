@@ -140,21 +140,22 @@ function PrivateFinancesContent() {
     };
   }, []);
 
-  async function handleUnlock() {
+  function handleUnlock() {
     const attempt = ++authenticationAttempt.current;
     updateViewState({ gateState: "authenticating", message: null });
-    const result = await authenticateSafely();
 
-    if (attempt !== authenticationAttempt.current || !isForeground.current) {
-      return;
-    }
+    void authenticateSafely().then((result) => {
+      if (attempt !== authenticationAttempt.current || !isForeground.current) {
+        return;
+      }
 
-    if (result.success) {
-      updateViewState({ gateState: "unlocked" });
-      return;
-    }
+      if (result.success) {
+        updateViewState({ gateState: "unlocked" });
+        return;
+      }
 
-    updateViewState({ gateState: "locked", message: result.message });
+      updateViewState({ gateState: "locked", message: result.message });
+    });
   }
 
   async function handleFinancialSave(values: ProfileFormValues) {
