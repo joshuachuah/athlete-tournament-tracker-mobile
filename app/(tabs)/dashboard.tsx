@@ -47,29 +47,40 @@ export default function DashboardScreen() {
       : stats.netResult < 0
         ? "loss"
         : "neutral";
-  const netLabel = !hasProjections
+  const netStatus = !hasProjections
     ? isEmpty
       ? "No result yet"
       : "Needs projection"
     : stats.netResult > 0
-      ? `Profit · ${formatMoney(stats.netResult, profile.home_currency)}`
+      ? "Profit"
       : stats.netResult < 0
-        ? `Loss · ${formatMoney(stats.netResult, profile.home_currency)}`
-        : `Break-even · ${formatMoney(stats.netResult, profile.home_currency)}`;
-  const netBackgroundColor =
+        ? "Loss"
+        : "Break-even";
+  const netValue = hasProjections
+    ? formatMoney(stats.netResult, profile.home_currency)
+    : "—";
+  const netStatusBackgroundColor =
     netTone === "profit"
       ? colors.profitSoft
       : netTone === "loss"
         ? colors.lossSoft
         : colors.surfaceMuted;
+  const netStatusColor =
+    netTone === "profit"
+      ? colors.profit
+      : netTone === "loss"
+        ? colors.loss
+        : colors.foreground;
 
   return (
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
+      style={{ backgroundColor: colors.background }}
       refreshControl={
         <RefreshControl refreshing={isRefetching} onRefresh={refetch} />
       }
       contentContainerStyle={{
+        flexGrow: 1,
         padding: spacing.lg,
         gap: spacing.lg,
         backgroundColor: colors.background,
@@ -107,47 +118,69 @@ export default function DashboardScreen() {
       {!isLoading && !hasBlockingError ? (
         <>
           <Card
+            accessible
+            accessibilityLabel={`Net result. ${netStatus}${hasProjections ? `, ${netValue}` : ""}. ${stats.tournamentCount} events. Projected coverage ${stats.projectedCount} of ${stats.tournamentCount}.`}
             style={{
               gap: spacing.lg,
               padding: spacing.lg,
               borderRadius: radii.lg,
-              boxShadow: "none",
+              backgroundColor: colors.brand,
+              boxShadow:
+                "0 2px 5px rgba(16, 23, 18, 0.10), 0 22px 42px -24px rgba(23, 63, 49, 0.70)",
             }}
           >
             <View style={{ gap: spacing.sm }}>
               <Text
-                style={{ color: colors.mutedForeground, fontSize: 13 }}
+                style={{
+                  color: colors.brandMutedForeground,
+                  fontSize: 13,
+                  fontWeight: "700",
+                }}
                 selectable
               >
                 Net result
               </Text>
-              <View
-                style={{
-                  alignSelf: "flex-start",
-                  maxWidth: "100%",
-                  paddingHorizontal: spacing.md,
-                  paddingVertical: spacing.sm,
-                  borderRadius: radii.sm,
-                  backgroundColor: netBackgroundColor,
-                }}
-              >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
                 <Text
                   style={{
-                    color: colors.foreground,
-                    fontSize: 22,
-                    fontWeight: "700",
+                    minWidth: 0,
+                    flexShrink: 1,
+                    color: colors.brandForeground,
+                    fontSize: 34,
+                    fontWeight: "800",
+                    letterSpacing: -0.8,
                     fontVariant: ["tabular-nums"],
                   }}
                   numberOfLines={1}
                   adjustsFontSizeToFit
                   selectable
                 >
-                  {netLabel}
+                  {netValue}
                 </Text>
+                <View
+                  style={{
+                    flexShrink: 0,
+                    paddingHorizontal: spacing.sm,
+                    paddingVertical: 6,
+                    borderRadius: 999,
+                    backgroundColor: netStatusBackgroundColor,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: netStatusColor,
+                      fontSize: 12,
+                      fontWeight: "800",
+                    }}
+                    selectable
+                  >
+                    {netStatus}
+                  </Text>
+                </View>
               </View>
               {hasIncompleteCoverage ? (
                 <Text
-                  style={{ color: colors.mutedForeground, fontSize: 12 }}
+                  style={{ color: colors.brandMutedForeground, fontSize: 12 }}
                   selectable
                 >
                   Partial result from projected events
@@ -160,19 +193,19 @@ export default function DashboardScreen() {
                 flexDirection: "row",
                 paddingTop: spacing.md,
                 borderTopWidth: 1,
-                borderTopColor: colors.border,
+                borderTopColor: colors.brandBorder,
               }}
             >
               <View style={{ flex: 1, gap: spacing.xs }}>
                 <Text
-                  style={{ color: colors.mutedForeground, fontSize: 12 }}
+                  style={{ color: colors.brandMutedForeground, fontSize: 12 }}
                   selectable
                 >
                   Events
                 </Text>
                 <Text
                   style={{
-                    color: colors.foreground,
+                    color: colors.brandForeground,
                     fontSize: 20,
                     fontWeight: "700",
                     fontVariant: ["tabular-nums"],
@@ -188,18 +221,18 @@ export default function DashboardScreen() {
                   gap: spacing.xs,
                   paddingLeft: spacing.lg,
                   borderLeftWidth: 1,
-                  borderLeftColor: colors.border,
+                  borderLeftColor: colors.brandBorder,
                 }}
               >
                 <Text
-                  style={{ color: colors.mutedForeground, fontSize: 12 }}
+                  style={{ color: colors.brandMutedForeground, fontSize: 12 }}
                   selectable
                 >
                   Projected coverage
                 </Text>
                 <Text
                   style={{
-                    color: colors.foreground,
+                    color: colors.brandForeground,
                     fontSize: 20,
                     fontWeight: "700",
                     fontVariant: ["tabular-nums"],
@@ -212,7 +245,11 @@ export default function DashboardScreen() {
             </View>
 
             <Text
-              style={{ color: colors.mutedForeground, fontSize: 12, lineHeight: 18 }}
+              style={{
+                color: colors.brandMutedForeground,
+                fontSize: 12,
+                lineHeight: 18,
+              }}
               selectable
             >
               Earned {formatMoney(stats.ytdEarnings, profile.home_currency)} · Spent{" "}
