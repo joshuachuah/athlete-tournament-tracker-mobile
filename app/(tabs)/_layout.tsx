@@ -6,7 +6,14 @@ import { colors } from "@/constants/theme";
 export default function TabLayout() {
   return (
     <ProtectedScreen>
-      <NativeTabs tintColor={colors.accent} minimizeBehavior="onScrollDown">
+      <NativeTabs
+        backgroundColor={colors.background}
+        blurEffect="none"
+        disableTransparentOnScrollEdge
+        minimizeBehavior="onScrollDown"
+        shadowColor={colors.border}
+        tintColor={colors.accent}
+      >
         <NativeTabs.Trigger name="dashboard">
           <Icon sf="chart.bar.fill" drawable="ic_menu_sort_by_size" />
           <Label>Dashboard</Label>
