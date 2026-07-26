@@ -46,6 +46,7 @@ export default function AccountScreen() {
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={styles.content}
+      style={styles.screen}
     >
       <View style={styles.heading}>
         <Text style={styles.eyebrow}>Account</Text>
@@ -143,7 +144,11 @@ export default function AccountScreen() {
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    backgroundColor: colors.background,
+  },
   content: {
+    flexGrow: 1,
     gap: spacing.xl,
     padding: spacing.xl,
     paddingBottom: spacing.xxl,
@@ -153,11 +158,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   eyebrow: {
-    color: colors.accent,
-    fontSize: 12,
-    fontWeight: "800",
-    letterSpacing: 1.1,
-    textTransform: "uppercase",
+    color: colors.mutedForeground,
+    fontSize: 13,
+    fontWeight: "700",
   },
   title: {
     color: colors.foreground,
@@ -191,9 +194,9 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderRadius: radii.lg,
     borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: colors.border,
     backgroundColor: colors.surface,
+    boxShadow:
+      "0 1px 2px rgba(16, 23, 18, 0.03), 0 12px 28px -20px rgba(16, 23, 18, 0.24)",
   },
   row: {
     minHeight: 68,
