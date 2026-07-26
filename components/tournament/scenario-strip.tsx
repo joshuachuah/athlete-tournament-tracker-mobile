@@ -19,13 +19,24 @@ import type { Scenario } from "@/types";
 const scenarios: Scenario[] = ["worst", "realistic", "best"];
 
 const styles = StyleSheet.create({
+  projectionHero: {
+    overflow: "hidden",
+    gap: spacing.lg,
+    padding: spacing.lg,
+    borderRadius: radii.lg,
+    borderCurve: "continuous",
+    backgroundColor: colors.brand,
+    boxShadow:
+      "0 2px 5px rgba(16, 23, 18, 0.10), 0 22px 42px -24px rgba(23, 63, 49, 0.70)",
+  },
   scenarioCard: {
     minHeight: 126,
     flex: 1,
     gap: spacing.sm,
     padding: spacing.md,
     borderWidth: 1,
-    borderRadius: radii.lg,
+    borderRadius: radii.md,
+    borderCurve: "continuous",
   },
 });
 
@@ -37,13 +48,12 @@ function canPreview(draft: TournamentDraft) {
 
 function netPresentation(net: number, currency: string) {
   if (net === 0) {
-    return { label: "Break even", value: formatMoney(0, currency), color: colors.foreground };
+    return { label: "Break even", value: formatMoney(0, currency) };
   }
 
   return {
     label: net > 0 ? "Projected gain" : "Projected loss",
     value: `${net > 0 ? "+" : "−"}${formatMoney(Math.abs(net), currency)}`,
-    color: net > 0 ? colors.profit : colors.loss,
   };
 }
 
@@ -87,25 +97,28 @@ export function ScenarioStrip({
   const loading = waitingForDebounce || isFetching;
 
   return (
-    <View style={{ gap: spacing.md }}>
+    <View style={styles.projectionHero}>
       <View style={{ flexDirection: "row", alignItems: "flex-end", gap: spacing.md }}>
         <View style={{ flex: 1, gap: spacing.xs }}>
           <Text
             style={{
-              color: colors.mutedForeground,
-              fontSize: 12,
-              fontWeight: "800",
-              letterSpacing: 0.8,
-              textTransform: "uppercase",
+              color: colors.brandMutedForeground,
+              fontSize: 13,
+              fontWeight: "700",
             }}
           >
             Live projection
           </Text>
-          <Text style={{ color: colors.foreground, fontSize: 22, fontWeight: "900" }}>
+          <Text style={{ color: colors.brandForeground, fontSize: 24, fontWeight: "900" }}>
             Outcome scenarios
           </Text>
+          <Text style={{ color: colors.brandMutedForeground, lineHeight: 20 }}>
+            How this tournament could affect your season.
+          </Text>
         </View>
-        {loading ? <ActivityIndicator color={colors.accent} size="small" /> : null}
+        {loading ? (
+          <ActivityIndicator color={colors.brandForeground} size="small" />
+        ) : null}
       </View>
 
       {!previewReady ? (
@@ -113,11 +126,11 @@ export function ScenarioStrip({
           accessibilityLiveRegion="polite"
           style={{
             padding: spacing.lg,
-            borderRadius: radii.lg,
-            backgroundColor: colors.surfaceMuted,
+            borderRadius: radii.md,
+            backgroundColor: "rgba(255, 255, 255, 0.08)",
           }}
         >
-          <Text style={{ color: colors.mutedForeground, lineHeight: 20 }}>
+          <Text style={{ color: colors.brandMutedForeground, lineHeight: 20 }}>
             {identityResolved
               ? "Complete the required tournament details to start a live preview."
               : "Choose the searched tournament or create it before previewing outcomes."}
@@ -131,11 +144,13 @@ export function ScenarioStrip({
             alignItems: "center",
             justifyContent: "center",
             gap: spacing.sm,
-            borderRadius: radii.lg,
-            backgroundColor: colors.surfaceMuted,
+            borderRadius: radii.md,
+            backgroundColor: "rgba(255, 255, 255, 0.08)",
           }}
         >
-          <Text style={{ color: colors.mutedForeground }}>Updating from the server…</Text>
+          <Text style={{ color: colors.brandMutedForeground }}>
+            Updating from the server…
+          </Text>
         </View>
       ) : isError ? (
         <View
@@ -167,16 +182,20 @@ export function ScenarioStrip({
           accessibilityLiveRegion="polite"
           style={{
             padding: spacing.lg,
-            borderWidth: 1,
-            borderColor: colors.border,
-            borderRadius: radii.lg,
-            backgroundColor: colors.surface,
+            borderRadius: radii.md,
+            backgroundColor: "rgba(255, 255, 255, 0.08)",
           }}
         >
-          <Text style={{ color: colors.foreground, fontWeight: "800" }}>
+          <Text style={{ color: colors.brandForeground, fontWeight: "800" }}>
             No outcomes yet
           </Text>
-          <Text style={{ color: colors.mutedForeground, lineHeight: 20, marginTop: spacing.xs }}>
+          <Text
+            style={{
+              color: colors.brandMutedForeground,
+              lineHeight: 20,
+              marginTop: spacing.xs,
+            }}
+          >
             Add prize estimates to see worst, realistic, and best outcomes.
           </Text>
         </View>
@@ -190,6 +209,7 @@ export function ScenarioStrip({
 
             if (!result) return null;
             const net = netPresentation(result.net_result, homeCurrency);
+            const featured = scenario === "realistic";
 
             return (
               <View
@@ -199,38 +219,49 @@ export function ScenarioStrip({
                 style={[
                   styles.scenarioCard,
                   {
-                    borderColor: scenario === "realistic" ? colors.accent : colors.border,
-                    backgroundColor:
-                      scenario === "realistic" ? colors.accentSoft : colors.surface,
+                    borderColor: featured
+                      ? "rgba(255, 255, 255, 0.42)"
+                      : "rgba(255, 255, 255, 0.14)",
+                    backgroundColor: featured
+                      ? "rgba(255, 255, 255, 0.16)"
+                      : "rgba(255, 255, 255, 0.06)",
                   },
                 ]}
               >
                 <Text
                   numberOfLines={1}
                   style={{
-                    color: colors.mutedForeground,
+                    color: colors.brandMutedForeground,
                     fontSize: 12,
                     fontWeight: "800",
-                    letterSpacing: 0.5,
-                    textTransform: "uppercase",
                   }}
                 >
                   {scenarioLabel(scenario)}
                 </Text>
                 <View style={{ gap: 2 }}>
-                  <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>Outcome</Text>
-                  <Text style={{ color: colors.foreground, fontSize: 18, fontWeight: "900" }}>
+                  <Text style={{ color: colors.brandMutedForeground, fontSize: 12 }}>
+                    Outcome
+                  </Text>
+                  <Text
+                    style={{
+                      color: colors.brandForeground,
+                      fontSize: 18,
+                      fontWeight: "900",
+                    }}
+                  >
                     {roundLabels[result.round]}
                   </Text>
                 </View>
                 <View style={{ gap: 2 }}>
-                  <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>{net.label}</Text>
+                  <Text style={{ color: colors.brandMutedForeground, fontSize: 12 }}>
+                    {net.label}
+                  </Text>
                   <Text
                     numberOfLines={1}
                     adjustsFontSizeToFit
                     minimumFontScale={0.86}
                     style={{
-                      color: net.color,
+                      color: colors.brandForeground,
                       fontSize: 14,
                       fontWeight: "900",
                       fontVariant: ["tabular-nums"],
@@ -247,11 +278,13 @@ export function ScenarioStrip({
         <View
           style={{
             padding: spacing.lg,
-            borderRadius: radii.lg,
-            backgroundColor: colors.surfaceMuted,
+            borderRadius: radii.md,
+            backgroundColor: "rgba(255, 255, 255, 0.08)",
           }}
         >
-          <Text style={{ color: colors.mutedForeground }}>Preview is ready when your edits settle.</Text>
+          <Text style={{ color: colors.brandMutedForeground }}>
+            Preview is ready when your edits settle.
+          </Text>
         </View>
       )}
     </View>

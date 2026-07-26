@@ -215,10 +215,8 @@ export function TournamentProjectionBuilder({
                 <Text
                   style={{
                     color: colors.mutedForeground,
-                    fontSize: 12,
-                    fontWeight: "800",
-                    letterSpacing: 0.8,
-                    textTransform: "uppercase",
+                    fontSize: 13,
+                    fontWeight: "700",
                   }}
                 >
                   Tournament projection
