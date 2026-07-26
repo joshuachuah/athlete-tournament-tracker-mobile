@@ -1,4 +1,16 @@
-import { Plus, ChevronRight } from "lucide-react-native";
+import {
+  BadgeDollarSign,
+  ChevronRight,
+  Ellipsis,
+  HandCoins,
+  HeartPulse,
+  MapPin,
+  Plane,
+  Plus,
+  Trophy,
+  WalletCards,
+  type LucideIcon,
+} from "lucide-react-native";
 import { Pressable, Text, View } from "react-native";
 
 import { colors, radii, spacing } from "@/constants/theme";
@@ -15,6 +27,7 @@ export type AssumptionEditor =
 export type ProjectionEditor = "details" | "prize" | "travel" | AssumptionEditor;
 
 type LedgerRowProps = {
+  icon: LucideIcon;
   title: string;
   summary: string;
   impact?: string;
@@ -23,6 +36,7 @@ type LedgerRowProps = {
 };
 
 function ImpactLedgerRow({
+  icon: Icon,
   impact,
   impactTone = "neutral",
   onPress,
@@ -51,21 +65,45 @@ function ImpactLedgerRow({
         opacity: pressed ? 0.65 : 1,
       })}
     >
-      <View style={{ flex: 1, gap: spacing.xs }}>
-        <Text style={{ color: colors.foreground, fontSize: 16, fontWeight: "800" }}>
+      <View
+        style={{
+          width: 38,
+          height: 38,
+          flexShrink: 0,
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: radii.sm,
+          backgroundColor: colors.surfaceMuted,
+        }}
+      >
+        <Icon color={colors.accent} size={19} strokeWidth={2.1} />
+      </View>
+      <View style={{ minWidth: 0, flex: 1, gap: spacing.xs }}>
+        <Text
+          numberOfLines={1}
+          style={{ color: colors.foreground, fontSize: 16, fontWeight: "800" }}
+        >
           {title}
         </Text>
-        <Text style={{ color: colors.mutedForeground, lineHeight: 19 }}>
+        <Text
+          numberOfLines={2}
+          style={{ color: colors.mutedForeground, lineHeight: 19 }}
+        >
           {summary}
         </Text>
       </View>
       {impact ? (
         <Text
+          adjustsFontSizeToFit
+          minimumFontScale={0.82}
+          numberOfLines={1}
           style={{
+            maxWidth: "34%",
             color: impactColor,
             fontSize: 15,
             fontWeight: "800",
             fontVariant: ["tabular-nums"],
+            textAlign: "right",
           }}
         >
           {impact}
@@ -89,6 +127,7 @@ function optionalAssumptions(draft: TournamentDraft) {
 
   if (draft.daily_spending_cap > 0) {
     rows.push({
+      icon: WalletCards,
       key: "daily-spending",
       title: "Daily spending cap",
       summary: "Maximum planned spend per day",
@@ -99,6 +138,7 @@ function optionalAssumptions(draft: TournamentDraft) {
   }
   if (draft.coaching_cost > 0) {
     rows.push({
+      icon: HeartPulse,
       key: "coaching",
       title: "Coaching / physio",
       summary: "Support cost for this tournament",
@@ -109,6 +149,7 @@ function optionalAssumptions(draft: TournamentDraft) {
   }
   if (draft.misc_cost > 0) {
     rows.push({
+      icon: Ellipsis,
       key: "misc",
       title: "Miscellaneous",
       summary: "Other tournament costs",
@@ -119,6 +160,7 @@ function optionalAssumptions(draft: TournamentDraft) {
   }
   if (draft.sponsorship_allocated > 0) {
     rows.push({
+      icon: HandCoins,
       key: "sponsorship",
       title: "Sponsorship",
       summary: "Funding allocated to this tournament",
@@ -129,6 +171,7 @@ function optionalAssumptions(draft: TournamentDraft) {
   }
   if (draft.subsidy_enabled) {
     rows.push({
+      icon: BadgeDollarSign,
       key: "subsidy",
       title: "Subsidy",
       summary: draft.subsidy_by.trim() || "Tournament subsidy",
@@ -175,34 +218,25 @@ export function ImpactLedger({
 
   return (
     <View style={{ gap: spacing.md }}>
-      <View style={{ gap: spacing.xs }}>
-        <Text
-          style={{
-            color: colors.mutedForeground,
-            fontSize: 12,
-            fontWeight: "800",
-            letterSpacing: 0.8,
-            textTransform: "uppercase",
-          }}
-        >
-          Impact ledger
-        </Text>
-        <Text style={{ color: colors.foreground, fontSize: 22, fontWeight: "900" }}>
-          Build the projection
-        </Text>
-      </View>
+      <Text
+        accessibilityRole="header"
+        style={{ color: colors.foreground, fontSize: 22, fontWeight: "900" }}
+      >
+        Impact ledger
+      </Text>
 
       <View
         style={{
           paddingHorizontal: spacing.lg,
           backgroundColor: colors.surface,
-          borderWidth: 1,
-          borderColor: colors.border,
           borderRadius: radii.lg,
           borderCurve: "continuous",
+          boxShadow:
+            "0 1px 2px rgba(16, 23, 18, 0.03), 0 12px 28px -18px rgba(16, 23, 18, 0.24)",
         }}
       >
         <ImpactLedgerRow
+          icon={MapPin}
           title="Tournament details"
           summary={detailSummary}
           impact={signedMoney(draft.entry_fee, draft.currency, "−")}
@@ -211,6 +245,7 @@ export function ImpactLedger({
         />
         <View style={{ height: 1, backgroundColor: colors.border }} />
         <ImpactLedgerRow
+          icon={Trophy}
           title="Prize and tax"
           summary={prizeSummary}
           impact={prizeImpact}
@@ -219,6 +254,7 @@ export function ImpactLedger({
         />
         <View style={{ height: 1, backgroundColor: colors.border }} />
         <ImpactLedgerRow
+          icon={Plane}
           title="Travel and stay"
           summary={travelSummary}
           impact={signedMoney(travel, draft.currency, "−")}
@@ -230,11 +266,9 @@ export function ImpactLedger({
       <View style={{ gap: spacing.sm }}>
         <Text
           style={{
-            color: colors.mutedForeground,
-            fontSize: 12,
+            color: colors.foreground,
+            fontSize: 16,
             fontWeight: "800",
-            letterSpacing: 0.8,
-            textTransform: "uppercase",
           }}
         >
           Optional assumptions
@@ -244,10 +278,10 @@ export function ImpactLedger({
             style={{
               paddingHorizontal: spacing.lg,
               backgroundColor: colors.surface,
-              borderWidth: 1,
-              borderColor: colors.border,
               borderRadius: radii.lg,
               borderCurve: "continuous",
+              boxShadow:
+                "0 1px 2px rgba(16, 23, 18, 0.03), 0 12px 28px -18px rgba(16, 23, 18, 0.24)",
             }}
           >
             {assumptions.map((row, index) => (
@@ -256,6 +290,7 @@ export function ImpactLedger({
                   <View style={{ height: 1, backgroundColor: colors.border }} />
                 ) : null}
                 <ImpactLedgerRow
+                  icon={row.icon}
                   title={row.title}
                   summary={row.summary}
                   impact={row.impact}
@@ -282,11 +317,10 @@ export function ImpactLedger({
             alignItems: "center",
             justifyContent: "center",
             gap: spacing.sm,
-            borderWidth: 1,
-            borderStyle: "dashed",
-            borderColor: colors.accent,
             borderRadius: radii.md,
-            backgroundColor: colors.accentSoft,
+            backgroundColor: colors.surface,
+            boxShadow:
+              "0 1px 2px rgba(16, 23, 18, 0.03), 0 10px 24px -18px rgba(16, 23, 18, 0.24)",
             opacity: pressed ? 0.7 : 1,
           })}
         >
