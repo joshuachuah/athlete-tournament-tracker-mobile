@@ -221,6 +221,7 @@ function PrivateFinancesContent() {
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.content}
+          style={styles.screen}
         >
           <View style={styles.verifiedBadge}>
             <CircleCheck color={colors.accent} size={16} strokeWidth={2.4} />
@@ -369,7 +370,11 @@ function FinanceValue({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    backgroundColor: colors.background,
+  },
   content: {
+    flexGrow: 1,
     gap: spacing.xl,
     padding: spacing.xl,
     paddingBottom: spacing.xxl,
@@ -419,11 +424,9 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderRadius: radii.lg,
     borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: colors.border,
     backgroundColor: colors.surface,
     boxShadow:
-      "0 2px 4px rgba(14, 16, 18, 0.04), 0 18px 34px -18px rgba(14, 16, 18, 0.18)",
+      "0 1px 2px rgba(16, 23, 18, 0.04), 0 18px 34px -20px rgba(16, 23, 18, 0.28)",
   },
   valueRow: {
     gap: spacing.sm,

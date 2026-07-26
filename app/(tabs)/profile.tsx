@@ -26,6 +26,7 @@ export default function ProfileScreen() {
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={styles.content}
+      style={styles.screen}
     >
       <View style={styles.heading}>
         <Text style={styles.eyebrow}>Profile</Text>
@@ -77,6 +78,9 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    backgroundColor: colors.background,
+  },
   content: {
     flexGrow: 1,
     gap: spacing.xxl,
@@ -87,11 +91,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   eyebrow: {
-    color: colors.accent,
-    fontSize: 12,
-    fontWeight: "800",
-    letterSpacing: 1.1,
-    textTransform: "uppercase",
+    color: colors.mutedForeground,
+    fontSize: 13,
+    fontWeight: "700",
   },
   title: {
     color: colors.foreground,
@@ -111,11 +113,9 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     borderRadius: radii.lg,
     borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: colors.border,
     backgroundColor: colors.surface,
     boxShadow:
-      "0 2px 4px rgba(14, 16, 18, 0.04), 0 18px 34px -18px rgba(14, 16, 18, 0.18)",
+      "0 1px 2px rgba(16, 23, 18, 0.04), 0 18px 34px -20px rgba(16, 23, 18, 0.28)",
   },
   avatar: {
     width: 92,
@@ -123,9 +123,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 46,
-    borderWidth: 6,
-    borderColor: colors.accentSoft,
-    backgroundColor: colors.foreground,
+    backgroundColor: colors.brand,
   },
   avatarText: {
     color: "#FFFFFF",
