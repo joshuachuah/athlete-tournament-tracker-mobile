@@ -32,9 +32,9 @@ function buttonColors(variant: ButtonVariant) {
       };
     case "primary":
       return {
-        backgroundColor: colors.foreground,
-        color: "#FFFFFF",
-        borderColor: colors.foreground,
+        backgroundColor: colors.brand,
+        color: colors.brandForeground,
+        borderColor: colors.brand,
       };
   }
 }
