@@ -1,4 +1,9 @@
-import { api, ApiError, API_REQUEST_TIMEOUT_MS } from "@/lib/api";
+import {
+  ACCOUNT_DELETION_CONFIRMATION,
+  api,
+  ApiError,
+  API_REQUEST_TIMEOUT_MS,
+} from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 
 jest.mock("@/lib/supabase", () => ({
@@ -360,6 +365,69 @@ describe("api client", () => {
     expect(fetchMock).toHaveBeenCalledWith(
       `${apiBase}/api/profile?email=a%2Bb%40x.com`,
       expect.any(Object),
+    );
+  });
+
+  it("sends an explicit, subject-bound account deletion request", async () => {
+    mockGetSession.mockResolvedValue({
+      data: {
+        session: {
+          access_token: "fresh-account-token",
+          user: { id: "account-a" },
+        },
+      },
+      error: null,
+    });
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true }),
+    } as Response);
+
+    await expect(
+      api.profile.delete({ authenticatedUserId: "account-a" }),
+    ).resolves.toEqual({ success: true });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${apiBase}/api/profile`,
+      expect.objectContaining({
+        body: JSON.stringify({
+          confirmation: ACCOUNT_DELETION_CONFIRMATION,
+        }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer fresh-account-token",
+        },
+        method: "DELETE",
+        signal: expect.any(AbortSignal),
+      }),
+    );
+  });
+
+  it("stores the one-time Apple authorization code with the new session", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true }),
+    } as Response);
+
+    await expect(
+      api.auth.apple.storeCredential("authorization-code", {
+        authToken: "apple-session-token",
+      }),
+    ).resolves.toEqual({ success: true });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${apiBase}/api/v1/auth/apple/credential`,
+      expect.objectContaining({
+        body: JSON.stringify({
+          authorization_code: "authorization-code",
+        }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer apple-session-token",
+        },
+        method: "POST",
+        signal: expect.any(AbortSignal),
+      }),
     );
   });
 

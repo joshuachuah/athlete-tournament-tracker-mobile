@@ -6,14 +6,22 @@ import {
   useRef,
   useState,
 } from "react";
-import * as AuthSession from "expo-auth-session";
+import * as AppleAuthentication from "expo-apple-authentication";
 import * as WebBrowser from "expo-web-browser";
+import { router } from "expo-router";
 import type { Session } from "@supabase/supabase-js";
 
 import { api } from "@/lib/api";
+import { createAppleAuthRequest } from "@/lib/apple-auth";
+import { oauthRedirectUri } from "@/lib/auth-redirect";
 import { queryClient } from "@/lib/query-client";
 import { hasSupabaseConfig, supabase } from "@/lib/supabase";
-import { profileStorage } from "@/lib/storage";
+import {
+  clearLegacyTournamentDraft,
+  draftStorage,
+  profileStorage,
+  tournamentDraftStorageKey,
+} from "@/lib/storage";
 import type { AthleteProfile } from "@/types";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -30,9 +38,11 @@ type AuthContextValue = {
   profile: AthleteProfile | null;
   status: "loading" | "ready";
   authError: string | null;
+  signInWithApple: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   saveProfile: (data: ProfileInput) => Promise<AthleteProfile>;
+  deleteAccount: () => Promise<void>;
   signOut: () => Promise<void>;
   isCurrentUser: (userId: string) => boolean;
 };
@@ -47,11 +57,171 @@ function cacheProfile(userId: string, profile: AthleteProfile | null): void {
   }
 }
 
-function redirectUri(): string {
-  return AuthSession.makeRedirectUri({
-    scheme: "athletetracker",
-    path: "auth/callback",
+async function startGoogleSignIn(
+  setAuthError: (error: string | null) => void,
+) {
+  if (!supabase) {
+    setAuthError(
+      "Supabase is not configured. Set Expo public Supabase environment variables.",
+    );
+    return;
+  }
+
+  setAuthError(null);
+  const callbackUrl = oauthRedirectUri();
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: callbackUrl,
+      skipBrowserRedirect: true,
+    },
   });
+
+  if (error) {
+    setAuthError(error.message);
+    return;
+  }
+
+  if (!data.url) {
+    setAuthError("Supabase did not return an OAuth URL.");
+    return;
+  }
+
+  const result = await WebBrowser.openAuthSessionAsync(data.url, callbackUrl);
+
+  if (result.type !== "success") {
+    return;
+  }
+
+  if (result.url.includes("#")) {
+    setAuthError("OAuth callback did not include a valid session code.");
+    return;
+  }
+
+  let callback: URL;
+
+  try {
+    callback = new URL(result.url);
+  } catch {
+    setAuthError("OAuth callback URL was invalid.");
+    return;
+  }
+
+  if (callback.searchParams.has("error")) {
+    setAuthError("OAuth sign-in was rejected by the provider.");
+    return;
+  }
+
+  const code = callback.searchParams.get("code");
+
+  if (code) {
+    const exchange = await supabase.auth.exchangeCodeForSession(code);
+    if (exchange.error) {
+      setAuthError(exchange.error.message);
+    }
+    return;
+  }
+
+  setAuthError("OAuth callback did not include a session code.");
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Sign in failed.";
+}
+
+function isAppleCancellation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "ERR_REQUEST_CANCELED"
+  );
+}
+
+async function startAppleSignIn(
+  setAuthError: (error: string | null) => void,
+) {
+  if (!supabase) {
+    setAuthError(
+      "Supabase is not configured. Set Expo public Supabase environment variables.",
+    );
+    return;
+  }
+
+  setAuthError(null);
+
+  try {
+    const request = await createAppleAuthRequest();
+    const credential = await AppleAuthentication.signInAsync({
+      nonce: request.hashedNonce,
+      requestedScopes: [
+        AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+        AppleAuthentication.AppleAuthenticationScope.EMAIL,
+      ],
+      state: request.state,
+    });
+
+    if (credential.state !== request.state) {
+      throw new Error("Apple sign-in response could not be verified.");
+    }
+
+    if (!credential.identityToken || !credential.authorizationCode) {
+      throw new Error(
+        "Apple did not return the credentials required to complete sign-in.",
+      );
+    }
+
+    const signIn = await supabase.auth.signInWithIdToken({
+      provider: "apple",
+      token: credential.identityToken,
+      nonce: request.rawNonce,
+    });
+
+    if (signIn.error) {
+      throw signIn.error;
+    }
+
+    if (!signIn.data.session?.access_token) {
+      throw new Error("Apple sign-in did not return an authenticated session.");
+    }
+
+    try {
+      await api.auth.apple.storeCredential(credential.authorizationCode, {
+        authToken: signIn.data.session.access_token,
+      });
+    } catch {
+      await supabase.auth.signOut({ scope: "local" });
+      throw new Error(
+        "Apple sign-in could not be completed securely. Please try again.",
+      );
+    }
+
+    const nameParts = [
+      credential.fullName?.givenName,
+      credential.fullName?.middleName,
+      credential.fullName?.familyName,
+    ].filter((part): part is string => Boolean(part));
+
+    if (nameParts.length > 0) {
+      const metadata = await supabase.auth.updateUser({
+        data: {
+          full_name: nameParts.join(" "),
+          given_name: credential.fullName?.givenName,
+          family_name: credential.fullName?.familyName,
+        },
+      });
+
+      if (metadata.error) {
+        setAuthError(
+          "Signed in, but your Apple profile name could not be saved. You can enter it during setup.",
+        );
+      }
+    }
+  } catch (error) {
+    if (!isAppleCancellation(error)) {
+      setAuthError(errorMessage(error));
+    }
+  }
 }
 
 export function AuthProvider({ children }: PropsWithChildren) {
@@ -61,7 +231,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [authError, setAuthError] = useState<string | null>(
     hasSupabaseConfig
       ? null
-      : "Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.",
+      : "Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY.",
   );
   const identityVersion = useRef(0);
   const profileLoadVersion = useRef(0);
@@ -176,69 +346,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, []);
 
   async function signInWithGoogle() {
-    if (!supabase) {
-      setAuthError(
-        "Supabase is not configured. Set Expo public Supabase environment variables.",
-      );
-      return;
-    }
+    await startGoogleSignIn(setAuthError);
+  }
 
-    setAuthError(null);
-    const callbackUrl = redirectUri();
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: callbackUrl,
-        skipBrowserRedirect: true,
-      },
-    });
-
-    if (error) {
-      setAuthError(error.message);
-      return;
-    }
-
-    if (!data.url) {
-      setAuthError("Supabase did not return an OAuth URL.");
-      return;
-    }
-
-    const result = await WebBrowser.openAuthSessionAsync(data.url, callbackUrl);
-
-    if (result.type !== "success") {
-      return;
-    }
-
-    if (result.url.includes("#")) {
-      setAuthError("OAuth callback did not include a valid session code.");
-      return;
-    }
-
-    let callback: URL;
-
-    try {
-      callback = new URL(result.url);
-    } catch {
-      setAuthError("OAuth callback URL was invalid.");
-      return;
-    }
-
-    if (callback.searchParams.has("error")) {
-      setAuthError("OAuth sign-in was rejected by the provider.");
-      return;
-    }
-
-    const code = callback.searchParams.get("code");
-
-    if (code) {
-      const exchange = await supabase.auth.exchangeCodeForSession(code);
-      if (exchange.error) {
-        setAuthError(exchange.error.message);
-      }
-      return;
-    }
-
-    setAuthError("OAuth callback did not include a session code.");
+  async function signInWithApple() {
+    await startAppleSignIn(setAuthError);
   }
 
   async function refreshProfile() {
@@ -316,7 +428,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     return savedProfile;
   }
 
-  async function signOut() {
+  function clearLocalAuthState(userId: string | null) {
     ++identityVersion.current;
     ++profileLoadVersion.current;
     currentUserId.current = null;
@@ -325,11 +437,53 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setProfile(null);
     setStatus("ready");
     profileStorage.clear();
+    if (userId) {
+      draftStorage.clear(tournamentDraftStorageKey(userId));
+    }
+    clearLegacyTournamentDraft();
     queryClient.clear();
+  }
+
+  async function signOut() {
+    const userId = currentUserId.current;
+    clearLocalAuthState(userId);
 
     if (supabase) {
       await supabase.auth.signOut();
     }
+  }
+
+  async function deleteAccount() {
+    const userId = currentUserId.current;
+
+    if (!userId) {
+      throw new Error("Sign in before deleting your account.");
+    }
+
+    const identity = identityVersion.current;
+    await api.profile.delete({ authenticatedUserId: userId });
+
+    if (
+      !mounted.current ||
+      currentUserId.current !== userId ||
+      identityVersion.current !== identity
+    ) {
+      draftStorage.clear(tournamentDraftStorageKey(userId));
+      return;
+    }
+
+    clearLocalAuthState(userId);
+
+    if (supabase) {
+      try {
+        await supabase.auth.signOut({ scope: "local" });
+      } catch {
+        // The backend has already deleted the Auth user. Local application
+        // state is authoritative here, so a stale-session error cannot restore it.
+      }
+    }
+
+    router.replace("/login");
   }
 
   function isCurrentUser(userId: string) {
@@ -343,9 +497,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
         profile,
         status,
         authError,
+        signInWithApple,
         signInWithGoogle,
         refreshProfile,
         saveProfile,
+        deleteAccount,
         signOut,
         isCurrentUser,
       }}
