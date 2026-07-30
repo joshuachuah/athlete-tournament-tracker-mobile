@@ -1,6 +1,6 @@
 {
   "cli": {
-    "version": ">= 13.0.0"
+    "version": "21.1.0"
   },
   "build": {
     "development": {
@@ -9,15 +9,11 @@
     },
     "preview": {
       "distribution": "internal",
-      "env": {
-        "EXPO_PUBLIC_API_URL": "https://web-production-2fa073.up.railway.app"
-      }
+      "environment": "preview"
     },
     "production": {
       "autoIncrement": true,
-      "env": {
-        "EXPO_PUBLIC_API_URL": "https://web-production-2fa073.up.railway.app"
-      }
+      "environment": "production"
     }
   },
   "submit": {

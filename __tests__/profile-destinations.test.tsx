@@ -69,7 +69,9 @@ describe("split profile destinations", () => {
       isCurrentUser: jest.fn(() => true),
       refreshProfile: jest.fn(),
       saveProfile: mockSaveProfile,
+      signInWithApple: jest.fn(),
       signInWithGoogle: jest.fn(),
+      deleteAccount: jest.fn(),
       signOut: jest.fn(),
     });
   });

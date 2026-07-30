@@ -26,6 +26,7 @@ export class ApiError extends Error {
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:5000";
 const TOURNAMENT_API_BASE = "/api/v2/tournaments";
 export const API_REQUEST_TIMEOUT_MS = 15_000;
+export const ACCOUNT_DELETION_CONFIRMATION = "DELETE";
 
 export type ApiRequestOptions = {
   signal?: AbortSignal;
@@ -168,6 +169,26 @@ async function requestParsed<S extends z.ZodType>(
 export const api = {
   health: (options?: ApiRequestOptions) =>
     requestParsed(healthSchema, "/health", options),
+  auth: {
+    apple: {
+      storeCredential: (
+        authorizationCode: string,
+        options?: ApiRequestOptions,
+      ) =>
+        requestParsed(
+          deleteResultSchema,
+          "/api/v1/auth/apple/credential",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              authorization_code: authorizationCode,
+            }),
+            signal: options?.signal,
+            authToken: options?.authToken,
+          },
+        ),
+    },
+  },
   profile: {
     get: (email: string, options?: ApiRequestOptions) =>
       requestParsed(
@@ -184,6 +205,16 @@ export const api = {
         body: JSON.stringify(data),
         signal: options?.signal,
         authToken: options?.authToken,
+      }),
+    delete: (options?: ApiRequestOptions) =>
+      requestParsed(deleteResultSchema, "/api/profile", {
+        method: "DELETE",
+        body: JSON.stringify({
+          confirmation: ACCOUNT_DELETION_CONFIRMATION,
+        }),
+        signal: options?.signal,
+        authToken: options?.authToken,
+        authenticatedUserId: options?.authenticatedUserId,
       }),
   },
   tournaments: {

@@ -81,7 +81,9 @@ explicit implementation plan before collecting data.
 
 The native Supabase client uses PKCE and accepts only a one-time authorization code
 from the browser callback. Reusable access and refresh tokens in URL fragments are
-rejected. The existing `athletetracker://auth/callback` target remains in place until
+rejected. The `athletetracker://auth/callback` target remains as the fallback for
+supported iOS releases older than 17.4, while newer iOS uses the associated-domain
+HTTPS callback.
 the external redirect allow-list and signed migration builds can be verified; no
 callback target has been removed from Supabase as part of this local change.
 
@@ -97,3 +99,35 @@ claimed HTTPS universal/app link with deployed association files or a reverse-do
 private-use scheme, add the exact preview and production URLs to Supabase, and test
 both signed platforms. Keep the legacy callback allow-listed until the new builds and
 an old migration-window build pass. Expo Go is not sufficient evidence.
+
+## Account deletion, privacy, and iOS sign-in
+
+The mobile app exposes permanent deletion from Account settings, requires an
+explicit confirmation phrase, and calls the authenticated backend before clearing
+the local profile, tournament draft, legacy draft, and query cache. The backend is
+responsible for deleting the Supabase Auth user and the cascading profile and
+tournament records. A failed API response leaves the device session and cached
+state intact so the user can retry the idempotent server flow; the API commits
+local database deletion before removing the Supabase Auth identity so a database
+failure cannot strand personal data behind an unusable login.
+Profileless users can access the same deletion flow or sign out directly from
+onboarding without first providing profile or financial information.
+
+The iOS target includes the Sign in with Apple capability and native button.
+Supabase exchanges Apple's identity token and the app preserves the first
+authorization's name metadata when available. These local checks do not prove the
+external provider configuration or entitlement:
+
+- deploy the backend with `SUPABASE_SERVICE_ROLE_KEY`,
+  `PRIVACY_CONTACT_EMAIL`, and all five `APPLE_*` server credentials;
+- enable Apple for `com.athletetracker.mobile` in Apple Developer and Supabase;
+- deploy and review the public `/privacy` and `/account-deletion` pages;
+- obtain legal/product approval for the privacy copy and app-store disclosures;
+- exercise Google and Apple deletion on signed preview and production builds.
+
+The app sends Apple's one-time authorization code to the authenticated API
+immediately after Supabase sign-in. The API exchanges it server-side and stores
+only an encrypted Apple refresh token. Account deletion revokes that token with
+Apple before deleting local data and the Supabase Auth identity. This exchange,
+storage, and revocation flow must be exercised on a signed physical-device build
+against preview and production Apple credentials before release.
