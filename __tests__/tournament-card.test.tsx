@@ -1,5 +1,6 @@
 import { render } from "@testing-library/react-native";
 import type { ReactNode } from "react";
+import { StyleSheet } from "react-native";
 
 import { TournamentCard } from "@/components/dashboard/tournament-card";
 import { colors } from "@/constants/theme";
@@ -89,13 +90,13 @@ const bestScenario: ScenarioResult = {
 };
 
 describe("TournamentCard", () => {
-  it("labels a missing realistic projection with a neutral pill", () => {
+  it("labels a missing realistic projection with a neutral outcome", () => {
     const screen = render(
       <TournamentCard tournament={tournament([worstScenario, bestScenario])} />,
     );
     const label = screen.getByText("Needs projection");
 
-    expect(label.props.style).toEqual(
+    expect(StyleSheet.flatten(label.props.style)).toEqual(
       expect.objectContaining({ color: colors.foreground }),
     );
     expect(screen.queryByText("$0 USD")).toBeNull();
@@ -119,7 +120,7 @@ describe("TournamentCard", () => {
     );
     const label = screen.getByText("Break-even · $0 USD");
 
-    expect(label.props.style).toEqual(
+    expect(StyleSheet.flatten(label.props.style)).toEqual(
       expect.objectContaining({ color: colors.foreground }),
     );
     expect(screen.queryByText("Needs projection")).toBeNull();

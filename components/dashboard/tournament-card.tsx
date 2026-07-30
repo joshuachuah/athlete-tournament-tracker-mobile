@@ -1,4 +1,4 @@
-import { Pressable, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Link } from "expo-router";
 
 import { Card } from "@/components/ui/card";
@@ -16,13 +16,13 @@ export function TournamentCard({ tournament }: { tournament: TournamentWithPnL }
       : realistic.net_result < 0
         ? `Loss · ${formatMoney(realistic.net_result, tournament.home_currency)}`
         : `Break-even · ${formatMoney(realistic.net_result, tournament.home_currency)}`;
-  const outcomeBackgroundColor = !realistic
-    ? colors.surfaceMuted
+  const outcomeColor = !realistic
+    ? colors.foreground
     : realistic.net_result > 0
-      ? colors.profitSoft
+      ? colors.profit
       : realistic.net_result < 0
-        ? colors.lossSoft
-        : colors.surfaceMuted;
+        ? colors.loss
+        : colors.foreground;
   const accessibilityOutcome = !realistic
     ? "needs projection"
     : `realistic net ${outcomeLabel}`;
@@ -36,62 +36,34 @@ export function TournamentCard({ tournament }: { tournament: TournamentWithPnL }
       >
         {({ pressed }) => (
           <Card
-            style={{
-              opacity: pressed ? 0.75 : 1,
-              borderRadius: radii.lg,
-              padding: spacing.md,
-              boxShadow:
-                "0 1px 2px rgba(14, 16, 18, 0.03), 0 8px 18px -12px rgba(14, 16, 18, 0.12)",
-            }}
+            style={[styles.card, { opacity: pressed ? 0.75 : 1 }]}
           >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "flex-start",
-                justifyContent: "space-between",
-                gap: spacing.md,
-              }}
-            >
-              <View style={{ flex: 1, minWidth: 0, gap: spacing.xs }}>
+            <View style={styles.row}>
+              <View style={styles.copy}>
                 <Text
-                  style={{ color: colors.foreground, fontSize: 17, fontWeight: "700" }}
+                  style={styles.name}
                   numberOfLines={2}
                   selectable
                 >
                   {tournament.name}
                 </Text>
                 <Text
-                  style={{ color: colors.mutedForeground, fontSize: 13, lineHeight: 18 }}
+                  style={styles.detail}
                   numberOfLines={2}
                   selectable
                 >
                   {tournament.location} · {formattedDate}
                 </Text>
               </View>
-              <View
-                style={{
-                  alignSelf: "flex-start",
-                  maxWidth: "46%",
-                  paddingHorizontal: spacing.sm,
-                  paddingVertical: 5,
-                  borderRadius: radii.sm,
-                  backgroundColor: outcomeBackgroundColor,
-                }}
+              <Text
+                numberOfLines={2}
+                adjustsFontSizeToFit
+                minimumFontScale={0.88}
+                selectable
+                style={[styles.outcome, { color: outcomeColor }]}
               >
-                <Text
-                  style={{
-                    color: colors.foreground,
-                    fontSize: 13,
-                    fontWeight: "600",
-                    fontVariant: ["tabular-nums"],
-                  }}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  selectable
-                >
-                  {outcomeLabel}
-                </Text>
-              </View>
+                {outcomeLabel}
+              </Text>
             </View>
           </Card>
         )}
@@ -99,3 +71,43 @@ export function TournamentCard({ tournament }: { tournament: TournamentWithPnL }
     </Link>
   );
 }
+
+const styles = StyleSheet.create({
+  card: {
+    borderRadius: radii.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    boxShadow:
+      "0 1px 2px rgba(16, 23, 18, 0.03), 0 10px 24px -18px rgba(16, 23, 18, 0.28)",
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
+  copy: {
+    minWidth: 0,
+    flex: 1,
+    gap: spacing.xs,
+  },
+  name: {
+    color: colors.foreground,
+    fontSize: 17,
+    fontWeight: "700",
+  },
+  detail: {
+    color: colors.mutedForeground,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  outcome: {
+    alignSelf: "flex-start",
+    maxWidth: "42%",
+    fontSize: 14,
+    fontWeight: "800",
+    fontVariant: ["tabular-nums"],
+    lineHeight: 19,
+    textAlign: "right",
+  },
+});
