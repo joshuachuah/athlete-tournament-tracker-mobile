@@ -8,6 +8,7 @@ import type { Session } from "@supabase/supabase-js";
 
 import { AuthProvider, useAuth } from "@/context/auth";
 import { api } from "@/lib/api";
+import { createAppleAuthRequest } from "@/lib/apple-auth";
 import { queryClient } from "@/lib/query-client";
 import {
   draftStorage,
@@ -21,10 +22,6 @@ let mockAuthStateCallback:
   | ((event: string, session: Session | null) => void)
   | undefined;
 
-jest.mock("expo-auth-session", () => ({
-  makeRedirectUri: jest.fn(() => "athletetracker://auth/callback"),
-}));
-
 jest.mock("expo-apple-authentication", () => ({
   AppleAuthenticationScope: {
     EMAIL: 0,
@@ -35,6 +32,10 @@ jest.mock("expo-apple-authentication", () => ({
     UNKNOWN: 1,
   },
   signInAsync: jest.fn(),
+}));
+
+jest.mock("@/lib/apple-auth", () => ({
+  createAppleAuthRequest: jest.fn(),
 }));
 
 jest.mock("expo-web-browser", () => ({
@@ -206,6 +207,8 @@ const mockStoreAppleCredential = api.auth.apple
   .storeCredential as jest.MockedFunction<
   typeof api.auth.apple.storeCredential
 >;
+const mockCreateAppleAuthRequest =
+  createAppleAuthRequest as jest.MockedFunction<typeof createAppleAuthRequest>;
 
 describe("AuthProvider OAuth callback", () => {
   beforeEach(() => {
@@ -344,6 +347,11 @@ describe("AuthProvider Apple sign-in", () => {
       error: null,
     });
     mockStoreAppleCredential.mockResolvedValue({ success: true });
+    mockCreateAppleAuthRequest.mockResolvedValue({
+      rawNonce: "raw-nonce",
+      hashedNonce: "hashed-nonce",
+      state: "apple-state",
+    });
     mockSignOut.mockResolvedValue({ error: null });
     mockUpdateUser.mockResolvedValue({
       data: { user: null },
@@ -379,15 +387,24 @@ describe("AuthProvider Apple sign-in", () => {
       },
       identityToken: "apple-identity-token",
       realUserStatus: AppleAuthentication.AppleAuthenticationUserDetectionStatus.LIKELY_REAL,
-      state: null,
+      state: "apple-state",
       user: "apple-user",
     });
 
     const screen = await startAppleSignIn();
 
     expect(mockSignInWithIdToken).toHaveBeenCalledWith({
+      nonce: "raw-nonce",
       provider: "apple",
       token: "apple-identity-token",
+    });
+    expect(mockAppleSignIn).toHaveBeenCalledWith({
+      nonce: "hashed-nonce",
+      requestedScopes: [
+        AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+        AppleAuthentication.AppleAuthenticationScope.EMAIL,
+      ],
+      state: "apple-state",
     });
     expect(mockStoreAppleCredential).toHaveBeenCalledWith(
       "authorization-code",
@@ -419,7 +436,7 @@ describe("AuthProvider Apple sign-in", () => {
       fullName: null,
       identityToken: null,
       realUserStatus: AppleAuthentication.AppleAuthenticationUserDetectionStatus.UNKNOWN,
-      state: null,
+      state: "apple-state",
       user: "apple-user",
     });
 
@@ -439,7 +456,7 @@ describe("AuthProvider Apple sign-in", () => {
       identityToken: "apple-identity-token",
       realUserStatus:
         AppleAuthentication.AppleAuthenticationUserDetectionStatus.UNKNOWN,
-      state: null,
+      state: "apple-state",
       user: "apple-user",
     });
     mockStoreAppleCredential.mockRejectedValue(
@@ -452,6 +469,26 @@ describe("AuthProvider Apple sign-in", () => {
     expect(mockUpdateUser).not.toHaveBeenCalled();
     expect(screen.getByTestId("auth-error").props.children).toBe(
       "Apple sign-in could not be completed securely. Please try again.",
+    );
+  });
+
+  it("rejects an Apple response with a mismatched state", async () => {
+    mockAppleSignIn.mockResolvedValue({
+      authorizationCode: "authorization-code",
+      email: null,
+      fullName: null,
+      identityToken: "apple-identity-token",
+      realUserStatus:
+        AppleAuthentication.AppleAuthenticationUserDetectionStatus.UNKNOWN,
+      state: "different-state",
+      user: "apple-user",
+    });
+
+    const screen = await startAppleSignIn();
+
+    expect(mockSignInWithIdToken).not.toHaveBeenCalled();
+    expect(screen.getByTestId("auth-error").props.children).toBe(
+      "Apple sign-in response could not be verified.",
     );
   });
 });

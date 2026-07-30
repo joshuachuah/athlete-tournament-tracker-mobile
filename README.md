@@ -31,7 +31,7 @@ Fill in the three variables from the API and Supabase projects:
 | --- | --- |
 | `EXPO_PUBLIC_API_URL` | Base URL of the sibling Flask API, without a trailing slash. |
 | `EXPO_PUBLIC_SUPABASE_URL` | Public URL of the shared Supabase project. |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Public anonymous client key for that Supabase project. Never substitute a service-role key. |
+| `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Public client key for that Supabase project. Never substitute a secret or service-role key. |
 | `EXPO_PUBLIC_PRIVACY_POLICY_URL` | Optional public privacy-policy URL. Defaults to `<EXPO_PUBLIC_API_URL>/privacy`. |
 | `EXPO_PUBLIC_ACCOUNT_DELETION_URL` | Optional public account-deletion information URL. Defaults to `<EXPO_PUBLIC_API_URL>/account-deletion`. |
 
@@ -51,7 +51,11 @@ For a physical device, put the device and development machine on the same networ
 
 ### Supabase callback
 
-The current native configuration uses the `athletetracker` app scheme and requests the callback URL `athletetracker://auth/callback`. Add that exact URL to the Supabase Auth redirect allow-list for the shared project before testing native Google sign-in. Do not broaden the allow-list with an unnecessary wildcard.
+The production iOS configuration uses
+`https://web-production-2fa073.up.railway.app/auth/callback` on iOS 17.4 and
+newer, with `athletetracker://auth/callback` retained for older supported iOS.
+Add both exact URLs to the Supabase Auth redirect allow-list before testing a
+signed build. Do not broaden the allow-list with an unnecessary wildcard.
 
 The app implements PKCE and accepts only one-time authorization-code callbacks; it does not accept access or refresh tokens from callback URL fragments. Live allow-list inspection and signed iOS/Android callback verification remain external release prerequisites, so local implementation does not by itself establish production OAuth readiness. Tournament CRUD and P&L preview use the currency-correct `/api/v2` contract; tournament search, profile, FX, and health retain their existing routes.
 

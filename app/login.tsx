@@ -3,7 +3,7 @@ import { StatusBar } from "expo-status-bar";
 import * as AppleAuthentication from "expo-apple-authentication";
 import * as Haptics from "expo-haptics";
 import { ArrowRight, ShieldCheck, TrendingUp } from "lucide-react-native";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -30,6 +30,30 @@ export default function LoginScreen() {
   const [signingInWith, setSigningInWith] = useState<"apple" | "google" | null>(
     null,
   );
+  const [appleSignInAvailable, setAppleSignInAvailable] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS !== "ios") {
+      return;
+    }
+
+    let active = true;
+    AppleAuthentication.isAvailableAsync()
+      .then((available) => {
+        if (active) {
+          setAppleSignInAvailable(available);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setAppleSignInAvailable(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   if (status === "ready" && session && profile) {
     return <Redirect href="/(tabs)/dashboard" />;
@@ -92,7 +116,7 @@ export default function LoginScreen() {
           </View>
         ) : null}
 
-        {Platform.OS === "ios" ? (
+        {appleSignInAvailable ? (
           <View
             pointerEvents={isLoading ? "none" : "auto"}
             style={{ opacity: isLoading && signingInWith !== "apple" ? 0.6 : 1 }}

@@ -4,6 +4,7 @@
     "slug": "tournament-tracker",
     "scheme": "athletetracker",
     "version": "0.1.0",
+    "icon": "./assets/images/athlete-tracker-icon.png",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "assetBundlePatterns": [
@@ -12,7 +13,13 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.athletetracker.mobile",
-      "usesAppleSignIn": true
+      "usesAppleSignIn": true,
+      "associatedDomains": [
+        "applinks:web-production-2fa073.up.railway.app"
+      ],
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.athletetracker.mobile",

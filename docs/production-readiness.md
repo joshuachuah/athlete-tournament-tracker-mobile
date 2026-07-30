@@ -81,7 +81,9 @@ explicit implementation plan before collecting data.
 
 The native Supabase client uses PKCE and accepts only a one-time authorization code
 from the browser callback. Reusable access and refresh tokens in URL fragments are
-rejected. The existing `athletetracker://auth/callback` target remains in place until
+rejected. The `athletetracker://auth/callback` target remains as the fallback for
+supported iOS releases older than 17.4, while newer iOS uses the associated-domain
+HTTPS callback.
 the external redirect allow-list and signed migration builds can be verified; no
 callback target has been removed from Supabase as part of this local change.
 
