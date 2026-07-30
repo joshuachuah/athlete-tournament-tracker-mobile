@@ -7,7 +7,8 @@ Athlete Tracker Mobile is an Expo/React Native client for athletes to manage pro
 - Node.js 22 with Corepack enabled.
 - pnpm 10.33.0, as pinned in [`package.json`](./package.json).
 - Access to the sibling Flask API and its health endpoint.
-- Access to the shared Supabase project for the public project URL, public anonymous key, and redirect allow-list.
+- Access to the shared Supabase project for the project URL, publishable key,
+  and redirect allow-list.
 - Xcode and an iOS Simulator for iOS development, or Android Studio, the Android SDK, and an emulator for Android development. A browser is sufficient for the web target.
 
 From the repository root, enable Corepack and install the locked dependency graph:
@@ -82,7 +83,7 @@ the Athlete Tracker profile.
 ### Account deletion and legal URLs
 
 Account deletion calls the sibling API's authenticated `DELETE /api/profile`
-endpoint. The API deployment must have `SUPABASE_SERVICE_ROLE_KEY` plus its
+endpoint. The API deployment must have `SUPABASE_SECRET_KEY` plus its
 server-only Apple credentials configured before the full Apple flow can
 succeed. Never place those values in an `EXPO_PUBLIC_*` variable.
 Newly authenticated users can sign out or delete directly from onboarding;

@@ -84,13 +84,13 @@ from the browser callback. Reusable access and refresh tokens in URL fragments a
 rejected. The `athletetracker://auth/callback` target remains as the fallback for
 supported iOS releases older than 17.4, while newer iOS uses the associated-domain
 HTTPS callback.
-the external redirect allow-list and signed migration builds can be verified; no
-callback target has been removed from Supabase as part of this local change.
+Both callback URLs must remain in the external redirect allow-list until signed
+migration builds have verified the HTTPS path and the older-iOS fallback.
 
 | Environment | Callback target | Supabase redirect allow-list | Signed iOS login, cancellation, cold start, and relaunch | Signed Android login, cancellation, cold start, and relaunch | Local review date |
 | --- | --- | --- | --- | --- | --- |
-| Preview | `athletetracker://auth/callback` | **NOT VERIFIED** - executor has no live project inspection in this task | **NOT VERIFIED** - no signed build ID available | **NOT VERIFIED** - no signed build ID available | 2026-07-17 |
-| Production | `athletetracker://auth/callback` | **NOT VERIFIED** - executor has no live project inspection in this task | **NOT VERIFIED** - no signed build ID available | **NOT VERIFIED** - no signed build ID available | 2026-07-17 |
+| Preview | `https://web-production-2fa073.up.railway.app/auth/callback` on iOS 17.4+; `athletetracker://auth/callback` on older supported iOS | **CONFIGURATION REQUIRED** - add both exact URLs before signed testing | **NOT VERIFIED** - no signed build ID available | **NOT VERIFIED** - no signed build ID available | 2026-07-30 |
+| Production | `https://web-production-2fa073.up.railway.app/auth/callback` on iOS 17.4+; `athletetracker://auth/callback` on older supported iOS | **CONFIGURATION REQUIRED** - add both exact URLs before signed testing | **NOT VERIFIED** - no signed build ID available | **NOT VERIFIED** - no signed build ID available | 2026-07-30 |
 
 The private-use scheme can still be claimed by another installed app. PKCE prevents
 an intercepted authorization code from being exchanged without the verifier stored
@@ -118,7 +118,7 @@ Supabase exchanges Apple's identity token and the app preserves the first
 authorization's name metadata when available. These local checks do not prove the
 external provider configuration or entitlement:
 
-- deploy the backend with `SUPABASE_SERVICE_ROLE_KEY`,
+- deploy the backend with `SUPABASE_SECRET_KEY`,
   `PRIVACY_CONTACT_EMAIL`, and all five `APPLE_*` server credentials;
 - enable Apple for `com.athletetracker.mobile` in Apple Developer and Supabase;
 - deploy and review the public `/privacy` and `/account-deletion` pages;
