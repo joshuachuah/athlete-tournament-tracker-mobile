@@ -34,6 +34,10 @@ jobs:
 
       - run: pnpm exec expo install --check
 
+      - run: pnpm check:dependency-advisories
+
+      - run: pnpm audit --prod --audit-level high
+
       - run: pnpm typecheck
 
       - run: pnpm test
