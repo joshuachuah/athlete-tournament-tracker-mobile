@@ -1,4 +1,14 @@
 # Supply-chain hardening for pnpm. See https://pnpm.io/settings
 minimumReleaseAge: 10080 # wait 7 days before installing a newly published version
+# Temporary, exact-version exceptions for reviewed security fixes. Remove after 2026-08-06 10:17 UTC.
+minimumReleaseAgeExclude:
+  - brace-expansion@1.1.18 || 2.1.4 || 5.0.9
 blockExoticSubdeps: true # reject transitive git:/file:/tarball deps that skip the registry
 trustPolicy: no-downgrade # reject packages whose provenance/signatures weaken between updates
+
+# Remove this acknowledgement when GitHub's advisory range recognizes the
+# maintainer's 1.x and 2.x backports. The CI lockfile assertion permits only
+# the reviewed fixed versions while the registry range remains stale.
+auditConfig:
+  ignoreCves:
+    - CVE-2026-14257
