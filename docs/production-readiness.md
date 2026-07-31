@@ -2,21 +2,22 @@
 
 ## Dependency risk register
 
-Reviewed on 2026-07-25 against Expo `54.0.36`, Expo CLI `54.0.26`,
+Reviewed on 2026-07-31 against Expo `54.0.36`, Expo CLI `54.0.26`,
 React `19.1.0`, React Native `0.81.5`, and pnpm `10.33.0`. The live
-`pnpm audit --prod` baseline was 17 findings: 1 critical, 11 high, and 5
-moderate. The scoped, same-major overrides below reduce that to 8 findings:
-0 critical, 5 high, and 3 moderate.
+`pnpm audit --prod --audit-level high` gate exits successfully. The registry
+still counts two high instances of CVE-2026-14257 because its affected range
+does not recognize the maintainer's patched 1.x and 2.x backports; the temporary
+acknowledgement is constrained by a CI lockfile assertion. One unrelated
+moderate advisory remains outside this high-severity pass.
 
 | Advisory / package | Owning chain | Reachability | Action / owner / trigger | Next review date |
 | --- | --- | --- | --- | --- |
-| GHSA-23hp-3jrh-7fpw and earlier `tar` advisories | `expo > @expo/cli > tar` | Expo CLI archive handling at build time | **Resolved through the critical/high floor.** Mobile dependency owner pins the CLI path from `7.5.16` to same-major `7.5.20`; this removes the critical and prior high findings. | 2026-07-28 |
-| GHSA-r292-9mhp-454m / `tar` | `expo > @expo/cli > tar` | Expo CLI archive handling at build time | **Time-gated moderate.** `7.5.21` is compatible with the CLI's `^7.5.2` range, but was published 2026-07-21 22:11 UTC and is blocked by the seven-day release-age policy until 2026-07-28 22:11 UTC. Mobile dependency owner retries after that time. | 2026-07-29 |
-| Earlier exponential-expansion advisories / `brace-expansion` | `expo > @expo/cli > minimatch`, plus the CLI's `glob` and React Native dev-middleware paths | CLI glob matching at build/development time | **Resolved where compatible.** Mobile dependency owner pins the three existing major lines to `1.1.16`, `2.1.2`, and `5.0.7`, all within their owning `minimatch` ranges. | 2026-07-30 |
-| GHSA-mh99-v99m-4gvg / `brace-expansion` | The same three CLI paths through `minimatch@3.1.5`, `9.0.9`, and `10.2.5` | CLI glob matching at build/development time | **Accepted high pending upstream.** The only patched release is `5.0.8`. It is time-gated until 2026-07-30 11:39 UTC for the `minimatch@10` path and is outside the declared major ranges of `minimatch@3` and `9`. Mobile dependency owner updates the 5.x path after the gate and removes the remaining acceptance when Expo/React Native tooling moves the older paths to a compatible major. No cross-major override. | 2026-07-30 |
+| GHSA-23hp-3jrh-7fpw, GHSA-r292-9mhp-454m, and earlier `tar` advisories | `expo > @expo/cli > tar` | Expo CLI archive handling at build time | **Resolved.** Mobile dependency owner pins the CLI path to same-major `7.5.21`, within the CLI's declared `^7.5.2` range. | 2026-08-31 |
+| Earlier exponential-expansion advisories / `brace-expansion` | `expo > @expo/cli > minimatch`, plus CLI `glob`, EAS, and React Native dev-middleware paths | CLI glob matching at build/development time | **Resolved.** All four observed `minimatch` paths are pinned within their declared brace-expansion major lines to `1.1.18`, `2.1.4`, or `5.0.9`. CI rejects any other lockfile version. | 2026-08-31 |
+| GHSA-mh99-v99m-4gvg / `brace-expansion` | The same four CLI/EAS paths through `minimatch@3.1.5`, `5.1.2`, `9.0.9`, and `10.2.5` | CLI glob matching at build/development time | **Patched; registry metadata pending.** The maintainer's follow-up releases fully bound intermediate sequence/comma arrays. Exact release-age exceptions expire after 2026-08-06 10:17 UTC. Remove the CVE acknowledgement as soon as GitHub recognizes the 1.x/2.x backports; until then, the CI lockfile assertion prevents it from masking an older version. | 2026-08-07 |
 | GHSA-52cp-r559-cp3m / `js-yaml` | `expo > @expo/cli > @expo/xcpretty > js-yaml` | Xcode output formatting at build time | **Resolved.** Mobile dependency owner pins the permitted `^4.1.0` path from `4.2.0` to `4.3.0`. The existing Istanbul-only 3.x override remains independently scoped at `3.15.0`. | 2026-08-25 |
 | GHSA-395f-4hp3-45gv / `shell-quote` | `react-native > react-devtools-core > shell-quote` | React Native development tooling | **Resolved.** Mobile dependency owner pins the permitted `^1.6.1` path from `1.8.4` to `1.9.0`. | 2026-08-25 |
-| GHSA-qx2v-qp2m-jg93, GHSA-6g55-p6wh-862q, and GHSA-r28c-9q8g-f849 / `postcss` | `expo > @expo/metro-config > postcss` | Metro build configuration; the app does not process untrusted CSS at runtime | **Accepted: 2 high and 1 moderate.** Expo SDK 54 Metro declares `~8.4.32`, while the complete patched floor is `8.5.18`. Mobile dependency owner must not force an out-of-range override; remove the acceptance when Expo publishes a compatible Metro range or during the next SDK upgrade. | 2026-08-08 |
+| GHSA-qx2v-qp2m-jg93, GHSA-6g55-p6wh-862q, and GHSA-r28c-9q8g-f849 / `postcss` | `expo > @expo/metro-config > postcss` | Metro build configuration; the app does not process untrusted CSS at runtime | **Resolved with reviewed out-of-range override.** Expo SDK 54 Metro declares `~8.4.32`; the complete patched floor is `8.5.18`. The override passed Expo compatibility, Jest, and a complete iOS Metro export. Re-check this deliberate compatibility exception at every Expo/Metro upgrade. | 2026-08-31 |
 | GHSA-w5hq-g745-h8pq / `uuid` | `expo > @expo/config-plugins > xcode > uuid` | Native project generation only | **Accepted moderate.** `xcode@3.0.1` declares `uuid@^7.0.3`, while the patch is `11.1.1`. Mobile dependency owner removes the acceptance when Expo/Xcode tooling updates its declared major. | 2026-08-08 |
 | Prior `undici` advisories | `expo > @expo/cli > undici` | Expo CLI networking at build time | **Resolved.** The existing same-major override remains locked at `6.27.0`, within Expo CLI's declared range. | 2026-08-25 |
 
