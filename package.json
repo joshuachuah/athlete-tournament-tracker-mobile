@@ -5,8 +5,9 @@
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
-    "ios": "expo start --ios",
-    "android": "expo start --android",
+    "ios": "expo run:ios",
+    "ios:simulator": "node scripts/run-ios-simulator.mjs",
+    "android": "expo run:android",
     "web": "expo start --web",
     "check:dependency-advisories": "node scripts/check-dependency-advisories.mjs",
     "typecheck": "tsc --noEmit",

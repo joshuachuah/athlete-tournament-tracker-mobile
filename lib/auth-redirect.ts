@@ -22,8 +22,9 @@ export function supportsHttpsAuthCallback(
 export function oauthRedirectUri(
   os: string = Platform.OS,
   version: string | number = Platform.Version,
+  isDevelopment: boolean = __DEV__,
 ): string {
-  return supportsHttpsAuthCallback(os, version)
+  return !isDevelopment && supportsHttpsAuthCallback(os, version)
     ? HTTPS_AUTH_CALLBACK
     : LEGACY_AUTH_CALLBACK;
 }

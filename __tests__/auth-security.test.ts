@@ -20,11 +20,15 @@ describe("OAuth callback selection", () => {
     ["ios", "17.4", true],
     ["ios", "18.0", true],
     ["android", "18", false],
-  ])("selects the supported callback for %s %s", (os, version, supported) => {
+  ])("selects the production callback for %s %s", (os, version, supported) => {
     expect(supportsHttpsAuthCallback(os, version)).toBe(supported);
-    expect(oauthRedirectUri(os, version)).toBe(
+    expect(oauthRedirectUri(os, version, false)).toBe(
       supported ? HTTPS_AUTH_CALLBACK : LEGACY_AUTH_CALLBACK,
     );
+  });
+
+  it("uses the custom app scheme in development builds", () => {
+    expect(oauthRedirectUri("ios", "26.0", true)).toBe(LEGACY_AUTH_CALLBACK);
   });
 });
 
