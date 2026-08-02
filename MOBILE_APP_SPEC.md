@@ -126,8 +126,8 @@ environment values in documentation or local profile storage.
 ```text
 app/
   _layout.tsx                       providers and root Stack
-  index.tsx                         auth/profile bootstrap redirect
-  login.tsx                         Google sign-in
+  index.tsx                         introduction and auth/profile bootstrap
+  login.tsx                         combined Apple/Google login and sign-up
   onboarding.tsx                    first profile setup
   (tabs)/
     _layout.tsx                     Dashboard, Add, Profile native tabs
@@ -152,8 +152,9 @@ history. `LegacyTournamentRedirect` sends each one to the canonical details
 route and preserves an edit ID when present.
 
 Protected routes mount their query-owning content only after auth bootstrap is
-ready. Loading preserves the current deep link; signed-out users route to login,
-and signed-in users without a profile route to onboarding.
+ready. The root route introduces the product to signed-out users, while direct
+protected links route them to login. Signed-in users without a profile route to
+onboarding.
 
 ## 6. Data and Cache Behavior
 
