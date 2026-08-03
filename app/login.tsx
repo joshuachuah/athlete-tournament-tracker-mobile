@@ -9,6 +9,7 @@ import {
   Image,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -94,116 +95,123 @@ export default function LoginScreen() {
   return (
     <SafeAreaView style={styles.screen}>
       <StatusBar style="dark" />
-
-      <View style={styles.navigation}>
-        <Pressable
-          accessibilityLabel="Back to introduction"
-          accessibilityRole="button"
-          hitSlop={8}
-          onPress={returnToIntroduction}
-          style={({ pressed }) => [
-            styles.backButton,
-            pressed && styles.backButtonPressed,
-          ]}
-        >
-          <ArrowLeft color={colors.brand} size={21} strokeWidth={2.2} />
-        </Pressable>
-        <View style={styles.brand}>
-          <Image
-            accessibilityIgnoresInvertColors
-            accessible={false}
-            source={require("../assets/images/athlete-tracker-icon.png")}
-            style={styles.brandMark}
-          />
-          <Text style={styles.brandName}>Athlete Tracker</Text>
-        </View>
-        <View style={styles.navigationSpacer} />
-      </View>
-
-      <View style={styles.hero}>
-        <Text style={styles.eyebrow}>YOUR ACCOUNT</Text>
-        <Text style={styles.title} selectable>
-          Log in or sign{"\u00A0"}up.
-        </Text>
-        <Text style={styles.subtitle} selectable>
-          Choose a secure option below. If you’re new, we’ll create your account
-          along the{"\u00A0"}way.
-        </Text>
-      </View>
-
-      <View style={styles.cta}>
-        {authError ? (
-          <View accessibilityRole="alert" style={styles.error}>
-            <Text style={styles.errorText} selectable>
-              {authError}
-            </Text>
-          </View>
-        ) : null}
-
-        {appleSignInAvailable ? (
-          <View
-            pointerEvents={isLoading ? "none" : "auto"}
-            style={[
-              styles.appleButtonContainer,
-              {
-                opacity:
-                  isLoading && signingInWith !== "apple" ? 0.6 : 1,
-              },
+      <ScrollView
+        alwaysBounceVertical={false}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        testID="login-scroll-view"
+      >
+        <View style={styles.navigation}>
+          <Pressable
+            accessibilityLabel="Back to introduction"
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={returnToIntroduction}
+            style={({ pressed }) => [
+              styles.backButton,
+              pressed && styles.backButtonPressed,
             ]}
           >
-            <AppleAuthentication.AppleAuthenticationButton
-              buttonStyle={
-                AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
-              }
-              buttonType={
-                AppleAuthentication.AppleAuthenticationButtonType.CONTINUE
-              }
-              cornerRadius={radii.lg}
-              onPress={handleAppleContinue}
-              style={styles.appleButton}
+            <ArrowLeft color={colors.brand} size={21} strokeWidth={2.2} />
+          </Pressable>
+          <View style={styles.brand}>
+            <Image
+              accessibilityIgnoresInvertColors
+              accessible={false}
+              source={require("../assets/images/athlete-tracker-icon.png")}
+              style={styles.brandMark}
             />
+            <Text style={styles.brandName}>Athlete Tracker</Text>
           </View>
-        ) : null}
+          <View style={styles.navigationSpacer} />
+        </View>
 
-        <Pressable
-          accessibilityLabel="Continue with Google"
-          accessibilityRole="button"
-          accessibilityHint="Opens Google sign in in a secure browser"
-          accessibilityState={{ busy: isLoading, disabled: isLoading }}
-          disabled={isLoading}
-          onPress={handleGoogleContinue}
-          style={({ pressed }) => [
-            styles.googleButton,
-            { opacity: isLoading ? 0.6 : pressed ? 0.9 : 1 },
-          ]}
-        >
-          <View accessible={false} style={styles.googleContent}>
-            {signingInWith === "google" ? (
-              <ActivityIndicator color={colors.brand} />
-            ) : (
-              <View style={styles.googleMark}>
-                <GoogleLogo size={18} />
-              </View>
-            )}
-            <Text style={styles.googleLabel}>
-              {signingInWith === "google"
-                ? "Just a moment…"
-                : "Continue with Google"}
-            </Text>
-          </View>
-        </Pressable>
-
-        <View style={styles.trust}>
-          <ShieldCheck
-            color={colors.brand}
-            size={14}
-            strokeWidth={2.4}
-          />
-          <Text style={styles.trustText}>
-            Secure sign-in · no password to remember
+        <View style={styles.hero}>
+          <Text style={styles.eyebrow}>YOUR ACCOUNT</Text>
+          <Text style={styles.title} selectable>
+            Log in or sign{"\u00A0"}up.
+          </Text>
+          <Text style={styles.subtitle} selectable>
+            Choose a secure option below. If you’re new, we’ll create your
+            account along the{"\u00A0"}way.
           </Text>
         </View>
-      </View>
+
+        <View style={styles.cta}>
+          {authError ? (
+            <View accessibilityRole="alert" style={styles.error}>
+              <Text style={styles.errorText} selectable>
+                {authError}
+              </Text>
+            </View>
+          ) : null}
+
+          {appleSignInAvailable ? (
+            <View
+              pointerEvents={isLoading ? "none" : "auto"}
+              style={[
+                styles.appleButtonContainer,
+                {
+                  opacity:
+                    isLoading && signingInWith !== "apple" ? 0.6 : 1,
+                },
+              ]}
+            >
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonStyle={
+                  AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                }
+                buttonType={
+                  AppleAuthentication.AppleAuthenticationButtonType.CONTINUE
+                }
+                cornerRadius={radii.lg}
+                onPress={handleAppleContinue}
+                style={styles.appleButton}
+              />
+            </View>
+          ) : null}
+
+          <Pressable
+            accessibilityLabel="Continue with Google"
+            accessibilityRole="button"
+            accessibilityHint="Opens Google sign in in a secure browser"
+            accessibilityState={{ busy: isLoading, disabled: isLoading }}
+            disabled={isLoading}
+            onPress={handleGoogleContinue}
+            style={({ pressed }) => [
+              styles.googleButton,
+              { opacity: isLoading ? 0.6 : pressed ? 0.9 : 1 },
+            ]}
+          >
+            <View accessible={false} style={styles.googleContent}>
+              {signingInWith === "google" ? (
+                <ActivityIndicator color={colors.brand} />
+              ) : (
+                <View style={styles.googleMark}>
+                  <GoogleLogo size={18} />
+                </View>
+              )}
+              <Text style={styles.googleLabel}>
+                {signingInWith === "google"
+                  ? "Just a moment…"
+                  : "Continue with Google"}
+              </Text>
+            </View>
+          </Pressable>
+
+          <View style={styles.trust}>
+            <ShieldCheck
+              color={colors.brand}
+              size={14}
+              strokeWidth={2.4}
+            />
+            <Text style={styles.trustText}>
+              Secure sign-in · no password to remember
+            </Text>
+          </View>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -212,6 +220,9 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.surface,
+  },
+  content: {
+    flexGrow: 1,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.lg,
   },
@@ -255,10 +266,12 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   hero: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 0,
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.sm,
+    paddingVertical: spacing.xl,
   },
   eyebrow: {
     color: colors.profit,
