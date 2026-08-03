@@ -1,4 +1,4 @@
-import { fireEvent, render } from "@testing-library/react-native";
+import { fireEvent, render, within } from "@testing-library/react-native";
 import { router } from "expo-router";
 import IntroductionScreen from "@/app/index";
 import LoginScreen from "@/app/login";
@@ -87,11 +87,13 @@ describe("IntroductionScreen", () => {
     mockAppleAvailability.mockResolvedValue(true);
 
     const screen = render(<LoginScreen />);
+    const scrollContent = within(screen.getByTestId("login-scroll-view"));
 
-    expect(await screen.findByLabelText("Continue with Apple")).toBeTruthy();
-    expect(screen.getByLabelText("Continue with Google")).toBeTruthy();
-    expect(screen.getByText("Sign-in failed. Try again.")).toBeTruthy();
-    expect(screen.getByTestId("login-scroll-view")).toBeTruthy();
+    expect(
+      await scrollContent.findByLabelText("Continue with Apple"),
+    ).toBeTruthy();
+    expect(scrollContent.getByLabelText("Continue with Google")).toBeTruthy();
+    expect(scrollContent.getByText("Sign-in failed. Try again.")).toBeTruthy();
   });
 
   it("keeps returning athletes on the direct dashboard path", () => {
