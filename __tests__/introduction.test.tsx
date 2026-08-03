@@ -1,7 +1,7 @@
 import { fireEvent, render } from "@testing-library/react-native";
 import { router } from "expo-router";
 import IntroductionScreen from "@/app/index";
-import { returnToIntroduction } from "@/app/login";
+import LoginScreen from "@/app/login";
 
 const mockAuthState: {
   profile: object | null;
@@ -15,6 +15,10 @@ const mockAuthState: {
 
 jest.mock("@/context/auth", () => ({
   useAuth: () => mockAuthState,
+}));
+
+jest.mock("expo-apple-authentication", () => ({
+  isAvailableAsync: jest.fn(() => new Promise(() => undefined)),
 }));
 
 jest.mock("expo-router", () => {
@@ -51,7 +55,9 @@ describe("IntroductionScreen", () => {
   });
 
   it("returns directly-opened account pages to the introduction", () => {
-    returnToIntroduction();
+    const screen = render(<LoginScreen />);
+
+    fireEvent.press(screen.getByLabelText("Back to introduction"));
 
     expect(router.replace).toHaveBeenCalledWith("/");
   });

@@ -19,7 +19,7 @@ import { GoogleLogo } from "@/components/ui/google-logo";
 import { colors, radii, spacing } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
 
-export function returnToIntroduction() {
+function returnToIntroduction() {
   router.replace("/");
 }
 
