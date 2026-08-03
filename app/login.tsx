@@ -19,6 +19,10 @@ import { GoogleLogo } from "@/components/ui/google-logo";
 import { colors, radii, spacing } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
 
+export function returnToIntroduction() {
+  router.replace("/");
+}
+
 export default function LoginScreen() {
   const {
     authError,
@@ -85,10 +89,6 @@ export default function LoginScreen() {
     return signInWithApple().finally(() => setSigningInWith(null));
   }
 
-  function handleBack() {
-    router.back();
-  }
-
   const isLoading = status === "loading" || signingInWith !== null;
 
   return (
@@ -100,7 +100,7 @@ export default function LoginScreen() {
           accessibilityLabel="Back to introduction"
           accessibilityRole="button"
           hitSlop={8}
-          onPress={handleBack}
+          onPress={returnToIntroduction}
           style={({ pressed }) => [
             styles.backButton,
             pressed && styles.backButtonPressed,

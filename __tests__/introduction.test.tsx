@@ -1,6 +1,7 @@
 import { fireEvent, render } from "@testing-library/react-native";
 import { router } from "expo-router";
 import IntroductionScreen from "@/app/index";
+import { returnToIntroduction } from "@/app/login";
 
 const mockAuthState: {
   profile: object | null;
@@ -25,6 +26,7 @@ jest.mock("expo-router", () => {
       React.createElement(Text, null, href),
     router: {
       push: jest.fn(),
+      replace: jest.fn(),
     },
   };
 });
@@ -46,6 +48,12 @@ describe("IntroductionScreen", () => {
     fireEvent.press(screen.getByText("Get started"));
 
     expect(router.push).toHaveBeenCalledWith("/login");
+  });
+
+  it("returns directly-opened account pages to the introduction", () => {
+    returnToIntroduction();
+
+    expect(router.replace).toHaveBeenCalledWith("/");
   });
 
   it("keeps returning athletes on the direct dashboard path", () => {
