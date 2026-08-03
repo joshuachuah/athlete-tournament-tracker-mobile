@@ -1,11 +1,12 @@
-import { Redirect } from "expo-router";
+import { Redirect, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as AppleAuthentication from "expo-apple-authentication";
 import * as Haptics from "expo-haptics";
-import { ArrowRight, ShieldCheck, TrendingUp } from "lucide-react-native";
+import { ArrowLeft, ShieldCheck } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   Platform,
   Pressable,
   StyleSheet,
@@ -17,6 +18,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { GoogleLogo } from "@/components/ui/google-logo";
 import { colors, radii, spacing } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
+
+function returnToIntroduction() {
+  router.replace("/");
+}
 
 export default function LoginScreen() {
   const {
@@ -90,20 +95,39 @@ export default function LoginScreen() {
     <SafeAreaView style={styles.screen}>
       <StatusBar style="dark" />
 
-      <View style={styles.brand}>
-        <View style={styles.brandMark}>
-          <TrendingUp color="#FFFFFF" size={18} strokeWidth={2.6} />
+      <View style={styles.navigation}>
+        <Pressable
+          accessibilityLabel="Back to introduction"
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={returnToIntroduction}
+          style={({ pressed }) => [
+            styles.backButton,
+            pressed && styles.backButtonPressed,
+          ]}
+        >
+          <ArrowLeft color={colors.brand} size={21} strokeWidth={2.2} />
+        </Pressable>
+        <View style={styles.brand}>
+          <Image
+            accessibilityIgnoresInvertColors
+            accessible={false}
+            source={require("../assets/images/athlete-tracker-icon.png")}
+            style={styles.brandMark}
+          />
+          <Text style={styles.brandName}>Athlete Tracker</Text>
         </View>
-        <Text style={styles.brandName}>Athlete Tracker</Text>
+        <View style={styles.navigationSpacer} />
       </View>
 
       <View style={styles.hero}>
+        <Text style={styles.eyebrow}>YOUR ACCOUNT</Text>
         <Text style={styles.title} selectable>
-          Know your net, every tournament.
+          Log in or sign{"\u00A0"}up.
         </Text>
         <Text style={styles.subtitle} selectable>
-          Travel, fees and prize money — settled to a single profit or loss per
-          event.
+          Choose a secure option below. If you’re new, we’ll create your account
+          along the{"\u00A0"}way.
         </Text>
       </View>
 
@@ -119,11 +143,17 @@ export default function LoginScreen() {
         {appleSignInAvailable ? (
           <View
             pointerEvents={isLoading ? "none" : "auto"}
-            style={{ opacity: isLoading && signingInWith !== "apple" ? 0.6 : 1 }}
+            style={[
+              styles.appleButtonContainer,
+              {
+                opacity:
+                  isLoading && signingInWith !== "apple" ? 0.6 : 1,
+              },
+            ]}
           >
             <AppleAuthentication.AppleAuthenticationButton
               buttonStyle={
-                AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
               }
               buttonType={
                 AppleAuthentication.AppleAuthenticationButtonType.CONTINUE
@@ -147,36 +177,30 @@ export default function LoginScreen() {
             { opacity: isLoading ? 0.6 : pressed ? 0.9 : 1 },
           ]}
         >
-          {signingInWith === "google" ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <View accessible={false} style={styles.googleMark}>
-              <GoogleLogo size={18} />
-            </View>
-          )}
-          <Text style={styles.googleLabel}>
-            {signingInWith === "google"
-              ? "Just a moment…"
-              : "Continue with Google"}
-          </Text>
-          {signingInWith !== "google" ? (
-            <ArrowRight
-              accessible={false}
-              color="#FFFFFF"
-              size={18}
-              strokeWidth={2.6}
-            />
-          ) : null}
+          <View accessible={false} style={styles.googleContent}>
+            {signingInWith === "google" ? (
+              <ActivityIndicator color={colors.brand} />
+            ) : (
+              <View style={styles.googleMark}>
+                <GoogleLogo size={18} />
+              </View>
+            )}
+            <Text style={styles.googleLabel}>
+              {signingInWith === "google"
+                ? "Just a moment…"
+                : "Continue with Google"}
+            </Text>
+          </View>
         </Pressable>
 
         <View style={styles.trust}>
           <ShieldCheck
-            color={colors.mutedForeground}
+            color={colors.brand}
             size={14}
             strokeWidth={2.4}
           />
           <Text style={styles.trustText}>
-            One secure account · stored safely on this device
+            Secure sign-in · no password to remember
           </Text>
         </View>
       </View>
@@ -187,7 +211,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.lg,
   },
@@ -195,42 +219,72 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
-    paddingTop: spacing.sm,
   },
-  brandMark: {
-    width: 30,
-    height: 30,
+  navigation: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  backButton: {
+    width: 42,
+    height: 42,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 21,
+    backgroundColor: colors.surface,
+  },
+  backButtonPressed: {
+    opacity: 0.65,
+  },
+  navigationSpacer: {
+    width: 42,
+  },
+  brandMark: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
     borderCurve: "continuous",
-    backgroundColor: colors.foreground,
   },
   brandName: {
-    color: colors.foreground,
+    color: colors.brand,
     fontSize: 15,
     fontWeight: "700",
     letterSpacing: -0.2,
   },
   hero: {
     flex: 1,
+    alignItems: "center",
     justifyContent: "center",
-    gap: spacing.md,
+    gap: spacing.sm,
+  },
+  eyebrow: {
+    color: colors.profit,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 1.4,
+    marginBottom: spacing.xs,
+    textAlign: "center",
   },
   title: {
-    color: colors.foreground,
-    fontSize: 34,
-    fontWeight: "700",
-    letterSpacing: -0.8,
+    color: colors.brand,
+    fontSize: 38,
+    lineHeight: 42,
+    fontWeight: "800",
+    letterSpacing: -1,
+    textAlign: "center",
   },
   subtitle: {
     color: colors.mutedForeground,
     fontSize: 16,
     lineHeight: 24,
     maxWidth: 320,
+    textAlign: "center",
   },
   cta: {
-    gap: spacing.lg,
+    gap: spacing.md,
   },
   error: {
     padding: spacing.md,
@@ -247,18 +301,31 @@ const styles = StyleSheet.create({
   },
   googleButton: {
     minHeight: 56,
-    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: spacing.sm,
     paddingHorizontal: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: radii.lg,
     borderCurve: "continuous",
-    backgroundColor: colors.foreground,
+    backgroundColor: colors.surface,
+  },
+  appleButtonContainer: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.lg,
+    borderCurve: "continuous",
+    backgroundColor: colors.surface,
   },
   appleButton: {
     width: "100%",
     height: 56,
+  },
+  googleContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    transform: [{ translateX: -4 }],
   },
   googleMark: {
     width: 24,
@@ -269,8 +336,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   googleLabel: {
-    color: "#FFFFFF",
-    fontSize: 16,
+    color: colors.brand,
+    fontSize: 19,
     fontWeight: "600",
     letterSpacing: -0.2,
   },
@@ -279,6 +346,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.xs,
+    marginTop: spacing.xs,
   },
   trustText: {
     color: colors.mutedForeground,
