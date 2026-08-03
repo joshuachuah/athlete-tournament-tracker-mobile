@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import os from "node:os";
@@ -51,6 +52,11 @@ function findBootedIphoneSimulator() {
   }
 
   return simulators[0];
+}
+
+if (!existsSync(workspace)) {
+  console.log("Generating the native iOS project...");
+  run("pnpm", ["exec", "expo", "prebuild", "--platform", "ios"]);
 }
 
 const simulator = findBootedIphoneSimulator();
