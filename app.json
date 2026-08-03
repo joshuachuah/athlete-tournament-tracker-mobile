@@ -37,6 +37,15 @@
       "expo-secure-store",
       "expo-web-browser",
       [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F4F6F1",
+          "image": "./assets/images/athlete-tracker-icon-rounded.png",
+          "imageWidth": 144,
+          "resizeMode": "contain"
+        }
+      ],
+      [
         "expo-local-authentication",
         {
           "faceIDPermission": "Allow Athlete Tracker to use Face ID to protect your private financial information."
