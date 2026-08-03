@@ -1,5 +1,5 @@
-import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import os from "node:os";
@@ -8,6 +8,10 @@ const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 const workspace = path.join(projectRoot, "ios", "AthleteTracker.xcworkspace");
 const derivedData = path.join(os.tmpdir(), "athlete-tracker-ios-simulator");
 const buildOnly = process.argv.includes("--build-only");
+const appConfig = JSON.parse(
+  readFileSync(path.join(projectRoot, "app.json"), "utf8"),
+);
+const bundleIdentifier = appConfig.expo.ios.bundleIdentifier;
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -54,6 +58,52 @@ function findBootedIphoneSimulator() {
   return simulators[0];
 }
 
+function delay(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function metroIsReady() {
+  try {
+    const response = await fetch("http://127.0.0.1:8081/status", {
+      signal: AbortSignal.timeout(1_000),
+    });
+    return (
+      response.ok &&
+      (await response.text()).includes("packager-status:running")
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function startMetro() {
+  if (await metroIsReady()) {
+    return null;
+  }
+
+  const metro = spawn(
+    "pnpm",
+    ["exec", "expo", "start", "--localhost", "--port", "8081"],
+    { cwd: projectRoot, stdio: "inherit" },
+  );
+
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    if (await metroIsReady()) {
+      return metro;
+    }
+
+    if (metro.exitCode !== null) {
+      process.exit(metro.exitCode ?? 1);
+    }
+
+    await delay(500);
+  }
+
+  metro.kill();
+  console.error("Metro did not become ready on port 8081 within 60 seconds.");
+  process.exit(1);
+}
+
 if (!existsSync(workspace)) {
   console.log("Generating the native iOS project...");
   run("pnpm", ["exec", "expo", "prebuild", "--platform", "ios"]);
@@ -94,5 +144,13 @@ if (buildOnly) {
   process.exit(0);
 }
 
-console.log("Starting Metro and opening the development build...");
-run("pnpm", ["exec", "expo", "start", "--dev-client", "--ios"]);
+console.log(`Starting Metro and opening Athlete Tracker on ${simulator.name}...`);
+const metro = await startMetro();
+run("xcrun", ["simctl", "launch", simulator.udid, bundleIdentifier]);
+
+if (metro) {
+  const stopMetro = () => metro.kill("SIGINT");
+  process.once("SIGINT", stopMetro);
+  process.once("SIGTERM", stopMetro);
+  await new Promise((resolve) => metro.once("exit", resolve));
+}

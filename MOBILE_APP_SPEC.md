@@ -98,8 +98,9 @@ The implementation lives in `lib/supabase.ts` and `context/auth.tsx`.
    changes.
 3. Google sign-in requests a Supabase OAuth URL and opens it with
    `WebBrowser.openAuthSessionAsync`. The callback is
-   `https://web-production-2fa073.up.railway.app/auth/callback` on iOS 17.4+
-   and `athletetracker://auth/callback` on older supported iOS.
+   `https://web-production-2fa073.up.railway.app/auth/callback` in production
+   on iOS 17.4+ and `athletetracker://auth/callback` in development builds or
+   on older supported iOS.
 4. The Supabase client uses PKCE. The callback handler exchanges a one-time
    authorization `code` and rejects access-token or refresh-token URL fragments.
 5. Once a session has both a user ID and email, the provider loads the cached
