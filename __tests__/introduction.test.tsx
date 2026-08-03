@@ -3,11 +3,15 @@ import { router } from "expo-router";
 import IntroductionScreen from "@/app/index";
 import LoginScreen from "@/app/login";
 
+const mockAppleAvailability = jest.fn();
+
 const mockAuthState: {
+  authError: string | null;
   profile: object | null;
   session: object | null;
   status: "loading" | "ready";
 } = {
+  authError: null,
   profile: null,
   session: null,
   status: "ready",
@@ -17,9 +21,22 @@ jest.mock("@/context/auth", () => ({
   useAuth: () => mockAuthState,
 }));
 
-jest.mock("expo-apple-authentication", () => ({
-  isAvailableAsync: jest.fn(() => new Promise(() => undefined)),
-}));
+jest.mock("expo-apple-authentication", () => {
+  const React = jest.requireActual("react");
+  const { Pressable } = jest.requireActual("react-native");
+
+  return {
+    AppleAuthenticationButton: ({ onPress, style }: Record<string, unknown>) =>
+      React.createElement(Pressable, {
+        accessibilityLabel: "Continue with Apple",
+        onPress,
+        style,
+      }),
+    AppleAuthenticationButtonStyle: { WHITE: "white" },
+    AppleAuthenticationButtonType: { CONTINUE: "continue" },
+    isAvailableAsync: (...args: unknown[]) => mockAppleAvailability(...args),
+  };
+});
 
 jest.mock("expo-router", () => {
   const React = jest.requireActual("react");
@@ -39,8 +56,10 @@ describe("IntroductionScreen", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockAuthState.profile = null;
+    mockAuthState.authError = null;
     mockAuthState.session = null;
     mockAuthState.status = "ready";
+    mockAppleAvailability.mockResolvedValue(false);
   });
 
   it("introduces the product and opens the combined account page", () => {
@@ -57,9 +76,22 @@ describe("IntroductionScreen", () => {
   it("returns directly-opened account pages to the introduction", () => {
     const screen = render(<LoginScreen />);
 
+    expect(screen.getByTestId("login-scroll-view")).toBeTruthy();
     fireEvent.press(screen.getByLabelText("Back to introduction"));
 
     expect(router.replace).toHaveBeenCalledWith("/");
+  });
+
+  it("keeps both sign-in providers and errors inside scrollable content", async () => {
+    mockAuthState.authError = "Sign-in failed. Try again.";
+    mockAppleAvailability.mockResolvedValue(true);
+
+    const screen = render(<LoginScreen />);
+
+    expect(await screen.findByLabelText("Continue with Apple")).toBeTruthy();
+    expect(screen.getByLabelText("Continue with Google")).toBeTruthy();
+    expect(screen.getByText("Sign-in failed. Try again.")).toBeTruthy();
+    expect(screen.getByTestId("login-scroll-view")).toBeTruthy();
   });
 
   it("keeps returning athletes on the direct dashboard path", () => {
