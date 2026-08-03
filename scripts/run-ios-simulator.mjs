@@ -60,6 +60,13 @@ if (!existsSync(workspace)) {
 }
 
 const simulator = findBootedIphoneSimulator();
+
+if (!buildOnly) {
+  console.log(`Building and opening Athlete Tracker on ${simulator.name}...`);
+  run("pnpm", ["exec", "expo", "run:ios", "--device", simulator.udid]);
+  process.exit(0);
+}
+
 const appPath = path.join(
   derivedData,
   "Build",
@@ -86,13 +93,6 @@ run("xcodebuild", [
   "AD_HOC_CODE_SIGNING_ALLOWED=YES",
 ]);
 
-console.log(`Installing on ${simulator.name}...`);
+console.log(`Installing the build-only app on ${simulator.name}...`);
 run("xcrun", ["simctl", "install", simulator.udid, appPath]);
-
-if (buildOnly) {
-  console.log("Simulator build and installation succeeded.");
-  process.exit(0);
-}
-
-console.log("Starting Metro and opening the development build...");
-run("pnpm", ["exec", "expo", "start", "--dev-client", "--ios"]);
+console.log("Simulator build and installation succeeded.");
