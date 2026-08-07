@@ -208,12 +208,6 @@ export function SetupFlow({
   }
 
   const firstName = draft.name.trim().split(/\s+/)[0] || "Athlete";
-  const primaryLabel =
-    draft.step === 3
-      ? "Review profile"
-      : draft.step === 4
-        ? "Finish setup"
-        : "Continue";
 
   return (
     <SafeAreaView edges={["top", "bottom"]} style={styles.safeArea}>
@@ -221,43 +215,10 @@ export function SetupFlow({
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.keyboardView}
       >
-        <View style={styles.header}>
-          {draft.step > 1 ? (
-            <Pressable
-              accessibilityLabel="Previous setup screen"
-              accessibilityRole="button"
-              hitSlop={8}
-              onPress={() => moveToStep(draft.step - 1)}
-              style={({ pressed }) => [
-                styles.headerButton,
-                pressed && styles.pressed,
-              ]}
-            >
-              <ChevronLeft
-                color={colors.foreground}
-                size={24}
-                strokeWidth={2.2}
-              />
-            </Pressable>
-          ) : (
-            <View style={styles.headerButton} />
-          )}
-          <View style={styles.headerCopy}>
-            <Text style={styles.headerTitle}>Guided setup</Text>
-            <Text style={styles.stepText}>{draft.step} of 4</Text>
-          </View>
-          <View style={styles.headerButton} />
-        </View>
-        <View
-          accessibilityLabel={`Setup progress: step ${draft.step} of 4`}
-          accessibilityRole="progressbar"
-          accessibilityValue={{ min: 1, max: 4, now: draft.step }}
-          style={styles.progressTrack}
-        >
-          <View
-            style={[styles.progressFill, { width: `${draft.step * 25}%` }]}
-          />
-        </View>
+        <SetupHeader
+          onPrevious={() => moveToStep(draft.step - 1)}
+          step={draft.step}
+        />
 
         <ScrollView
           automaticallyAdjustKeyboardInsets
@@ -308,59 +269,14 @@ export function SetupFlow({
           ) : null}
         </ScrollView>
 
-        <View style={styles.footer}>
-          <Pressable
-            accessibilityRole="button"
-            disabled={saving || signingOut}
-            onPress={continueSetup}
-            style={({ pressed }) => [
-              styles.primaryButton,
-              (saving || signingOut) && styles.disabled,
-              pressed && !saving && !signingOut && styles.primaryPressed,
-            ]}
-          >
-            {saving ? (
-              <ActivityIndicator color={colors.brandForeground} />
-            ) : null}
-            <Text style={styles.primaryButtonText}>
-              {saving ? "Saving profile…" : primaryLabel}
-            </Text>
-          </Pressable>
-
-          {draft.step === 1 ? (
-            <View style={styles.accountActions}>
-              <Pressable
-                accessibilityRole="button"
-                disabled={signingOut}
-                onPress={signOut}
-                style={({ pressed }) => [
-                  styles.accountAction,
-                  pressed && styles.pressed,
-                ]}
-              >
-                {signingOut ? (
-                  <ActivityIndicator color={colors.brand} size="small" />
-                ) : (
-                  <LogOut color={colors.brand} size={15} strokeWidth={2.2} />
-                )}
-                <Text style={styles.accountActionText}>
-                  {signingOut ? "Signing out…" : "Not your account? Sign out"}
-                </Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                onPress={onDeleteAccount}
-                style={({ pressed }) => [
-                  styles.accountAction,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <Trash2 color={colors.loss} size={15} strokeWidth={2.1} />
-                <Text style={styles.deleteActionText}>Delete this account</Text>
-              </Pressable>
-            </View>
-          ) : null}
-        </View>
+        <SetupFooter
+          onContinue={continueSetup}
+          onDeleteAccount={onDeleteAccount}
+          onSignOut={signOut}
+          saving={saving}
+          signingOut={signingOut}
+          step={draft.step}
+        />
       </KeyboardAvoidingView>
 
       {sheet === "country" ? (
@@ -382,6 +298,129 @@ export function SetupFlow({
         />
       ) : null}
     </SafeAreaView>
+  );
+}
+
+function SetupHeader({
+  step,
+  onPrevious,
+}: {
+  step: number;
+  onPrevious: () => void;
+}) {
+  return (
+    <>
+      <View style={styles.header}>
+        {step > 1 ? (
+          <Pressable
+            accessibilityLabel="Previous setup screen"
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={onPrevious}
+            style={({ pressed }) => [
+              styles.headerButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <ChevronLeft
+              color={colors.foreground}
+              size={24}
+              strokeWidth={2.2}
+            />
+          </Pressable>
+        ) : (
+          <View style={styles.headerButton} />
+        )}
+        <View style={styles.headerCopy}>
+          <Text style={styles.headerTitle}>Guided setup</Text>
+          <Text style={styles.stepText}>{step} of 4</Text>
+        </View>
+        <View style={styles.headerButton} />
+      </View>
+      <View
+        accessibilityLabel={`Setup progress: step ${step} of 4`}
+        accessibilityRole="progressbar"
+        accessibilityValue={{ min: 1, max: 4, now: step }}
+        style={styles.progressTrack}
+      >
+        <View style={[styles.progressFill, { width: `${step * 25}%` }]} />
+      </View>
+    </>
+  );
+}
+
+function SetupFooter({
+  onContinue,
+  onDeleteAccount,
+  onSignOut,
+  saving,
+  signingOut,
+  step,
+}: {
+  onContinue: () => Promise<void>;
+  onDeleteAccount: () => void;
+  onSignOut: () => Promise<void>;
+  saving: boolean;
+  signingOut: boolean;
+  step: number;
+}) {
+  const primaryLabel =
+    step === 3 ? "Review profile" : step === 4 ? "Finish setup" : "Continue";
+
+  return (
+    <View style={styles.footer}>
+      <Pressable
+        accessibilityRole="button"
+        disabled={saving || signingOut}
+        onPress={onContinue}
+        style={({ pressed }) => [
+          styles.primaryButton,
+          (saving || signingOut) && styles.disabled,
+          pressed && !saving && !signingOut && styles.primaryPressed,
+        ]}
+      >
+        {saving ? (
+          <ActivityIndicator color={colors.brandForeground} />
+        ) : null}
+        <Text style={styles.primaryButtonText}>
+          {saving ? "Saving profile…" : primaryLabel}
+        </Text>
+      </Pressable>
+
+      {step === 1 ? (
+        <View style={styles.accountActions}>
+          <Pressable
+            accessibilityRole="button"
+            disabled={signingOut}
+            onPress={onSignOut}
+            style={({ pressed }) => [
+              styles.accountAction,
+              pressed && styles.pressed,
+            ]}
+          >
+            {signingOut ? (
+              <ActivityIndicator color={colors.brand} size="small" />
+            ) : (
+              <LogOut color={colors.brand} size={15} strokeWidth={2.2} />
+            )}
+            <Text style={styles.accountActionText}>
+              {signingOut ? "Signing out…" : "Not your account? Sign out"}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onDeleteAccount}
+            style={({ pressed }) => [
+              styles.accountAction,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Trash2 color={colors.loss} size={15} strokeWidth={2.1} />
+            <Text style={styles.deleteActionText}>Delete this account</Text>
+          </Pressable>
+        </View>
+      ) : null}
+    </View>
   );
 }
 
