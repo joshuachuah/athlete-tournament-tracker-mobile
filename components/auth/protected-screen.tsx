@@ -1,6 +1,7 @@
 import type { PropsWithChildren } from "react";
 import { Redirect } from "expo-router";
 
+import { ProfileLoadError } from "@/components/auth/profile-load-error";
 import { LoadingState } from "@/components/ui/loading-state";
 import { useAuth } from "@/context/auth";
 
@@ -12,7 +13,7 @@ export function ProtectedScreen({
   children,
   requireProfile = true,
 }: ProtectedScreenProps) {
-  const { profile, session, status } = useAuth();
+  const { profile, profileLoadError, session, status } = useAuth();
 
   if (status === "loading") {
     return <LoadingState label="Loading athlete tracker" />;
@@ -20,6 +21,10 @@ export function ProtectedScreen({
 
   if (!session) {
     return <Redirect href="/login" />;
+  }
+
+  if (!profile && profileLoadError !== null) {
+    return <ProfileLoadError />;
   }
 
   if (requireProfile && !profile) {

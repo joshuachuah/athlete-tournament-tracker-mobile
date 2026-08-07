@@ -51,6 +51,7 @@ describe("Account deletion", () => {
       session: {} as ReturnType<typeof useAuth>["session"],
       status: "ready",
       authError: null,
+      profileLoadError: null,
       isCurrentUser: jest.fn(() => true),
       refreshProfile: jest.fn(),
       saveProfile: jest.fn(),

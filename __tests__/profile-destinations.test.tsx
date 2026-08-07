@@ -66,6 +66,7 @@ describe("split profile destinations", () => {
       session: {} as ReturnType<typeof useAuth>["session"],
       status: "ready",
       authError: null,
+      profileLoadError: null,
       isCurrentUser: jest.fn(() => true),
       refreshProfile: jest.fn(),
       saveProfile: mockSaveProfile,

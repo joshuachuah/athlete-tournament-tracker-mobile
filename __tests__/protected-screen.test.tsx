@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react-native";
+import { fireEvent, render } from "@testing-library/react-native";
 import { Text } from "react-native";
 
 import { ProtectedScreen } from "@/components/auth/protected-screen";
@@ -6,6 +6,8 @@ import { ProtectedScreen } from "@/components/auth/protected-screen";
 const mockUseAuth = jest.fn();
 
 jest.mock("@/context/auth", () => ({
+  PROFILE_LOAD_FALLBACK_MESSAGE:
+    "We couldn't load your profile. Check your connection and try again.",
   useAuth: () => mockUseAuth(),
 }));
 
@@ -37,6 +39,7 @@ describe("ProtectedScreen", () => {
       status: "loading",
       session: null,
       profile: null,
+      profileLoadError: null,
     });
 
     const screen = render(
@@ -55,6 +58,7 @@ describe("ProtectedScreen", () => {
       status: "ready",
       session: null,
       profile: null,
+      profileLoadError: null,
     });
 
     const screen = render(
@@ -72,6 +76,7 @@ describe("ProtectedScreen", () => {
       status: "ready",
       session: {},
       profile: null,
+      profileLoadError: null,
     });
 
     const screen = render(
@@ -91,6 +96,7 @@ describe("ProtectedScreen", () => {
       status: "ready",
       session: {},
       profile: null,
+      profileLoadError: null,
     });
 
     const screen = render(
@@ -103,11 +109,41 @@ describe("ProtectedScreen", () => {
     expect(screen.queryByTestId("redirect-href")).toBeNull();
   });
 
+  it("blocks optional-profile content after a load failure and offers recovery", () => {
+    const refreshProfile = jest.fn().mockResolvedValue(undefined);
+    const signOut = jest.fn().mockResolvedValue(undefined);
+    mockUseAuth.mockReturnValue({
+      status: "ready",
+      session: {},
+      profile: null,
+      profileLoadError: "Profile service unavailable.",
+      refreshProfile,
+      signOut,
+    });
+
+    const screen = render(
+      <ProtectedScreen requireProfile={false}>
+        <ProtectedContent />
+      </ProtectedScreen>,
+    );
+
+    expect(screen.getByText("Profile service unavailable.")).toBeTruthy();
+    expect(screen.queryByTestId("redirect-href")).toBeNull();
+    expect(protectedQueryRender).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByText("Try again"));
+    fireEvent.press(screen.getByText("Sign out"));
+
+    expect(refreshProfile).toHaveBeenCalledTimes(1);
+    expect(signOut).toHaveBeenCalledTimes(1);
+  });
+
   it("mounts protected content for a signed-in user with a profile", () => {
     mockUseAuth.mockReturnValue({
       status: "ready",
       session: {},
       profile: {},
+      profileLoadError: null,
     });
 
     const screen = render(
@@ -130,6 +166,7 @@ describe("ProtectedScreen", () => {
         status: "loading",
         session: null,
         profile: null,
+        profileLoadError: null,
       });
 
       const screen = render(
@@ -145,6 +182,7 @@ describe("ProtectedScreen", () => {
         status: "ready",
         session: {},
         profile: {},
+        profileLoadError: null,
       });
       screen.rerender(
         <ProtectedScreen>

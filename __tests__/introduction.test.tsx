@@ -8,16 +8,24 @@ const mockAppleAvailability = jest.fn();
 const mockAuthState: {
   authError: string | null;
   profile: object | null;
+  profileLoadError: string | null;
+  refreshProfile: jest.Mock<Promise<void>, []>;
   session: object | null;
+  signOut: jest.Mock<Promise<void>, []>;
   status: "loading" | "ready";
 } = {
   authError: null,
   profile: null,
+  profileLoadError: null,
+  refreshProfile: jest.fn().mockResolvedValue(undefined),
   session: null,
+  signOut: jest.fn().mockResolvedValue(undefined),
   status: "ready",
 };
 
 jest.mock("@/context/auth", () => ({
+  PROFILE_LOAD_FALLBACK_MESSAGE:
+    "We couldn't load your profile. Check your connection and try again.",
   useAuth: () => mockAuthState,
 }));
 
@@ -57,6 +65,7 @@ describe("IntroductionScreen", () => {
     jest.clearAllMocks();
     mockAuthState.profile = null;
     mockAuthState.authError = null;
+    mockAuthState.profileLoadError = null;
     mockAuthState.session = null;
     mockAuthState.status = "ready";
     mockAppleAvailability.mockResolvedValue(false);
@@ -111,5 +120,53 @@ describe("IntroductionScreen", () => {
     const screen = render(<IntroductionScreen />);
 
     expect(screen.getByText("/onboarding")).toBeTruthy();
+  });
+
+  it("blocks onboarding and retries when the profile load failed", () => {
+    mockAuthState.session = { user: { id: "athlete" } };
+    mockAuthState.profileLoadError = "Profile service unavailable.";
+
+    const screen = render(<IntroductionScreen />);
+
+    expect(screen.getByText("Profile service unavailable.")).toBeTruthy();
+    expect(screen.queryByText("/onboarding")).toBeNull();
+
+    fireEvent.press(screen.getByText("Try again"));
+
+    expect(mockAuthState.refreshProfile).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats an empty recorded failure as blocking", () => {
+    mockAuthState.session = { user: { id: "athlete" } };
+    mockAuthState.profileLoadError = "";
+
+    const screen = render(<IntroductionScreen />);
+
+    expect(
+      screen.getByText(
+        "We couldn't load your profile. Check your connection and try again.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText("/onboarding")).toBeNull();
+  });
+
+  it("keeps the authenticated login route off onboarding while loading", () => {
+    mockAuthState.session = { user: { id: "athlete" } };
+    mockAuthState.status = "loading";
+
+    const screen = render(<LoginScreen />);
+
+    expect(screen.getByText("Loading Athlete Tracker")).toBeTruthy();
+    expect(screen.queryByText("/onboarding")).toBeNull();
+  });
+
+  it("shows profile recovery on the login route instead of onboarding", () => {
+    mockAuthState.session = { user: { id: "athlete" } };
+    mockAuthState.profileLoadError = "Profile service unavailable.";
+
+    const screen = render(<LoginScreen />);
+
+    expect(screen.getByText("Profile service unavailable.")).toBeTruthy();
+    expect(screen.queryByText("/onboarding")).toBeNull();
   });
 });

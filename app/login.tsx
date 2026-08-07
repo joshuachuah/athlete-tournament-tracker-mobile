@@ -16,7 +16,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { ProfileLoadError } from "@/components/auth/profile-load-error";
 import { GoogleLogo } from "@/components/ui/google-logo";
+import { LoadingState } from "@/components/ui/loading-state";
 import { colors, radii, spacing } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
 
@@ -28,6 +30,7 @@ export default function LoginScreen() {
   const {
     authError,
     profile,
+    profileLoadError,
     session,
     signInWithApple,
     signInWithGoogle,
@@ -61,8 +64,24 @@ export default function LoginScreen() {
     };
   }, []);
 
+  if (session && status === "loading") {
+    return (
+      <SafeAreaView style={styles.loadingScreen}>
+        <LoadingState label="Loading Athlete Tracker" />
+      </SafeAreaView>
+    );
+  }
+
   if (status === "ready" && session && profile) {
     return <Redirect href="/(tabs)/dashboard" />;
+  }
+
+  if (
+    status === "ready" &&
+    session &&
+    profileLoadError !== null
+  ) {
+    return <ProfileLoadError />;
   }
 
   if (status === "ready" && session && !profile) {
@@ -217,6 +236,11 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
+  loadingScreen: {
+    flex: 1,
+    justifyContent: "center",
+    backgroundColor: colors.background,
+  },
   screen: {
     flex: 1,
     backgroundColor: colors.surface,

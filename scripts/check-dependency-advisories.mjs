@@ -4,11 +4,15 @@ const lockfile = readFileSync(new URL("../pnpm-lock.yaml", import.meta.url), "ut
 
 const expectedVersions = new Map([
   ["brace-expansion", new Set(["1.1.18", "2.1.4", "5.0.9"])],
+  ["js-yaml", new Set(["3.15.1", "4.3.1"])],
 ]);
 
 for (const [packageName, expected] of expectedVersions) {
   const escapedName = packageName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const entryPattern = new RegExp(`^  ${escapedName}@([^:]+):`, "gm");
+  const entryPattern = new RegExp(
+    `^  ${escapedName}@([^:]+):\n    resolution:`,
+    "gm",
+  );
   const actual = new Set(
     [...lockfile.matchAll(entryPattern)].map((match) => match[1]),
   );
