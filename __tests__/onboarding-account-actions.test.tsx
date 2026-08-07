@@ -11,6 +11,7 @@ import OnboardingScreen from "@/app/onboarding";
 import { getOnboardingDraft } from "@/lib/onboarding";
 
 const mockDeleteAccount = jest.fn();
+let mockProfile: { id: string } | null = null;
 const mockSaveProfile = jest.fn();
 const mockSignOut = jest.fn();
 const mockSession = {
@@ -41,6 +42,7 @@ jest.mock("expo-sqlite/localStorage/install", () => {
 jest.mock("@/context/auth", () => ({
   useAuth: () => ({
     deleteAccount: mockDeleteAccount,
+    profile: mockProfile,
     saveProfile: mockSaveProfile,
     session: mockSession,
     signOut: mockSignOut,
@@ -56,6 +58,12 @@ jest.mock("expo-haptics", () => ({
 }));
 
 jest.mock("expo-router", () => ({
+  Redirect: ({ href }: { href: string }) => {
+    const React = jest.requireActual("react");
+    const { Text } = jest.requireActual("react-native");
+
+    return React.createElement(Text, null, `Redirect to ${href}`);
+  },
   router: {
     replace: jest.fn(),
   },
@@ -65,9 +73,20 @@ describe("profileless onboarding", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     localStorage.clear();
+    mockProfile = null;
     mockDeleteAccount.mockResolvedValue(undefined);
     mockSaveProfile.mockResolvedValue(undefined);
     mockSignOut.mockResolvedValue(undefined);
+  });
+
+  it("redirects an existing profile instead of allowing setup to overwrite it", () => {
+    mockProfile = { id: "existing-profile" };
+
+    const screen = render(<OnboardingScreen />);
+
+    expect(screen.getByText("Redirect to /(tabs)/dashboard")).toBeTruthy();
+    expect(screen.queryByText("Let’s start with you")).toBeNull();
+    expect(mockSaveProfile).not.toHaveBeenCalled();
   });
 
   it("completes the approved setup flow and saves only from review", async () => {

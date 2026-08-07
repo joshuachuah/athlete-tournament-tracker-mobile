@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { Redirect, router } from "expo-router";
 import { useState } from "react";
 
 import { AccountDeletionDialog } from "@/components/account/account-deletion-dialog";
@@ -19,7 +19,7 @@ export default function OnboardingScreen() {
 }
 
 function OnboardingContent() {
-  const { deleteAccount, saveProfile, session, signOut } = useAuth();
+  const { deleteAccount, profile, saveProfile, session, signOut } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [deletionOpen, setDeletionOpen] = useState(false);
@@ -28,6 +28,10 @@ function OnboardingContent() {
 
   if (!userId || !email) {
     return null;
+  }
+
+  if (profile) {
+    return <Redirect href="/(tabs)/dashboard" />;
   }
 
   const authenticatedUserId = userId;
