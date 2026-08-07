@@ -16,6 +16,7 @@ import type { Session } from "@supabase/supabase-js";
 import { api } from "@/lib/api";
 import { createAppleAuthRequest } from "@/lib/apple-auth";
 import { oauthRedirectUri } from "@/lib/auth-redirect";
+import { clearOnboardingDraft } from "@/lib/onboarding";
 import { queryClient } from "@/lib/query-client";
 import { hasSupabaseConfig, supabase } from "@/lib/supabase";
 import {
@@ -579,6 +580,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     profileStorage.clear();
     if (userId) {
       draftStorage.clear(tournamentDraftStorageKey(userId));
+      clearOnboardingDraft(userId);
     }
     clearLegacyTournamentDraft();
     queryClient.clear();
@@ -607,6 +609,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     if (!identityIsCurrent) {
       draftStorage.clear(tournamentDraftStorageKey(userId));
+      clearOnboardingDraft(userId);
       return;
     }
 

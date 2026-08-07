@@ -9,6 +9,7 @@ import type { Session } from "@supabase/supabase-js";
 import { AuthProvider, useAuth } from "@/context/auth";
 import { api } from "@/lib/api";
 import { createAppleAuthRequest } from "@/lib/apple-auth";
+import { getOnboardingDraft, saveOnboardingDraft } from "@/lib/onboarding";
 import { queryClient } from "@/lib/query-client";
 import {
   draftStorage,
@@ -1218,6 +1219,16 @@ describe("AuthProvider profile isolation", () => {
         : new Promise(() => undefined),
     );
     mockSignOut.mockReturnValue(remoteSignOut.promise);
+    saveOnboardingDraft(secondUserId, {
+      step: 2,
+      name: "Second Athlete",
+      country: "Malaysia",
+      currency: "MYR",
+      sport: "Squash",
+      customCountry: false,
+      customCurrency: false,
+      customSport: false,
+    });
 
     const { authRef, screen } = renderAuthProvider();
 
@@ -1243,6 +1254,7 @@ describe("AuthProvider profile isolation", () => {
     expect(screen.getByTestId("profile-email").props.children).toBe("none");
     expect(screen.getByTestId("status").props.children).toBe("ready");
     expect(profileStorage.get()).toBeNull();
+    expect(getOnboardingDraft(secondUserId)).toBeNull();
 
     await act(async () => {
       secondLoad.resolve(secondProfile);
@@ -1262,6 +1274,16 @@ describe("AuthProvider profile isolation", () => {
     const draftKey = tournamentDraftStorageKey(firstUserId);
     profileStorage.set(firstUserId, firstProfile);
     draftStorage.set(draftKey, { private: "draft" });
+    saveOnboardingDraft(firstUserId, {
+      step: 2,
+      name: "First Athlete",
+      country: "Malaysia",
+      currency: "MYR",
+      sport: "Squash",
+      customCountry: false,
+      customCurrency: false,
+      customSport: false,
+    });
     mockGetSession.mockResolvedValue({
       data: { session: session(firstProfile.email, firstUserId) },
       error: null,
@@ -1292,6 +1314,7 @@ describe("AuthProvider profile isolation", () => {
     );
     expect(profileStorage.getForUser(firstUserId)).toEqual(firstProfile);
     expect(draftStorage.get(draftKey)).toEqual({ private: "draft" });
+    expect(getOnboardingDraft(firstUserId)).not.toBeNull();
     expect(queryClient.getQueryData(["tournament", "private"])).toEqual({
       id: "private",
     });
@@ -1303,6 +1326,16 @@ describe("AuthProvider profile isolation", () => {
     const draftKey = tournamentDraftStorageKey(firstUserId);
     profileStorage.set(firstUserId, firstProfile);
     draftStorage.set(draftKey, { private: "draft" });
+    saveOnboardingDraft(firstUserId, {
+      step: 2,
+      name: "First Athlete",
+      country: "Malaysia",
+      currency: "MYR",
+      sport: "Squash",
+      customCountry: false,
+      customCurrency: false,
+      customSport: false,
+    });
     mockGetSession.mockResolvedValue({
       data: { session: session(firstProfile.email, firstUserId) },
       error: null,
@@ -1330,6 +1363,7 @@ describe("AuthProvider profile isolation", () => {
     expect(screen.getByTestId("status").props.children).toBe("ready");
     expect(profileStorage.get()).toBeNull();
     expect(draftStorage.get(draftKey)).toBeNull();
+    expect(getOnboardingDraft(firstUserId)).toBeNull();
     expect(queryClient.getQueryData(["tournament", "private"])).toBeUndefined();
     expect(mockSignOut).toHaveBeenCalledWith({ scope: "local" });
     expect(router.replace).toHaveBeenCalledWith("/login");

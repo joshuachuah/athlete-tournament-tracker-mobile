@@ -102,6 +102,10 @@ export function SetupFlow({
   }
 
   function moveToStep(step: number) {
+    if (saving) {
+      return;
+    }
+
     updateDraft({ step: Math.max(1, Math.min(4, step)) });
     selectionFeedback();
   }
@@ -149,6 +153,10 @@ export function SetupFlow({
   }
 
   async function continueSetup() {
+    if (saving) {
+      return;
+    }
+
     if (draft.step === 1) {
       if (!draft.name.trim()) {
         setValidationError("Add your name to continue.");
@@ -216,6 +224,7 @@ export function SetupFlow({
         style={styles.keyboardView}
       >
         <SetupHeader
+          disabled={saving}
           onPrevious={() => moveToStep(draft.step - 1)}
           step={draft.step}
         />
@@ -256,6 +265,7 @@ export function SetupFlow({
           ) : null}
           {draft.step === 4 ? (
             <ReviewStep
+              disabled={saving}
               draft={draft}
               firstName={firstName}
               onEdit={moveToStep}
@@ -302,9 +312,11 @@ export function SetupFlow({
 }
 
 function SetupHeader({
+  disabled,
   step,
   onPrevious,
 }: {
+  disabled: boolean;
   step: number;
   onPrevious: () => void;
 }) {
@@ -315,11 +327,14 @@ function SetupHeader({
           <Pressable
             accessibilityLabel="Previous setup screen"
             accessibilityRole="button"
+            accessibilityState={{ disabled }}
+            disabled={disabled}
             hitSlop={8}
             onPress={onPrevious}
             style={({ pressed }) => [
               styles.headerButton,
-              pressed && styles.pressed,
+              disabled && styles.disabled,
+              pressed && !disabled && styles.pressed,
             ]}
           >
             <ChevronLeft
@@ -728,10 +743,12 @@ function SportStep({
 }
 
 function ReviewStep({
+  disabled,
   draft,
   firstName,
   onEdit,
 }: {
+  disabled: boolean;
   draft: OnboardingDraft;
   firstName: string;
   onEdit: (step: number) => void;
@@ -751,22 +768,26 @@ function ReviewStep({
       </View>
       <View style={styles.summaryGrid}>
         <SummaryTile
+          disabled={disabled}
           label="Athlete"
           onEdit={() => onEdit(1)}
           value={draft.name}
           wide
         />
         <SummaryTile
+          disabled={disabled}
           label="Home"
           onEdit={() => onEdit(2)}
           value={draft.country}
         />
         <SummaryTile
+          disabled={disabled}
           label="Currency"
           onEdit={() => onEdit(2)}
           value={draft.currency.toUpperCase()}
         />
         <SummaryTile
+          disabled={disabled}
           label="Primary sport"
           onEdit={() => onEdit(3)}
           value={draft.sport}
@@ -778,11 +799,13 @@ function ReviewStep({
 }
 
 function SummaryTile({
+  disabled,
   label,
   value,
   wide = false,
   onEdit,
 }: {
+  disabled: boolean;
   label: string;
   value: string;
   wide?: boolean;
@@ -795,9 +818,15 @@ function SummaryTile({
       <Pressable
         accessibilityLabel={`Edit ${label.toLowerCase()}`}
         accessibilityRole="button"
+        accessibilityState={{ disabled }}
+        disabled={disabled}
         hitSlop={8}
         onPress={onEdit}
-        style={({ pressed }) => [styles.editButton, pressed && styles.pressed]}
+        style={({ pressed }) => [
+          styles.editButton,
+          disabled && styles.disabled,
+          pressed && !disabled && styles.pressed,
+        ]}
       >
         <Text style={styles.editButtonText}>Edit</Text>
       </Pressable>

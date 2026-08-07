@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   waitFor,
@@ -130,6 +131,42 @@ describe("profileless onboarding", () => {
       });
       expect(router.replace).toHaveBeenCalledWith("/(tabs)/dashboard");
     });
+    expect(getOnboardingDraft("new-athlete")).toBeNull();
+  });
+
+  it("locks review navigation while profile creation is pending", async () => {
+    let resolveSave!: () => void;
+    mockSaveProfile.mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveSave = resolve;
+      }),
+    );
+    const screen = render(<OnboardingScreen />);
+
+    fireEvent.press(screen.getByText("Continue"));
+    fireEvent.press(screen.getByLabelText("Home country. Choose a country"));
+    fireEvent.press(screen.getByText("Singapore"));
+    fireEvent.press(screen.getByText("Continue"));
+    fireEvent.press(screen.getByText("Tennis"));
+    fireEvent.press(screen.getByText("Review profile"));
+    fireEvent.press(screen.getByText("Finish setup"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Saving profile…")).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByLabelText("Edit athlete"));
+    fireEvent.press(screen.getByLabelText("Previous setup screen"));
+
+    expect(screen.getByText("You’re ready, Taylor")).toBeTruthy();
+    expect(screen.queryByDisplayValue("Taylor Kim")).toBeNull();
+    expect(getOnboardingDraft("new-athlete")?.step).toBe(4);
+
+    await act(async () => {
+      resolveSave();
+    });
+
+    expect(router.replace).toHaveBeenCalledWith("/(tabs)/dashboard");
     expect(getOnboardingDraft("new-athlete")).toBeNull();
   });
 
