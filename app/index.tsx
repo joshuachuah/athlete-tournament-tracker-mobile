@@ -18,6 +18,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { ProfileLoadError } from "@/components/auth/profile-load-error";
 import { LoadingState } from "@/components/ui/loading-state";
 import { colors, radii, spacing } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
@@ -29,7 +30,7 @@ const highlights = [
 ] as const;
 
 export default function IntroductionScreen() {
-  const { profile, session, status } = useAuth();
+  const { profile, profileLoadError, session, status } = useAuth();
   const { width } = useWindowDimensions();
   const heroSize = Math.min(width - spacing.xl * 4, 210);
 
@@ -43,6 +44,10 @@ export default function IntroductionScreen() {
 
   if (session && profile) {
     return <Redirect href="/(tabs)/dashboard" />;
+  }
+
+  if (session && profileLoadError !== null) {
+    return <ProfileLoadError />;
   }
 
   if (session && !profile) {

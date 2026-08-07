@@ -1,6 +1,8 @@
 import {
   createContext,
+  type Dispatch,
   type PropsWithChildren,
+  type SetStateAction,
   use,
   useEffect,
   useRef,
@@ -38,6 +40,7 @@ type AuthContextValue = {
   profile: AthleteProfile | null;
   status: "loading" | "ready";
   authError: string | null;
+  profileLoadError: string | null;
   signInWithApple: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -47,7 +50,36 @@ type AuthContextValue = {
   isCurrentUser: (userId: string) => boolean;
 };
 
+type ProfileState = {
+  profile: AthleteProfile | null;
+  profileLoadError: string | null;
+  session: Session | null;
+  status: "loading" | "ready";
+};
+
+type ProfileRequestToken = {
+  email: string;
+  identity: number;
+  loadVersion: number;
+  userId: string;
+};
+
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+export const PROFILE_LOAD_FALLBACK_MESSAGE =
+  "We couldn't load your profile. Check your connection and try again.";
+
+function profileLoadErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  if (typeof error === "string" && error.trim()) {
+    return error;
+  }
+
+  return PROFILE_LOAD_FALLBACK_MESSAGE;
+}
 
 function cacheProfile(userId: string, profile: AthleteProfile | null): void {
   if (profile) {
@@ -224,24 +256,75 @@ async function startAppleSignIn(
   }
 }
 
-export function AuthProvider({ children }: PropsWithChildren) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<AthleteProfile | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready">("loading");
-  const [authError, setAuthError] = useState<string | null>(
-    hasSupabaseConfig
-      ? null
-      : "Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY.",
-  );
+function useProfileBootstrap(
+  setProfileState: Dispatch<SetStateAction<ProfileState>>,
+  setAuthError: Dispatch<SetStateAction<string | null>>,
+) {
   const identityVersion = useRef(0);
   const profileLoadVersion = useRef(0);
   const currentUserId = useRef<string | null>(null);
   const currentEmail = useRef<string | null>(null);
   const mounted = useRef(true);
 
+  function beginProfileRequest(
+    currentSession: Session | null,
+  ): ProfileRequestToken | null {
+    const userId = currentSession?.user.id;
+    const email = currentSession?.user.email;
+
+    if (!userId || !email) {
+      return null;
+    }
+
+    return {
+      email,
+      identity: identityVersion.current,
+      loadVersion: ++profileLoadVersion.current,
+      userId,
+    };
+  }
+
+  function isCurrentProfileRequest(request: ProfileRequestToken) {
+    return (
+      mounted.current &&
+      currentUserId.current === request.userId &&
+      currentEmail.current === request.email &&
+      identityVersion.current === request.identity &&
+      profileLoadVersion.current === request.loadVersion
+    );
+  }
+
+  function isCurrentIdentity(userId: string, email: string, identity: number) {
+    return (
+      mounted.current &&
+      currentUserId.current === userId &&
+      currentEmail.current === email &&
+      identityVersion.current === identity
+    );
+  }
+
+  function isCurrentUserIdentity(userId: string, identity: number) {
+    return (
+      mounted.current &&
+      currentUserId.current === userId &&
+      identityVersion.current === identity
+    );
+  }
+
+  function clearIdentity() {
+    ++identityVersion.current;
+    ++profileLoadVersion.current;
+    currentUserId.current = null;
+    currentEmail.current = null;
+  }
+
   useEffect(() => {
     let active = true;
     mounted.current = true;
+
+    function updateProfileState(nextState: Partial<ProfileState>) {
+      setProfileState((currentState) => ({ ...currentState, ...nextState }));
+    }
 
     function beginProfileLoad(event: string | null, nextSession: Session | null) {
       const userId = nextSession?.user.id ?? null;
@@ -263,18 +346,19 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
       currentUserId.current = userId;
       currentEmail.current = email;
-      setSession(nextSession);
+      updateProfileState({ session: nextSession, profileLoadError: null });
 
       if (!userId || !email) {
-        setProfile(null);
+        updateProfileState({ profile: null, status: "ready" });
         profileStorage.clear();
-        setStatus("ready");
         return;
       }
 
       const cachedProfile = profileStorage.getForUser(userId);
-      setProfile(cachedProfile);
-      setStatus(cachedProfile ? "ready" : "loading");
+      updateProfileState({
+        profile: cachedProfile,
+        status: cachedProfile ? "ready" : "loading",
+      });
 
       api.profile
         .get(email)
@@ -290,10 +374,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
           }
 
           cacheProfile(userId, freshProfile);
-          setProfile(freshProfile);
-          setStatus("ready");
+          updateProfileState({
+            profile: freshProfile,
+            profileLoadError: null,
+            status: "ready",
+          });
         })
-        .catch((profileError: Error) => {
+        .catch((profileError: unknown) => {
           if (
             !active ||
             !mounted.current ||
@@ -303,16 +390,17 @@ export function AuthProvider({ children }: PropsWithChildren) {
           ) {
             return;
           }
-
-          setAuthError(profileError.message);
-          setStatus("ready");
+          updateProfileState({
+            profileLoadError: profileLoadErrorMessage(profileError),
+            status: "ready",
+          });
         });
     }
 
     async function bootstrap() {
       if (!supabase) {
         profileStorage.clear();
-        setStatus("ready");
+        updateProfileState({ status: "ready" });
         return;
       }
 
@@ -343,7 +431,47 @@ export function AuthProvider({ children }: PropsWithChildren) {
       ++profileLoadVersion.current;
       subscription?.data.subscription.unsubscribe();
     };
-  }, []);
+  }, [setAuthError, setProfileState]);
+
+  return {
+    beginProfileRequest,
+    clearIdentity,
+    currentUserId: () => currentUserId.current,
+    identityVersion: () => identityVersion.current,
+    invalidateProfileLoads: () => ++profileLoadVersion.current,
+    isCurrentIdentity,
+    isCurrentProfileRequest,
+    isCurrentUserIdentity,
+  };
+}
+
+export function AuthProvider({ children }: PropsWithChildren) {
+  const [{ profile, profileLoadError, session, status }, setProfileState] =
+    useState<ProfileState>({
+      profile: null,
+      profileLoadError: null,
+      session: null,
+      status: "loading",
+    });
+  const [authError, setAuthError] = useState<string | null>(
+    hasSupabaseConfig
+      ? null
+      : "Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY.",
+  );
+  const {
+    beginProfileRequest,
+    clearIdentity,
+    currentUserId,
+    identityVersion,
+    invalidateProfileLoads,
+    isCurrentIdentity,
+    isCurrentProfileRequest,
+    isCurrentUserIdentity,
+  } = useProfileBootstrap(setProfileState, setAuthError);
+
+  function updateProfileState(nextState: Partial<ProfileState>) {
+    setProfileState((currentState) => ({ ...currentState, ...nextState }));
+  }
 
   async function signInWithGoogle() {
     await startGoogleSignIn(setAuthError);
@@ -354,27 +482,41 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }
 
   async function refreshProfile() {
-    const userId = session?.user.id;
-    const email = session?.user.email;
+    const request = beginProfileRequest(session);
 
-    if (!userId || !email) {
-      setProfile(null);
+    if (!request) {
+      updateProfileState({
+        profile: null,
+        profileLoadError: null,
+        status: "ready",
+      });
       return;
     }
 
-    const identity = identityVersion.current;
-    const loadVersion = ++profileLoadVersion.current;
-    const freshProfile = await api.profile.get(email);
+    updateProfileState({
+      profileLoadError: null,
+      ...(!profile && { status: "loading" as const }),
+    });
 
-    if (
-      mounted.current &&
-      currentUserId.current === userId &&
-      currentEmail.current === email &&
-      identityVersion.current === identity &&
-      profileLoadVersion.current === loadVersion
-    ) {
-      cacheProfile(userId, freshProfile);
-      setProfile(freshProfile);
+    try {
+      const freshProfile = await api.profile.get(request.email);
+
+      if (isCurrentProfileRequest(request)) {
+        cacheProfile(request.userId, freshProfile);
+        updateProfileState({
+          profile: freshProfile,
+          profileLoadError: null,
+          status: "ready",
+        });
+      }
+    } catch (profileError) {
+      if (isCurrentProfileRequest(request)) {
+        updateProfileState({
+          profileLoadError: profileLoadErrorMessage(profileError),
+          status: "ready",
+        });
+        throw profileError;
+      }
     }
   }
 
@@ -388,7 +530,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       throw new Error("Sign in before saving a profile.");
     }
 
-    const identity = identityVersion.current;
+    const identity = identityVersion();
     const savedProfile = await api.profile.save(
       {
         ...data,
@@ -399,15 +541,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
     );
     const savedHomeCurrency = savedProfile.home_currency.toUpperCase();
 
-    if (
-      mounted.current &&
-      currentUserId.current === userId &&
-      currentEmail.current === email &&
-      identityVersion.current === identity
-    ) {
-      ++profileLoadVersion.current;
-      setProfile(savedProfile);
-      setStatus("ready");
+    if (isCurrentIdentity(userId, email, identity)) {
+      invalidateProfileLoads();
+      updateProfileState({
+        profile: savedProfile,
+        profileLoadError: null,
+        status: "ready",
+      });
       profileStorage.set(userId, savedProfile);
 
       const invalidations = [
@@ -429,13 +569,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }
 
   function clearLocalAuthState(userId: string | null) {
-    ++identityVersion.current;
-    ++profileLoadVersion.current;
-    currentUserId.current = null;
-    currentEmail.current = null;
-    setSession(null);
-    setProfile(null);
-    setStatus("ready");
+    clearIdentity();
+    updateProfileState({
+      session: null,
+      profile: null,
+      profileLoadError: null,
+      status: "ready",
+    });
     profileStorage.clear();
     if (userId) {
       draftStorage.clear(tournamentDraftStorageKey(userId));
@@ -445,7 +585,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }
 
   async function signOut() {
-    const userId = currentUserId.current;
+    const userId = currentUserId();
     clearLocalAuthState(userId);
 
     if (supabase) {
@@ -454,20 +594,18 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }
 
   async function deleteAccount() {
-    const userId = currentUserId.current;
+    const userId = currentUserId();
 
     if (!userId) {
       throw new Error("Sign in before deleting your account.");
     }
 
-    const identity = identityVersion.current;
-    await api.profile.delete({ authenticatedUserId: userId });
+    const identity = identityVersion();
+    const identityIsCurrent = await api.profile
+      .delete({ authenticatedUserId: userId })
+      .then(() => isCurrentUserIdentity(userId, identity));
 
-    if (
-      !mounted.current ||
-      currentUserId.current !== userId ||
-      identityVersion.current !== identity
-    ) {
+    if (!identityIsCurrent) {
       draftStorage.clear(tournamentDraftStorageKey(userId));
       return;
     }
@@ -487,7 +625,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }
 
   function isCurrentUser(userId: string) {
-    return currentUserId.current === userId;
+    return currentUserId() === userId;
   }
 
   return (
@@ -497,6 +635,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         profile,
         status,
         authError,
+        profileLoadError,
         signInWithApple,
         signInWithGoogle,
         refreshProfile,

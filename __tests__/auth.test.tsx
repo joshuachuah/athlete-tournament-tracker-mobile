@@ -174,6 +174,9 @@ function AuthState({ authRef }: { authRef: RefObject<AuthProbe | null> }) {
       <Text testID="profile-name">{auth.profile?.name ?? "none"}</Text>
       <Text testID="status">{auth.status}</Text>
       <Text testID="auth-error">{auth.authError ?? "none"}</Text>
+      <Text testID="profile-load-error">
+        {auth.profileLoadError ?? "none"}
+      </Text>
     </View>
   );
 }
@@ -547,15 +550,132 @@ describe("AuthProvider profile isolation", () => {
     const { screen } = renderAuthProvider();
 
     await waitFor(() => {
-      expect(screen.getByTestId("auth-error").props.children).toBe(
+      expect(screen.getByTestId("profile-load-error").props.children).toBe(
         "refresh unavailable",
       );
     });
 
+    expect(screen.getByTestId("auth-error").props.children).toBe("none");
     expect(screen.getByTestId("profile-email").props.children).toBe(
       firstProfile.email,
     );
     expect(profileStorage.get()).toEqual(firstProfile);
+  });
+
+  it("keeps a failed initial load distinct and recovers on retry", async () => {
+    const retry = deferred<AthleteProfile | null>();
+    mockGetSession.mockResolvedValue({
+      data: { session: session(firstProfile.email, firstUserId) },
+      error: null,
+    });
+    getProfile
+      .mockRejectedValueOnce(new Error("profile unavailable"))
+      .mockReturnValueOnce(retry.promise);
+
+    const { authRef, screen } = renderAuthProvider();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("profile-load-error").props.children).toBe(
+        "profile unavailable",
+      );
+    });
+
+    expect(screen.getByTestId("profile-email").props.children).toBe("none");
+    expect(screen.getByTestId("auth-error").props.children).toBe("none");
+    expect(profileStorage.get()).toBeNull();
+
+    let refreshPromise!: Promise<void>;
+    act(() => {
+      refreshPromise = authRef.current!.refreshProfile();
+    });
+
+    expect(screen.getByTestId("status").props.children).toBe("loading");
+    expect(screen.getByTestId("profile-load-error").props.children).toBe(
+      "none",
+    );
+
+    await act(async () => {
+      retry.resolve(firstProfile);
+      await refreshPromise;
+    });
+
+    expect(screen.getByTestId("status").props.children).toBe("ready");
+    expect(screen.getByTestId("profile-email").props.children).toBe(
+      firstProfile.email,
+    );
+    expect(screen.getByTestId("profile-load-error").props.children).toBe(
+      "none",
+    );
+    expect(profileStorage.get()).toEqual(firstProfile);
+  });
+
+  it.each([
+    ["an empty error", new Error("")],
+    ["a non-Error rejection", { reason: "unavailable" }],
+  ])("normalizes %s to a blocking fallback", async (_, rejection) => {
+    mockGetSession.mockResolvedValue({
+      data: { session: session(firstProfile.email, firstUserId) },
+      error: null,
+    });
+    getProfile.mockRejectedValue(rejection);
+
+    const { screen } = renderAuthProvider();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("profile-load-error").props.children).toBe(
+        "We couldn't load your profile. Check your connection and try again.",
+      );
+    });
+
+    expect(screen.getByTestId("status").props.children).toBe("ready");
+    expect(screen.getByTestId("profile-email").props.children).toBe("none");
+    expect(screen.getByTestId("auth-error").props.children).toBe("none");
+    expect(profileStorage.get()).toBeNull();
+  });
+
+  it("ignores a failed profile request superseded by a new identity", async () => {
+    const firstLoad = deferred<AthleteProfile | null>();
+    const secondLoad = deferred<AthleteProfile | null>();
+    mockGetSession.mockResolvedValue({
+      data: { session: session(firstProfile.email, firstUserId) },
+      error: null,
+    });
+    getProfile.mockImplementation((email) =>
+      email === firstProfile.email ? firstLoad.promise : secondLoad.promise,
+    );
+
+    const { screen } = renderAuthProvider();
+
+    await waitFor(() => {
+      expect(getProfile).toHaveBeenCalledWith(firstProfile.email);
+    });
+
+    act(() => {
+      mockAuthStateCallback?.(
+        "SIGNED_IN",
+        session(secondProfile.email, secondUserId),
+      );
+    });
+
+    await act(async () => {
+      secondLoad.resolve(secondProfile);
+      await secondLoad.promise;
+    });
+
+    await act(async () => {
+      firstLoad.reject(new Error("stale profile failure"));
+      await expect(firstLoad.promise).rejects.toThrow("stale profile failure");
+    });
+
+    expect(screen.getByTestId("session-user-id").props.children).toBe(
+      secondUserId,
+    );
+    expect(screen.getByTestId("profile-email").props.children).toBe(
+      secondProfile.email,
+    );
+    expect(screen.getByTestId("profile-load-error").props.children).toBe(
+      "none",
+    );
   });
 
   it("clears the current profile when the server returns null", async () => {
@@ -767,11 +887,12 @@ describe("AuthProvider profile isolation", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("status").props.children).toBe("ready");
-      expect(screen.getByTestId("auth-error").props.children).toBe(
+      expect(screen.getByTestId("profile-load-error").props.children).toBe(
         "profile unavailable",
       );
     });
 
+    expect(screen.getByTestId("auth-error").props.children).toBe("none");
     expect(screen.getByTestId("profile-email").props.children).toBe("none");
     expect(profileStorage.get()).toBeNull();
   });
