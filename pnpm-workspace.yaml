@@ -1,9 +1,12 @@
 # Supply-chain hardening for pnpm. See https://pnpm.io/settings
 minimumReleaseAge: 10080 # wait 7 days before installing a newly published version
-# Temporary, exact-version exceptions for reviewed security fixes. Remove after 2026-08-08 00:00 UTC.
+# Temporary, exact-version exceptions for reviewed security fixes.
 minimumReleaseAgeExclude:
+  # Remove these two after 2026-08-08 00:00 UTC.
   - brace-expansion@1.1.18 || 2.1.4 || 5.0.9
   - js-yaml@3.15.1 || 4.3.1
+  # Remove after 2026-08-15 00:00 UTC.
+  - nanoid@3.3.17
 blockExoticSubdeps: true # reject transitive git:/file:/tarball deps that skip the registry
 trustPolicy: no-downgrade # reject packages whose provenance/signatures weaken between updates
 # Expo SDK 54 requires this exact Worklets release, which predates its
@@ -12,9 +15,11 @@ trustPolicyExclude:
   - react-native-worklets@0.5.1
   - semver@6.3.1
 
-# Remove this acknowledgement when GitHub's advisory range recognizes the
-# maintainer's 1.x and 2.x backports. The CI lockfile assertion permits only
-# the reviewed fixed versions while the registry range remains stale.
+# Remove these acknowledgements when GitHub's advisory range recognizes the
+# reviewed backports or Expo's Metro dependency ships a patched image-size.
+# CI lockfile assertions keep each accepted package version exact.
 auditConfig:
   ignoreCves:
     - CVE-2026-14257
+    - CVE-2025-71329
+    - CVE-2025-71330
