@@ -1,7 +1,7 @@
 import "react-native-gesture-handler";
 
 import { Pressable, Text, View } from "react-native";
-import { router, Stack } from "expo-router";
+import { router, Stack, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ChevronLeft } from "lucide-react-native";
@@ -32,6 +32,8 @@ function TournamentBackButton() {
 }
 
 export default function RootLayout() {
+  const pathname = usePathname();
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
@@ -60,7 +62,7 @@ export default function RootLayout() {
           />
           <Stack.Screen name="tournaments/new" options={{ headerShown: false }} />
         </Stack>
-        <StatusBar style="dark" />
+        <StatusBar style={pathname === "/login" ? "light" : "dark"} />
       </AuthProvider>
     </QueryClientProvider>
   );

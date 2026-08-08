@@ -1,5 +1,4 @@
 import { Redirect, router } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import * as AppleAuthentication from "expo-apple-authentication";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
@@ -125,7 +124,6 @@ export default function LoginScreen() {
       style={styles.screen}
     >
       <SafeAreaView style={styles.safeArea}>
-        <StatusBar style="light" />
         <ScrollView
           alwaysBounceVertical={false}
           contentContainerStyle={styles.content}
