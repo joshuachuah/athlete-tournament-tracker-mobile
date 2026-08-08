@@ -6,6 +6,11 @@ minimumReleaseAgeExclude:
   - js-yaml@3.15.1 || 4.3.1
 blockExoticSubdeps: true # reject transitive git:/file:/tarball deps that skip the registry
 trustPolicy: no-downgrade # reject packages whose provenance/signatures weaken between updates
+# Expo SDK 54 requires this exact Worklets release, which predates its
+# provenance-enabled releases. Keep the reviewed exception pinned to it.
+trustPolicyExclude:
+  - react-native-worklets@0.5.1
+  - semver@6.3.1
 
 # Remove this acknowledgement when GitHub's advisory range recognizes the
 # maintainer's 1.x and 2.x backports. The CI lockfile assertion permits only
