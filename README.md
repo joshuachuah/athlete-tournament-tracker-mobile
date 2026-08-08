@@ -60,6 +60,18 @@ signed build. Do not broaden the allow-list with an unnecessary wildcard.
 
 The app implements PKCE and accepts only one-time authorization-code callbacks; it does not accept access or refresh tokens from callback URL fragments. Live allow-list inspection and signed iOS/Android callback verification remain external release prerequisites, so local implementation does not by itself establish production OAuth readiness. Tournament CRUD and P&L preview use the currency-correct `/api/v2` contract; tournament search, profile, FX, and health retain their existing routes.
 
+### Passwordless email
+
+The email option sends a six-digit Supabase OTP and uses the same flow for
+login and signup. Enable the Email provider in Supabase Auth, then update the
+email template to include `{{ .Token }}` so the athlete can enter the code in
+the app. The client intentionally sets `shouldCreateUser: true`; a first-time
+email creates an Auth user and follows the existing onboarding path.
+
+Before release, verify first-time and returning email sign-in, invalid and
+expired codes, resend/rate-limit behavior, and delivery to representative mail
+providers. This flow is passwordless and does not use email callback URLs.
+
 ### Sign in with Apple
 
 The iOS app uses Expo's native Authentication Services integration, passes

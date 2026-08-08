@@ -99,8 +99,10 @@ jest.mock("@/lib/supabase", () => ({
       setSession: jest.fn(),
       signInWithIdToken: jest.fn(),
       signInWithOAuth: jest.fn(),
+      signInWithOtp: jest.fn(),
       signOut: jest.fn(),
       updateUser: jest.fn(),
+      verifyOtp: jest.fn(),
     },
   },
 }));
@@ -150,10 +152,12 @@ type AuthProbe = Pick<
   ReturnType<typeof useAuth>,
   | "deleteAccount"
   | "refreshProfile"
+  | "requestEmailCode"
   | "saveProfile"
   | "signInWithApple"
   | "signInWithGoogle"
   | "signOut"
+  | "verifyEmailCode"
 >;
 
 function AuthState({ authRef }: { authRef: RefObject<AuthProbe | null> }) {
@@ -161,10 +165,12 @@ function AuthState({ authRef }: { authRef: RefObject<AuthProbe | null> }) {
   useImperativeHandle(authRef, () => ({
     deleteAccount: auth.deleteAccount,
     refreshProfile: auth.refreshProfile,
+    requestEmailCode: auth.requestEmailCode,
     saveProfile: auth.saveProfile,
     signInWithApple: auth.signInWithApple,
     signInWithGoogle: auth.signInWithGoogle,
     signOut: auth.signOut,
+    verifyEmailCode: auth.verifyEmailCode,
   }));
 
   return (
@@ -202,7 +208,9 @@ const mockExchangeCodeForSession = supabase!.auth
 const mockSetSession = supabase!.auth.setSession as jest.Mock;
 const mockSignInWithOAuth = supabase!.auth.signInWithOAuth as jest.Mock;
 const mockSignInWithIdToken = supabase!.auth.signInWithIdToken as jest.Mock;
+const mockSignInWithOtp = supabase!.auth.signInWithOtp as jest.Mock;
 const mockUpdateUser = supabase!.auth.updateUser as jest.Mock;
+const mockVerifyOtp = supabase!.auth.verifyOtp as jest.Mock;
 const mockAppleSignIn =
   AppleAuthentication.signInAsync as jest.MockedFunction<
     typeof AppleAuthentication.signInAsync
@@ -328,6 +336,115 @@ describe("AuthProvider OAuth callback", () => {
     expect(mockSetSession).not.toHaveBeenCalled();
     expect(screen.getByTestId("auth-error").props.children).toBe(
       "OAuth callback did not include a valid session code.",
+    );
+  });
+});
+
+describe("AuthProvider email sign-in", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    localStorage.clear();
+    queryClient.clear();
+    mockAuthStateCallback = undefined;
+    mockGetSession.mockResolvedValue({ data: { session: null }, error: null });
+    mockSignInWithOtp.mockResolvedValue({ data: {}, error: null });
+    mockVerifyOtp.mockResolvedValue({
+      data: {
+        session: session("athlete@example.com", "email-user"),
+        user: null,
+      },
+      error: null,
+    });
+  });
+
+  it("requests a one-time code that can create a new account", async () => {
+    const { authRef, screen } = renderAuthProvider();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("status").props.children).toBe("ready");
+    });
+
+    let sent = false;
+    await act(async () => {
+      sent = await authRef.current!.requestEmailCode("  Athlete@Example.com ");
+    });
+
+    expect(sent).toBe(true);
+    expect(mockSignInWithOtp).toHaveBeenCalledWith({
+      email: "athlete@example.com",
+      options: { shouldCreateUser: true },
+    });
+    expect(screen.getByTestId("auth-error").props.children).toBe("none");
+  });
+
+  it("verifies the email code without putting credentials in a callback URL", async () => {
+    const { authRef, screen } = renderAuthProvider();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("status").props.children).toBe("ready");
+    });
+
+    let verified = false;
+    await act(async () => {
+      verified = await authRef.current!.verifyEmailCode(
+        "Athlete@Example.com",
+        " 123456 ",
+      );
+    });
+
+    expect(verified).toBe(true);
+    expect(mockVerifyOtp).toHaveBeenCalledWith({
+      email: "athlete@example.com",
+      token: "123456",
+      type: "email",
+    });
+    expect(screen.getByTestId("auth-error").props.children).toBe("none");
+  });
+
+  it("rejects a verification response that does not create a session", async () => {
+    mockVerifyOtp.mockResolvedValue({
+      data: { session: null, user: null },
+      error: null,
+    });
+    const { authRef, screen } = renderAuthProvider();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("status").props.children).toBe("ready");
+    });
+
+    let verified = true;
+    await act(async () => {
+      verified = await authRef.current!.verifyEmailCode(
+        "athlete@example.com",
+        "123456",
+      );
+    });
+
+    expect(verified).toBe(false);
+    expect(screen.getByTestId("auth-error").props.children).toBe(
+      "The code was accepted, but no authenticated session was created. Request a new code and try again.",
+    );
+  });
+
+  it("keeps the email form on screen when Supabase rejects the request", async () => {
+    mockSignInWithOtp.mockResolvedValue({
+      data: {},
+      error: new Error("Please wait before requesting another code."),
+    });
+    const { authRef, screen } = renderAuthProvider();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("status").props.children).toBe("ready");
+    });
+
+    let sent = true;
+    await act(async () => {
+      sent = await authRef.current!.requestEmailCode("athlete@example.com");
+    });
+
+    expect(sent).toBe(false);
+    expect(screen.getByTestId("auth-error").props.children).toBe(
+      "Please wait before requesting another code.",
     );
   });
 });
