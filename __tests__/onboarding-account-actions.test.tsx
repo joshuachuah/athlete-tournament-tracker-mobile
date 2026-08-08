@@ -212,6 +212,20 @@ describe("profileless onboarding", () => {
       expect(router.replace).toHaveBeenCalledWith("/login");
     });
     expect(mockSaveProfile).not.toHaveBeenCalled();
-    expect(getOnboardingDraft("new-athlete")).toBeNull();
+  });
+
+  it("preserves the setup draft when sign-out fails", async () => {
+    mockSignOut.mockRejectedValue(new Error("Sign-out service unavailable"));
+    const screen = render(<OnboardingScreen />);
+
+    expect(getOnboardingDraft("new-athlete")?.step).toBe(1);
+
+    fireEvent.press(screen.getByText("Not your account? Sign out"));
+
+    expect(
+      await screen.findByText("Sign-out service unavailable"),
+    ).toBeTruthy();
+    expect(router.replace).not.toHaveBeenCalled();
+    expect(getOnboardingDraft("new-athlete")?.step).toBe(1);
   });
 });

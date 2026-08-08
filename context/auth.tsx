@@ -642,11 +642,27 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   async function signOut() {
     const userId = currentUserId();
-    clearLocalAuthState(userId);
+    const identity = identityVersion();
 
     if (supabase) {
-      await supabase.auth.signOut();
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        throw error;
+      }
     }
+
+    if (userId && !isCurrentUserIdentity(userId, identity)) {
+      draftStorage.clear(tournamentDraftStorageKey(userId));
+      clearOnboardingDraft(userId);
+
+      if (!currentUserId()) {
+        clearLegacyTournamentDraft();
+      }
+      return;
+    }
+
+    clearLocalAuthState(userId);
   }
 
   async function deleteAccount() {

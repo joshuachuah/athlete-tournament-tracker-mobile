@@ -60,7 +60,6 @@ function OnboardingContent() {
 
   async function handleSignOut() {
     setError(null);
-    clearOnboardingDraft(authenticatedUserId);
     await signOut();
     router.replace("/login");
   }
