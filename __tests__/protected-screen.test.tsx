@@ -1,4 +1,4 @@
-import { fireEvent, render } from "@testing-library/react-native";
+import { fireEvent, render, waitFor } from "@testing-library/react-native";
 import { Text } from "react-native";
 
 import { ProtectedScreen } from "@/components/auth/protected-screen";
@@ -136,6 +136,35 @@ describe("ProtectedScreen", () => {
 
     expect(refreshProfile).toHaveBeenCalledTimes(1);
     expect(signOut).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a sign-out failure without discarding the authenticated recovery state", async () => {
+    const refreshProfile = jest.fn().mockResolvedValue(undefined);
+    const signOut = jest.fn().mockRejectedValue(new Error("Remote sign-out failed."));
+    mockUseAuth.mockReturnValue({
+      status: "ready",
+      session: {},
+      profile: null,
+      profileLoadError: "Profile service unavailable.",
+      refreshProfile,
+      signOut,
+    });
+
+    const screen = render(
+      <ProtectedScreen requireProfile={false}>
+        <ProtectedContent />
+      </ProtectedScreen>,
+    );
+
+    fireEvent.press(screen.getByText("Sign out"));
+
+    expect(screen.getByText("Signing out…")).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByText("Remote sign-out failed.")).toBeTruthy();
+    });
+    expect(screen.getByText("Sign out")).toBeTruthy();
+    expect(screen.getByText("Profile service unavailable.")).toBeTruthy();
+    expect(screen.queryByTestId("redirect-href")).toBeNull();
   });
 
   it("mounts protected content for a signed-in user with a profile", () => {
