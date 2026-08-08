@@ -53,12 +53,14 @@ describe("Account deletion", () => {
       authError: null,
       profileLoadError: null,
       isCurrentUser: jest.fn(() => true),
+      requestEmailCode: jest.fn(),
       refreshProfile: jest.fn(),
       saveProfile: jest.fn(),
       signInWithApple: jest.fn(),
       signInWithGoogle: jest.fn(),
       deleteAccount,
       signOut: jest.fn(),
+      verifyEmailCode: jest.fn(),
     });
   });
 

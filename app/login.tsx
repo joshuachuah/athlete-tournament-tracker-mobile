@@ -1,12 +1,13 @@
 import { Redirect, router } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import * as AppleAuthentication from "expo-apple-authentication";
 import * as Haptics from "expo-haptics";
-import { ArrowLeft, ShieldCheck } from "lucide-react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { X } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -16,13 +17,20 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { EmailSignIn } from "@/components/auth/email-sign-in";
 import { ProfileLoadError } from "@/components/auth/profile-load-error";
 import { GoogleLogo } from "@/components/ui/google-logo";
 import { LoadingState } from "@/components/ui/loading-state";
 import { colors, radii, spacing } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
+import { privacyPolicyUrl } from "@/lib/legal";
 
 function returnToIntroduction() {
+  if (router.canGoBack()) {
+    router.back();
+    return;
+  }
+
   router.replace("/");
 }
 
@@ -36,9 +44,9 @@ export default function LoginScreen() {
     signInWithGoogle,
     status,
   } = useAuth();
-  const [signingInWith, setSigningInWith] = useState<"apple" | "google" | null>(
-    null,
-  );
+  const [signingInWith, setSigningInWith] = useState<
+    "apple" | "email" | "google" | null
+  >(null);
   const [appleSignInAvailable, setAppleSignInAvailable] = useState(false);
 
   useEffect(() => {
@@ -64,23 +72,19 @@ export default function LoginScreen() {
     };
   }, []);
 
-  if (session && status === "loading") {
-    return (
-      <SafeAreaView style={styles.loadingScreen}>
-        <LoadingState label="Loading Athlete Tracker" />
-      </SafeAreaView>
-    );
-  }
-
   if (status === "ready" && session && profile) {
     return <Redirect href="/(tabs)/dashboard" />;
   }
 
-  if (
-    status === "ready" &&
-    session &&
-    profileLoadError !== null
-  ) {
+  if (status === "loading" && session) {
+    return (
+      <SafeAreaView style={styles.loadingScreen}>
+        <LoadingState label="Loading athlete profile" />
+      </SafeAreaView>
+    );
+  }
+
+  if (status === "ready" && session && profileLoadError !== null) {
     return <ProfileLoadError />;
   }
 
@@ -112,126 +116,148 @@ export default function LoginScreen() {
   const isLoading = status === "loading" || signingInWith !== null;
 
   return (
-    <SafeAreaView style={styles.screen}>
-      <StatusBar style="dark" />
-      <ScrollView
-        alwaysBounceVertical={false}
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        testID="login-scroll-view"
-      >
-        <View style={styles.navigation}>
-          <Pressable
-            accessibilityLabel="Back to introduction"
-            accessibilityRole="button"
-            hitSlop={8}
-            onPress={returnToIntroduction}
-            style={({ pressed }) => [
-              styles.backButton,
-              pressed && styles.backButtonPressed,
-            ]}
-          >
-            <ArrowLeft color={colors.brand} size={21} strokeWidth={2.2} />
-          </Pressable>
-          <View style={styles.brand}>
-            <Image
-              accessibilityIgnoresInvertColors
-              accessible={false}
-              source={require("../assets/images/athlete-tracker-icon.png")}
-              style={styles.brandMark}
-            />
-            <Text style={styles.brandName}>Athlete Tracker</Text>
-          </View>
-          <View style={styles.navigationSpacer} />
-        </View>
-
-        <View style={styles.hero}>
-          <Text style={styles.eyebrow}>YOUR ACCOUNT</Text>
-          <Text style={styles.title} selectable>
-            Log in or sign{"\u00A0"}up.
-          </Text>
-          <Text style={styles.subtitle} selectable>
-            Choose a secure option below. If you’re new, we’ll create your
-            account along the{"\u00A0"}way.
-          </Text>
-        </View>
-
-        <View style={styles.cta}>
-          {authError ? (
-            <View accessibilityRole="alert" style={styles.error}>
-              <Text style={styles.errorText} selectable>
-                {authError}
-              </Text>
-            </View>
-          ) : null}
-
-          {appleSignInAvailable ? (
-            <View
-              pointerEvents={isLoading ? "none" : "auto"}
-              style={[
-                styles.appleButtonContainer,
-                {
-                  opacity:
-                    isLoading && signingInWith !== "apple" ? 0.6 : 1,
-                },
+    <LinearGradient
+      colors={["#061C14", "#0A3A28", "#0E6542"]}
+      end={{ x: 1, y: 1 }}
+      locations={[0, 0.54, 1]}
+      start={{ x: 0.08, y: 0 }}
+      style={styles.screen}
+    >
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView
+          alwaysBounceVertical={false}
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          testID="login-scroll-view"
+        >
+          <View style={styles.navigation}>
+            <Pressable
+              accessibilityLabel="Close account screen"
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={returnToIntroduction}
+              style={({ pressed }) => [
+                styles.backButton,
+                pressed && styles.backButtonPressed,
               ]}
             >
-              <AppleAuthentication.AppleAuthenticationButton
-                buttonStyle={
-                  AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
-                }
-                buttonType={
-                  AppleAuthentication.AppleAuthenticationButtonType.CONTINUE
-                }
-                cornerRadius={radii.lg}
-                onPress={handleAppleContinue}
-                style={styles.appleButton}
-              />
-            </View>
-          ) : null}
+              <X color="#FFFFFF" size={22} strokeWidth={1.9} />
+            </Pressable>
+          </View>
 
-          <Pressable
-            accessibilityLabel="Continue with Google"
-            accessibilityRole="button"
-            accessibilityHint="Opens Google sign in in a secure browser"
-            accessibilityState={{ busy: isLoading, disabled: isLoading }}
-            disabled={isLoading}
-            onPress={handleGoogleContinue}
-            style={({ pressed }) => [
-              styles.googleButton,
-              { opacity: isLoading ? 0.6 : pressed ? 0.9 : 1 },
-            ]}
-          >
-            <View accessible={false} style={styles.googleContent}>
-              {signingInWith === "google" ? (
-                <ActivityIndicator color={colors.brand} />
-              ) : (
-                <View style={styles.googleMark}>
-                  <GoogleLogo size={18} />
-                </View>
-              )}
-              <Text style={styles.googleLabel}>
-                {signingInWith === "google"
-                  ? "Just a moment…"
-                  : "Continue with Google"}
-              </Text>
-            </View>
-          </Pressable>
-
-          <View style={styles.trust}>
-            <ShieldCheck
-              color={colors.brand}
-              size={14}
-              strokeWidth={2.4}
+          <View style={styles.identity}>
+            <Image
+              accessibilityIgnoresInvertColors
+              accessibilityLabel="Athlete Tracker app icon"
+              source={require("../assets/images/athlete-tracker-splash-icon.png")}
+              style={styles.mark}
             />
-            <Text style={styles.trustText}>
-              Secure sign-in · no password to remember
+            <View style={styles.tag}>
+              <Text style={styles.tagLabel}>ATHLETE TRACKER</Text>
+            </View>
+            <Text style={styles.title} selectable>
+              Your season, in focus.
+            </Text>
+            <Text style={styles.subtitle} selectable>
+              Sign in or create an account to keep every tournament in one
+              clear view.
             </Text>
           </View>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+
+          <View style={styles.authPanel}>
+            {authError ? (
+              <View accessibilityRole="alert" style={styles.error}>
+                <Text style={styles.errorText} selectable>
+                  {authError}
+                </Text>
+              </View>
+            ) : null}
+
+            <Pressable
+              accessibilityLabel="Continue with Google"
+              accessibilityRole="button"
+              accessibilityHint="Opens Google sign in in a secure browser"
+              accessibilityState={{ busy: isLoading, disabled: isLoading }}
+              disabled={isLoading}
+              onPress={handleGoogleContinue}
+              style={({ pressed }) => [
+                styles.googleButton,
+                isLoading && styles.providerButtonDisabled,
+                pressed && !isLoading && styles.providerButtonPressed,
+              ]}
+            >
+              <View accessible={false} style={styles.googleContent}>
+                {signingInWith === "google" ? (
+                  <ActivityIndicator color={colors.brand} />
+                ) : (
+                  <View style={styles.googleMark}>
+                    <GoogleLogo size={18} />
+                  </View>
+                )}
+                <Text style={styles.googleLabel}>
+                  {signingInWith === "google"
+                    ? "Just a moment…"
+                    : "Continue with Google"}
+                </Text>
+              </View>
+            </Pressable>
+
+            {appleSignInAvailable ? (
+              <View
+                pointerEvents={isLoading ? "none" : "auto"}
+                style={[
+                  styles.appleButtonContainer,
+                  {
+                    opacity:
+                      isLoading && signingInWith !== "apple" ? 0.6 : 1,
+                  },
+                ]}
+              >
+                <AppleAuthentication.AppleAuthenticationButton
+                  buttonStyle={
+                    AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                  }
+                  buttonType={
+                    AppleAuthentication.AppleAuthenticationButtonType.CONTINUE
+                  }
+                  cornerRadius={radii.lg}
+                  onPress={handleAppleContinue}
+                  style={styles.appleButton}
+                />
+              </View>
+            ) : null}
+
+            <View accessibilityRole="text" style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>OR USE EMAIL</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <EmailSignIn
+              disabled={isLoading}
+              onBusyChange={(busy) =>
+                setSigningInWith(busy ? "email" : null)
+              }
+              submitting={signingInWith === "email"}
+            />
+
+            <Text style={styles.legal} selectable>
+              By continuing, you acknowledge our{" "}
+              <Text
+                accessibilityHint="Opens the privacy policy in your browser"
+                accessibilityRole="link"
+                onPress={() => Linking.openURL(privacyPolicyUrl)}
+                style={styles.legalLink}
+              >
+                Privacy Policy
+              </Text>
+              .
+            </Text>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
@@ -243,96 +269,99 @@ const styles = StyleSheet.create({
   },
   screen: {
     flex: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: "#08281B",
+  },
+  safeArea: {
+    flex: 1,
   },
   content: {
     flexGrow: 1,
     paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
-  },
-  brand: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xl,
   },
   navigation: {
     minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
   },
   backButton: {
-    width: 42,
-    height: 42,
+    width: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 21,
-    backgroundColor: colors.surface,
+    borderColor: "rgba(255, 255, 255, 0.12)",
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
   },
   backButtonPressed: {
-    opacity: 0.65,
+    opacity: 0.72,
+    transform: [{ scale: 0.96 }],
   },
-  navigationSpacer: {
-    width: 42,
+  identity: {
+    alignItems: "center",
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xl,
   },
-  brandMark: {
-    width: 32,
-    height: 32,
-    borderRadius: 9,
+  mark: {
+    width: 104,
+    height: 104,
+    marginBottom: spacing.lg,
+    borderRadius: 29,
     borderCurve: "continuous",
   },
-  brandName: {
-    color: colors.brand,
-    fontSize: 15,
-    fontWeight: "700",
-    letterSpacing: -0.2,
+  tag: {
+    marginBottom: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: "rgba(211, 255, 226, 0.24)",
+    borderRadius: 999,
+    backgroundColor: "rgba(211, 255, 226, 0.1)",
   },
-  hero: {
-    flexGrow: 1,
-    flexShrink: 0,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.sm,
-    paddingVertical: spacing.xl,
-  },
-  eyebrow: {
-    color: colors.profit,
-    fontSize: 11,
-    fontWeight: "900",
-    letterSpacing: 1.4,
-    marginBottom: spacing.xs,
-    textAlign: "center",
+  tagLabel: {
+    color: "#D6FFE4",
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 1.45,
   },
   title: {
-    color: colors.brand,
-    fontSize: 38,
-    lineHeight: 42,
+    color: "#FFFFFF",
+    fontSize: 30,
+    lineHeight: 36,
     fontWeight: "800",
-    letterSpacing: -1,
+    letterSpacing: -0.8,
     textAlign: "center",
   },
   subtitle: {
-    color: colors.mutedForeground,
-    fontSize: 16,
-    lineHeight: 24,
-    maxWidth: 320,
+    maxWidth: 330,
+    marginTop: spacing.sm,
+    color: "rgba(255, 255, 255, 0.68)",
+    fontSize: 14,
+    lineHeight: 20,
     textAlign: "center",
   },
-  cta: {
+  authPanel: {
     gap: spacing.md,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.12)",
+    borderRadius: radii.lg,
+    borderCurve: "continuous",
+    backgroundColor: "rgba(3, 22, 15, 0.34)",
   },
   error: {
     padding: spacing.md,
     borderRadius: radii.md,
     borderCurve: "continuous",
-    backgroundColor: colors.lossSoft,
+    backgroundColor: "rgba(200, 64, 50, 0.18)",
     borderWidth: 1,
-    borderColor: colors.loss,
+    borderColor: "rgba(255, 160, 148, 0.55)",
   },
   errorText: {
-    color: colors.loss,
+    color: "#FFD7D1",
     fontSize: 14,
     lineHeight: 20,
   },
@@ -342,14 +371,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: spacing.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: "rgba(255, 255, 255, 0.22)",
     borderRadius: radii.lg,
     borderCurve: "continuous",
     backgroundColor: colors.surface,
   },
+  providerButtonDisabled: {
+    opacity: 0.6,
+  },
+  providerButtonPressed: {
+    opacity: 0.92,
+    transform: [{ scale: 0.98 }],
+  },
   appleButtonContainer: {
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: "rgba(255, 255, 255, 0.22)",
     borderRadius: radii.lg,
     borderCurve: "continuous",
     backgroundColor: colors.surface,
@@ -373,21 +409,38 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   googleLabel: {
-    color: colors.brand,
-    fontSize: 19,
+    color: colors.foreground,
+    fontSize: 17,
     fontWeight: "600",
     letterSpacing: -0.2,
   },
-  trust: {
+  divider: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.xs,
-    marginTop: spacing.xs,
+    gap: spacing.md,
+    marginVertical: spacing.xs,
   },
-  trustText: {
-    color: colors.mutedForeground,
+  dividerLine: {
+    height: StyleSheet.hairlineWidth,
+    flex: 1,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+  },
+  dividerText: {
+    color: "rgba(255, 255, 255, 0.58)",
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1.1,
+  },
+  legal: {
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.md,
+    color: "rgba(255, 255, 255, 0.58)",
     fontSize: 12,
-    fontWeight: "400",
+    lineHeight: 18,
+    textAlign: "center",
+  },
+  legalLink: {
+    color: "#FFFFFF",
+    textDecorationLine: "underline",
   },
 });

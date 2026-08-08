@@ -42,6 +42,8 @@ type AuthContextValue = {
   status: "loading" | "ready";
   authError: string | null;
   profileLoadError: string | null;
+  requestEmailCode: (email: string) => Promise<boolean>;
+  verifyEmailCode: (email: string, code: string) => Promise<boolean>;
   signInWithApple: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -478,6 +480,58 @@ export function AuthProvider({ children }: PropsWithChildren) {
     await startGoogleSignIn(setAuthError);
   }
 
+  async function requestEmailCode(email: string) {
+    if (!supabase) {
+      setAuthError(
+        "Supabase is not configured. Set Expo public Supabase environment variables.",
+      );
+      return false;
+    }
+
+    setAuthError(null);
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim().toLowerCase(),
+      options: { shouldCreateUser: true },
+    });
+
+    if (error) {
+      setAuthError(error.message);
+      return false;
+    }
+
+    return true;
+  }
+
+  async function verifyEmailCode(email: string, code: string) {
+    if (!supabase) {
+      setAuthError(
+        "Supabase is not configured. Set Expo public Supabase environment variables.",
+      );
+      return false;
+    }
+
+    setAuthError(null);
+    const { data, error } = await supabase.auth.verifyOtp({
+      email: email.trim().toLowerCase(),
+      token: code.trim(),
+      type: "email",
+    });
+
+    if (error) {
+      setAuthError(error.message);
+      return false;
+    }
+
+    if (!data.session?.access_token) {
+      setAuthError(
+        "The code was accepted, but no authenticated session was created. Request a new code and try again.",
+      );
+      return false;
+    }
+
+    return true;
+  }
+
   async function signInWithApple() {
     await startAppleSignIn(setAuthError);
   }
@@ -639,6 +693,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
         status,
         authError,
         profileLoadError,
+        requestEmailCode,
+        verifyEmailCode,
         signInWithApple,
         signInWithGoogle,
         refreshProfile,

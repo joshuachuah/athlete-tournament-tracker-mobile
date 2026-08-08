@@ -68,12 +68,14 @@ describe("split profile destinations", () => {
       authError: null,
       profileLoadError: null,
       isCurrentUser: jest.fn(() => true),
+      requestEmailCode: jest.fn(),
       refreshProfile: jest.fn(),
       saveProfile: mockSaveProfile,
       signInWithApple: jest.fn(),
       signInWithGoogle: jest.fn(),
       deleteAccount: jest.fn(),
       signOut: jest.fn(),
+      verifyEmailCode: jest.fn(),
     });
   });
 

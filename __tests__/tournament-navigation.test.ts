@@ -1,8 +1,11 @@
+import { render } from "@testing-library/react-native";
 import { router } from "expo-router";
-import type { ReactNode } from "react";
+import { createElement, type ReactNode } from "react";
 
-import { returnToDashboard } from "@/app/_layout";
+import RootLayout, { returnToDashboard } from "@/app/_layout";
 import { leaveTournamentProjection } from "@/app/tournaments/new/_layout";
+
+let mockPathname = "/";
 
 jest.mock("expo-router", () => ({
   router: {
@@ -11,6 +14,16 @@ jest.mock("expo-router", () => ({
     dismissTo: jest.fn(),
   },
   Stack: Object.assign(() => null, { Screen: () => null }),
+  usePathname: () => mockPathname,
+}));
+
+jest.mock("expo-status-bar", () => ({
+  StatusBar: ({ style }: { style: string }) => {
+    const React = jest.requireActual("react");
+    const { Text } = jest.requireActual("react-native");
+
+    return React.createElement(Text, { testID: "root-status-bar" }, style);
+  },
 }));
 
 jest.mock("@/components/auth/protected-screen", () => ({
@@ -32,6 +45,21 @@ const mockCanGoBack = router.canGoBack as jest.MockedFunction<
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockPathname = "/";
+});
+
+it("uses light system icons when login is the initial route", () => {
+  mockPathname = "/login";
+
+  const screen = render(createElement(RootLayout));
+
+  expect(screen.getByTestId("root-status-bar").props.children).toBe("light");
+});
+
+it("uses dark system icons for light-background routes", () => {
+  const screen = render(createElement(RootLayout));
+
+  expect(screen.getByTestId("root-status-bar").props.children).toBe("dark");
 });
 
 it("returns tournament details to the dashboard deterministically", () => {

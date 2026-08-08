@@ -39,8 +39,8 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#F4F6F1",
-          "image": "./assets/images/athlete-tracker-icon-rounded.png",
+          "backgroundColor": "#08281B",
+          "image": "./assets/images/athlete-tracker-splash-icon.png",
           "imageWidth": 144,
           "resizeMode": "contain"
         }

@@ -158,6 +158,7 @@ describe("TournamentDetailScreen deletion", () => {
       status: "ready",
       authError: null,
       profileLoadError: null,
+      requestEmailCode: jest.fn(),
       signInWithApple: jest.fn(),
       signInWithGoogle: jest.fn(),
       refreshProfile: jest.fn(),
@@ -165,6 +166,7 @@ describe("TournamentDetailScreen deletion", () => {
       deleteAccount: jest.fn(),
       signOut: jest.fn(),
       isCurrentUser: jest.fn(() => true),
+      verifyEmailCode: jest.fn(),
     });
   });
 
