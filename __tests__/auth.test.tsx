@@ -1322,7 +1322,7 @@ describe("AuthProvider profile isolation", () => {
     expect(invalidateQueries).not.toHaveBeenCalled();
   });
 
-  it("keeps local sign-out isolated when a load and remote sign-out fail", async () => {
+  it("preserves the active session and private state when persisted sign-out fails", async () => {
     const secondLoad = deferred<AthleteProfile | null>();
     const remoteSignOut = deferred<{ error: Error | null }>();
     profileStorage.set(firstUserId, firstProfile);
@@ -1367,24 +1367,69 @@ describe("AuthProvider profile isolation", () => {
       signOutPromise = authRef.current!.signOut();
     });
 
-    expect(screen.getByTestId("session-email").props.children).toBe("none");
+    expect(screen.getByTestId("session-email").props.children).toBe(
+      secondProfile.email,
+    );
     expect(screen.getByTestId("profile-email").props.children).toBe("none");
-    expect(screen.getByTestId("status").props.children).toBe("ready");
-    expect(profileStorage.get()).toBeNull();
-    expect(getOnboardingDraft(secondUserId)).toBeNull();
+    expect(screen.getByTestId("status").props.children).toBe("loading");
+    expect(getOnboardingDraft(secondUserId)).not.toBeNull();
+
+    await act(async () => {
+      remoteSignOut.resolve({ error: new Error("remote sign-out failed") });
+      await expect(signOutPromise).rejects.toThrow("remote sign-out failed");
+    });
+
+    expect(screen.getByTestId("session-email").props.children).toBe(
+      secondProfile.email,
+    );
+    expect(getOnboardingDraft(secondUserId)).not.toBeNull();
 
     await act(async () => {
       secondLoad.resolve(secondProfile);
       await secondLoad.promise;
     });
 
-    expect(screen.getByTestId("profile-email").props.children).toBe("none");
-    expect(profileStorage.get()).toBeNull();
+    expect(screen.getByTestId("profile-email").props.children).toBe(
+      secondProfile.email,
+    );
+    expect(profileStorage.get()).toEqual(secondProfile);
+  });
 
-    remoteSignOut.reject(new Error("remote sign-out failed"));
-    await expect(signOutPromise).rejects.toThrow("remote sign-out failed");
+  it("clears the session and private state after persisted sign-out succeeds", async () => {
+    profileStorage.set(firstUserId, firstProfile);
+    saveOnboardingDraft(firstUserId, {
+      step: 2,
+      name: "First Athlete",
+      country: "Malaysia",
+      currency: "MYR",
+      sport: "Squash",
+      customCountry: false,
+      customCurrency: false,
+      customSport: false,
+    });
+    mockGetSession.mockResolvedValue({
+      data: { session: session(firstProfile.email, firstUserId) },
+      error: null,
+    });
+    getProfile.mockResolvedValue(firstProfile);
+
+    const { authRef, screen } = renderAuthProvider();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("profile-email").props.children).toBe(
+        firstProfile.email,
+      );
+    });
+
+    await act(async () => {
+      await authRef.current!.signOut();
+    });
+
+    expect(screen.getByTestId("session-email").props.children).toBe("none");
     expect(screen.getByTestId("profile-email").props.children).toBe("none");
+    expect(screen.getByTestId("status").props.children).toBe("ready");
     expect(profileStorage.get()).toBeNull();
+    expect(getOnboardingDraft(firstUserId)).toBeNull();
   });
 
   it("preserves the session and private caches when remote deletion fails", async () => {

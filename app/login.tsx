@@ -17,7 +17,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { EmailSignIn } from "@/components/auth/email-sign-in";
 import { ProfileLoadError } from "@/components/auth/profile-load-error";
 import { GoogleLogo } from "@/components/ui/google-logo";
 import { LoadingState } from "@/components/ui/loading-state";
@@ -45,7 +44,7 @@ export default function LoginScreen() {
     status,
   } = useAuth();
   const [signingInWith, setSigningInWith] = useState<
-    "apple" | "email" | "google" | null
+    "apple" | "google" | null
   >(null);
   const [appleSignInAvailable, setAppleSignInAvailable] = useState(false);
 
@@ -228,20 +227,6 @@ export default function LoginScreen() {
               </View>
             ) : null}
 
-            <View accessibilityRole="text" style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>OR USE EMAIL</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            <EmailSignIn
-              disabled={isLoading}
-              onBusyChange={(busy) =>
-                setSigningInWith(busy ? "email" : null)
-              }
-              submitting={signingInWith === "email"}
-            />
-
             <Text style={styles.legal} selectable>
               By continuing, you acknowledge our{" "}
               <Text
@@ -413,23 +398,6 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "600",
     letterSpacing: -0.2,
-  },
-  divider: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    marginVertical: spacing.xs,
-  },
-  dividerLine: {
-    height: StyleSheet.hairlineWidth,
-    flex: 1,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-  },
-  dividerText: {
-    color: "rgba(255, 255, 255, 0.58)",
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 1.1,
   },
   legal: {
     marginTop: spacing.xs,
