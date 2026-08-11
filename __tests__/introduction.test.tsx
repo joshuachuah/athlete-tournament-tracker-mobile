@@ -1,10 +1,17 @@
-import { fireEvent, render, within } from "@testing-library/react-native";
+import {
+  act,
+  fireEvent,
+  render,
+  waitFor,
+  within,
+} from "@testing-library/react-native";
 import { router } from "expo-router";
 import { Linking } from "react-native";
 import IntroductionScreen from "@/app/index";
 import LoginScreen from "@/app/login";
 
 const mockAppleAvailability = jest.fn();
+const mockImpactAsync = jest.fn();
 
 const mockAuthState: {
   authError: string | null;
@@ -12,6 +19,8 @@ const mockAuthState: {
   profileLoadError: string | null;
   refreshProfile: jest.Mock<Promise<void>, []>;
   session: object | null;
+  signInWithApple: jest.Mock<Promise<void>, []>;
+  signInWithGoogle: jest.Mock<Promise<void>, []>;
   signOut: jest.Mock<Promise<void>, []>;
   status: "loading" | "ready";
 } = {
@@ -20,6 +29,8 @@ const mockAuthState: {
   profileLoadError: null,
   refreshProfile: jest.fn().mockResolvedValue(undefined),
   session: null,
+  signInWithApple: jest.fn().mockResolvedValue(undefined),
+  signInWithGoogle: jest.fn().mockResolvedValue(undefined),
   signOut: jest.fn().mockResolvedValue(undefined),
   status: "ready",
 };
@@ -47,6 +58,11 @@ jest.mock("expo-apple-authentication", () => {
   };
 });
 
+jest.mock("expo-haptics", () => ({
+  ImpactFeedbackStyle: { Medium: "medium" },
+  impactAsync: (...args: unknown[]) => mockImpactAsync(...args),
+}));
+
 jest.mock("expo-router", () => {
   const React = jest.requireActual("react");
   const { Text } = jest.requireActual("react-native");
@@ -72,6 +88,7 @@ describe("IntroductionScreen", () => {
     mockAuthState.session = null;
     mockAuthState.status = "ready";
     mockAppleAvailability.mockResolvedValue(false);
+    mockImpactAsync.mockResolvedValue(undefined);
     jest.mocked(router.canGoBack).mockReturnValue(false);
   });
 
@@ -121,6 +138,28 @@ describe("IntroductionScreen", () => {
     expect(scrollContent.queryByLabelText("Email address")).toBeNull();
     expect(scrollContent.queryByText("OR USE EMAIL")).toBeNull();
     expect(scrollContent.getByText("Sign-in failed. Try again.")).toBeTruthy();
+  });
+
+  it("starts Google sign-in without waiting for haptic feedback", async () => {
+    const expoOs = process.env.EXPO_OS;
+    process.env.EXPO_OS = "ios";
+    mockImpactAsync.mockReturnValue(new Promise(() => undefined));
+    const screen = render(<LoginScreen />);
+
+    try {
+      await act(async () => {
+        fireEvent.press(screen.getByLabelText("Continue with Google"));
+        await Promise.resolve();
+      });
+
+      expect(mockImpactAsync).toHaveBeenCalledWith("medium");
+      expect(mockAuthState.signInWithGoogle).toHaveBeenCalledTimes(1);
+      await waitFor(() => {
+        expect(screen.getByText("Continue with Google")).toBeTruthy();
+      });
+    } finally {
+      process.env.EXPO_OS = expoOs;
+    }
   });
 
   it("opens the configured privacy policy from the consent copy", () => {

@@ -1,12 +1,7 @@
 import * as Crypto from "expo-crypto";
 
 import { createAppleAuthRequest } from "@/lib/apple-auth";
-import {
-  HTTPS_AUTH_CALLBACK,
-  LEGACY_AUTH_CALLBACK,
-  oauthRedirectUri,
-  supportsHttpsAuthCallback,
-} from "@/lib/auth-redirect";
+import { LEGACY_AUTH_CALLBACK, oauthRedirectUri } from "@/lib/auth-redirect";
 
 jest.mock("expo-crypto", () => ({
   CryptoDigestAlgorithm: { SHA256: "SHA-256" },
@@ -15,20 +10,8 @@ jest.mock("expo-crypto", () => ({
 }));
 
 describe("OAuth callback selection", () => {
-  it.each([
-    ["ios", "17.3", false],
-    ["ios", "17.4", true],
-    ["ios", "18.0", true],
-    ["android", "18", false],
-  ])("selects the production callback for %s %s", (os, version, supported) => {
-    expect(supportsHttpsAuthCallback(os, version)).toBe(supported);
-    expect(oauthRedirectUri(os, version, false)).toBe(
-      supported ? HTTPS_AUTH_CALLBACK : LEGACY_AUTH_CALLBACK,
-    );
-  });
-
-  it("uses the custom app scheme in development builds", () => {
-    expect(oauthRedirectUri("ios", "26.0", true)).toBe(LEGACY_AUTH_CALLBACK);
+  it("uses the registered custom app scheme in every native build", () => {
+    expect(oauthRedirectUri()).toBe(LEGACY_AUTH_CALLBACK);
   });
 });
 

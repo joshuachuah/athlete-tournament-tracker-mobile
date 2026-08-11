@@ -94,16 +94,13 @@ export default function LoginScreen() {
   function handleGoogleContinue() {
     setSigningInWith("google");
 
-    const haptic =
-      process.env.EXPO_OS === "ios"
-        ? Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
-            () => undefined,
-          )
-        : Promise.resolve();
+    if (process.env.EXPO_OS === "ios") {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
+        () => undefined,
+      );
+    }
 
-    return haptic
-      .then(signInWithGoogle)
-      .finally(() => setSigningInWith(null));
+    return signInWithGoogle().finally(() => setSigningInWith(null));
   }
 
   function handleAppleContinue() {

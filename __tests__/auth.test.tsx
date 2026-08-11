@@ -279,6 +279,67 @@ describe("AuthProvider OAuth callback", () => {
     expect(screen.getByTestId("auth-error").props.children).toBe("none");
   });
 
+  it("shares one PKCE initializer across concurrent Google sign-in calls", async () => {
+    const browserSession = deferred<{
+      type: WebBrowser.WebBrowserResultType.CANCEL;
+    }>();
+    mockOpenAuthSession.mockReturnValue(browserSession.promise);
+    const { authRef, screen } = renderAuthProvider();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("status").props.children).toBe("ready");
+    });
+
+    let firstSignIn!: Promise<void>;
+    let secondSignIn!: Promise<void>;
+
+    act(() => {
+      firstSignIn = authRef.current!.signInWithGoogle();
+      secondSignIn = authRef.current!.signInWithGoogle();
+    });
+
+    await waitFor(() => {
+      expect(mockOpenAuthSession).toHaveBeenCalledTimes(1);
+    });
+    expect(firstSignIn).toBe(secondSignIn);
+    expect(mockSignInWithOAuth).toHaveBeenCalledTimes(1);
+
+    browserSession.resolve({ type: WebBrowser.WebBrowserResultType.CANCEL });
+    await act(async () => {
+      await Promise.all([firstSignIn, secondSignIn]);
+    });
+
+    expect(screen.getByTestId("auth-error").props.children).toBe("none");
+  });
+
+  it("reports a native browser launch rejection", async () => {
+    mockOpenAuthSession.mockRejectedValue(new Error("native browser detail"));
+
+    const screen = await startSignIn();
+
+    expect(mockExchangeCodeForSession).not.toHaveBeenCalled();
+    expect(screen.getByTestId("auth-error").props.children).toBe(
+      "Google sign-in couldn't open. Please try again.",
+    );
+  });
+
+  it("reports a code exchange rejection", async () => {
+    mockOpenAuthSession.mockResolvedValue({
+      type: "success",
+      url: "athletetracker://auth/callback?code=one-time-code",
+    });
+    mockExchangeCodeForSession.mockRejectedValue(
+      new Error("session exchange detail"),
+    );
+
+    const screen = await startSignIn();
+
+    expect(mockExchangeCodeForSession).toHaveBeenCalledWith("one-time-code");
+    expect(screen.getByTestId("auth-error").props.children).toBe(
+      "Google sign-in couldn't be completed. Please try again.",
+    );
+  });
+
   it("reports a provider rejection without exposing callback details", async () => {
     mockOpenAuthSession.mockResolvedValue({
       type: "success",

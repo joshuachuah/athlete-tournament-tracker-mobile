@@ -52,11 +52,10 @@ For a physical device, put the device and development machine on the same networ
 
 ### Supabase callback
 
-The production iOS configuration uses
-`https://web-production-2fa073.up.railway.app/auth/callback` on iOS 17.4 and
-newer, with `athletetracker://auth/callback` retained for older supported iOS.
-Add both exact URLs to the Supabase Auth redirect allow-list before testing a
-signed build. Do not broaden the allow-list with an unnecessary wildcard.
+Native Google OAuth uses `athletetracker://auth/callback` in development,
+TestFlight, and production. Add that exact URL to the Supabase Auth redirect
+allow-list before testing a signed build. Do not broaden the allow-list with an
+unnecessary wildcard.
 
 The app implements PKCE and accepts only one-time authorization-code callbacks; it does not accept access or refresh tokens from callback URL fragments. Live allow-list inspection and signed iOS/Android callback verification remain external release prerequisites, so local implementation does not by itself establish production OAuth readiness. Tournament CRUD and P&L preview use the currency-correct `/api/v2` contract; tournament search, profile, FX, and health retain their existing routes.
 
