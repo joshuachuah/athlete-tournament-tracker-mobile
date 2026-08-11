@@ -312,6 +312,18 @@ describe("AuthProvider OAuth callback", () => {
     expect(screen.getByTestId("auth-error").props.children).toBe("none");
   });
 
+  it("reports an OAuth initializer rejection without opening the browser", async () => {
+    mockSignInWithOAuth.mockRejectedValue(new Error("initializer detail"));
+
+    const screen = await startSignIn();
+
+    expect(mockOpenAuthSession).not.toHaveBeenCalled();
+    expect(mockExchangeCodeForSession).not.toHaveBeenCalled();
+    expect(screen.getByTestId("auth-error").props.children).toBe(
+      "Google sign-in couldn't start. Please try again.",
+    );
+  });
+
   it("reports a native browser launch rejection", async () => {
     mockOpenAuthSession.mockRejectedValue(new Error("native browser detail"));
 
@@ -352,6 +364,22 @@ describe("AuthProvider OAuth callback", () => {
     expect(mockSetSession).not.toHaveBeenCalled();
     expect(screen.getByTestId("auth-error").props.children).toBe(
       "OAuth sign-in was rejected by the provider.",
+    );
+  });
+
+  it.each([
+    "othertracker://auth/callback?code=one-time-code",
+    "athletetracker://other/callback?code=one-time-code",
+    "athletetracker://auth/other?code=one-time-code",
+  ])("rejects an OAuth code from an unexpected callback URL: %s", async (url) => {
+    mockOpenAuthSession.mockResolvedValue({ type: "success", url });
+
+    const screen = await startSignIn();
+
+    expect(mockExchangeCodeForSession).not.toHaveBeenCalled();
+    expect(mockSetSession).not.toHaveBeenCalled();
+    expect(screen.getByTestId("auth-error").props.children).toBe(
+      "OAuth callback URL did not match the configured redirect.",
     );
   });
 

@@ -156,11 +156,23 @@ async function startGoogleSignIn(
   }
 
   let callback: URL;
+  let expectedCallback: URL;
 
   try {
     callback = new URL(result.url);
+    expectedCallback = new URL(callbackUrl);
   } catch {
     setAuthError("OAuth callback URL was invalid.");
+    return;
+  }
+
+  if (
+    callback.protocol !== expectedCallback.protocol ||
+    callback.hostname !== expectedCallback.hostname ||
+    callback.port !== expectedCallback.port ||
+    callback.pathname !== expectedCallback.pathname
+  ) {
+    setAuthError("OAuth callback URL did not match the configured redirect.");
     return;
   }
 

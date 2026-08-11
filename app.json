@@ -14,9 +14,6 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.athletetracker.mobile",
       "usesAppleSignIn": true,
-      "associatedDomains": [
-        "applinks:web-production-2fa073.up.railway.app"
-      ],
       "config": {
         "usesNonExemptEncryption": false
       }
