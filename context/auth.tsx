@@ -15,7 +15,7 @@ import type { Session } from "@supabase/supabase-js";
 
 import { api } from "@/lib/api";
 import { createAppleAuthRequest } from "@/lib/apple-auth";
-import { oauthRedirectUri } from "@/lib/auth-redirect";
+import { isExpectedAuthCallback, oauthRedirectUri } from "@/lib/auth-redirect";
 import { clearOnboardingDraft } from "@/lib/onboarding";
 import { queryClient } from "@/lib/query-client";
 import { hasSupabaseConfig, supabase } from "@/lib/supabase";
@@ -71,6 +71,12 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export const PROFILE_LOAD_FALLBACK_MESSAGE =
   "We couldn't load your profile. Check your connection and try again.";
+const GOOGLE_OAUTH_START_ERROR =
+  "Google sign-in couldn't start. Please try again.";
+const GOOGLE_OAUTH_BROWSER_ERROR =
+  "Google sign-in couldn't open. Please try again.";
+const GOOGLE_OAUTH_SESSION_ERROR =
+  "Google sign-in couldn't be completed. Please try again.";
 
 function profileLoadErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) {
@@ -104,16 +110,25 @@ async function startGoogleSignIn(
 
   setAuthError(null);
   const callbackUrl = oauthRedirectUri();
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo: callbackUrl,
-      skipBrowserRedirect: true,
-    },
-  });
+  let authorization;
+
+  try {
+    authorization = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: callbackUrl,
+        skipBrowserRedirect: true,
+      },
+    });
+  } catch {
+    setAuthError(GOOGLE_OAUTH_START_ERROR);
+    return;
+  }
+
+  const { data, error } = authorization;
 
   if (error) {
-    setAuthError(error.message);
+    setAuthError(GOOGLE_OAUTH_START_ERROR);
     return;
   }
 
@@ -122,7 +137,14 @@ async function startGoogleSignIn(
     return;
   }
 
-  const result = await WebBrowser.openAuthSessionAsync(data.url, callbackUrl);
+  let result;
+
+  try {
+    result = await WebBrowser.openAuthSessionAsync(data.url, callbackUrl);
+  } catch {
+    setAuthError(GOOGLE_OAUTH_BROWSER_ERROR);
+    return;
+  }
 
   if (result.type !== "success") {
     return;
@@ -142,6 +164,11 @@ async function startGoogleSignIn(
     return;
   }
 
+  if (!isExpectedAuthCallback(callback, callbackUrl)) {
+    setAuthError("OAuth callback URL did not match the configured redirect.");
+    return;
+  }
+
   if (callback.searchParams.has("error")) {
     setAuthError("OAuth sign-in was rejected by the provider.");
     return;
@@ -150,9 +177,17 @@ async function startGoogleSignIn(
   const code = callback.searchParams.get("code");
 
   if (code) {
-    const exchange = await supabase.auth.exchangeCodeForSession(code);
+    let exchange;
+
+    try {
+      exchange = await supabase.auth.exchangeCodeForSession(code);
+    } catch {
+      setAuthError(GOOGLE_OAUTH_SESSION_ERROR);
+      return;
+    }
+
     if (exchange.error) {
-      setAuthError(exchange.error.message);
+      setAuthError(GOOGLE_OAUTH_SESSION_ERROR);
     }
     return;
   }
@@ -461,6 +496,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       ? null
       : "Supabase is not configured. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY.",
   );
+  const googleSignInPromise = useRef<Promise<void> | null>(null);
   const {
     beginProfileRequest,
     clearIdentity,
@@ -476,8 +512,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setProfileState((currentState) => ({ ...currentState, ...nextState }));
   }
 
-  async function signInWithGoogle() {
-    await startGoogleSignIn(setAuthError);
+  function signInWithGoogle() {
+    if (googleSignInPromise.current) {
+      return googleSignInPromise.current;
+    }
+
+    const request = startGoogleSignIn(setAuthError).finally(() => {
+      googleSignInPromise.current = null;
+    });
+    googleSignInPromise.current = request;
+    return request;
   }
 
   async function requestEmailCode(email: string) {
