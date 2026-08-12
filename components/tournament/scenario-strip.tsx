@@ -113,7 +113,7 @@ export function ScenarioStrip({
             Outcome scenarios
           </Text>
           <Text style={{ color: colors.brandMutedForeground, lineHeight: 20 }}>
-            How this tournament could affect your season.
+            Based on your earliest, middle, and latest entered prize rounds.
           </Text>
         </View>
         {loading ? (
@@ -196,12 +196,12 @@ export function ScenarioStrip({
               marginTop: spacing.xs,
             }}
           >
-            Add prize estimates to see worst, realistic, and best outcomes.
+            Add prize estimates to see worst, middle, and best outcomes.
           </Text>
         </View>
       ) : data ? (
         <View
-          accessibilityLabel="Worst, realistic, and best projected outcomes"
+          accessibilityLabel="Worst, middle, and best projected outcomes"
           style={{ flexDirection: "row", gap: spacing.sm }}
         >
           {scenarios.map((scenario) => {

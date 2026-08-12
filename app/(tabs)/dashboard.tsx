@@ -267,7 +267,7 @@ export default function DashboardScreen() {
             {tournaments.length === 0 ? (
               <EmptyState
                 title="No tournaments yet"
-                body="Add a tournament to generate worst, realistic, and best-case projections."
+                body="Add a tournament to generate worst, middle, and best-case projections."
                 action={
                   <Link href="/(tabs)/add" asChild>
                     <Button label="Add tournament" />

@@ -27,17 +27,17 @@ const saved: TournamentWithPnL = {
   subsidy_amount: 0,
   subsidy_covers: null,
   sponsorship_allocated: 0,
-  prize_rounds: { qf: 100 },
+  prize_rounds: { r2: 100 },
   prize_tax_rate: 30,
   created_at: "2026-01-01T00:00:00Z",
   home_currency: "MYR",
   pnl: {
     total_expenses: 100,
     total_income_base: 0,
-    break_even_round: "qf",
+    break_even_round: "r2",
     scenarios: [
       { scenario: "worst", round: "r1", prize_money: 0, prize_money_after_tax: 0, net_result: -100, profitable: false },
-      { scenario: "realistic", round: "qf", prize_money: 100, prize_money_after_tax: 100, net_result: 0, profitable: false },
+      { scenario: "realistic", round: "r2", prize_money: 100, prize_money_after_tax: 100, net_result: 0, profitable: true },
       { scenario: "best", round: "w", prize_money: 500, prize_money_after_tax: 350, net_result: 250, profitable: true },
     ],
   },
@@ -51,7 +51,9 @@ it("renders the actual returned projection and delegates view or dismiss", () =>
   );
 
   expect(screen.getByText("Server Open now uses the server’s latest tax-aware P&L.")).toBeTruthy();
-  expect(screen.getByText("QF")).toBeTruthy();
+  expect(screen.getByText("Middle case")).toBeTruthy();
+  expect(screen.getByText("R2")).toBeTruthy();
+  expect(screen.queryByText("QF")).toBeNull();
   expect(screen.getByText("Break even · MYR 0 MYR")).toBeTruthy();
   fireEvent.press(screen.getByText("View projection"));
   fireEvent.press(screen.getAllByLabelText("Dismiss saved projection")[0]);

@@ -25,7 +25,7 @@ export function TournamentCard({ tournament }: { tournament: TournamentWithPnL }
         : colors.foreground;
   const accessibilityOutcome = !realistic
     ? "needs projection"
-    : `realistic net ${outcomeLabel}`;
+    : `middle-case net ${outcomeLabel}`;
 
   return (
     <Link href={`/tournaments/${tournament.id}`} asChild>
