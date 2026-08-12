@@ -1,5 +1,5 @@
 import { useNavigation, usePreventRemove } from "@react-navigation/native";
-import { useEffect, useReducer, useRef } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import {
   Alert,
   Keyboard,
@@ -104,6 +104,7 @@ export function TournamentProjectionBuilder({
   loading = false,
   onSubmit,
   profileId,
+  saveCompleted = false,
   sport,
   submitError,
 }: {
@@ -113,6 +114,7 @@ export function TournamentProjectionBuilder({
   loading?: boolean;
   onSubmit: (draft: TournamentDraft) => void;
   profileId: string;
+  saveCompleted?: boolean;
   sport?: string;
   submitError?: string | null;
 }) {
@@ -132,15 +134,15 @@ export function TournamentProjectionBuilder({
     submissionSummary,
   } = builderState;
   const identityInputRef = useRef<TextInput>(null);
-  const initialDraftRef = useRef(initialDraft);
+  const [initialDraftBaseline] = useState(initialDraft);
   const setPersistedDraftRef = useRef(setDraft);
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const hasUnsavedEdit =
     Boolean(formDraft.editId) &&
-    JSON.stringify(formDraft) !== JSON.stringify(initialDraftRef.current);
+    JSON.stringify(formDraft) !== JSON.stringify(initialDraftBaseline);
 
-  usePreventRemove(hasUnsavedEdit && !loading, ({ data }) => {
+  usePreventRemove(hasUnsavedEdit && !loading && !saveCompleted, ({ data }) => {
     Alert.alert(
       "Discard unsaved changes?",
       "Your tournament changes have not been saved.",
@@ -162,8 +164,8 @@ export function TournamentProjectionBuilder({
   useEffect(() => {
     // The container keys the builder by create/edit identity. Seed persistence
     // once per mount without re-syncing over the user's in-progress edits.
-    setPersistedDraftRef.current(initialDraftRef.current);
-  }, []);
+    setPersistedDraftRef.current(initialDraftBaseline);
+  }, [initialDraftBaseline]);
 
   function updateDraft(next: TournamentDraft) {
     updateBuilderState({ formDraft: next, submissionSummary: null });

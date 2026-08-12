@@ -384,6 +384,34 @@ describe("TournamentProjectionBuilder", () => {
     });
     expect(mockDispatch).toHaveBeenCalledWith({ type: "GO_BACK" });
   });
+
+  it("releases the navigation guard after an edit saves successfully", () => {
+    const initialDraft = tournamentToDraft(savedTournament);
+    const onSubmit = jest.fn();
+    const { screen } = renderBuilder(initialDraft, onSubmit);
+
+    fireEvent.press(screen.getByText("Coaching / physio"));
+    fireEvent.changeText(screen.getByLabelText("Coaching / physio (USD)"), "75");
+    fireEvent.press(screen.getByText("Apply coaching / physio"));
+
+    expect(mockUsePreventRemove.mock.calls.at(-1)?.[0]).toBe(true);
+
+    screen.rerender(
+      <TournamentDraftProvider userId="account-1">
+        <TournamentProjectionBuilder
+          authenticatedUserId="account-1"
+          homeCurrency="USD"
+          initialDraft={initialDraft}
+          onSubmit={onSubmit}
+          profileId="athlete-1"
+          saveCompleted
+          sport="tennis"
+        />
+      </TournamentDraftProvider>,
+    );
+
+    expect(mockUsePreventRemove.mock.calls.at(-1)?.[0]).toBe(false);
+  });
 });
 
 describe("save completion helpers", () => {
