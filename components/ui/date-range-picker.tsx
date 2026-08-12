@@ -1,6 +1,6 @@
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react-native";
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Keyboard, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { colors, radii, spacing } from "@/constants/theme";
 import { formatDate, isoToday, parseDateOnly } from "@/lib/utils";
@@ -49,11 +49,14 @@ function DateButton({
   onPress: () => void;
   value: string;
 }) {
+  const parsedValue = parseDateOnly(value);
+  const displayValue = parsedValue ? formatDate(parsedValue) : "Choose a date";
+
   return (
     <View style={styles.dateField}>
       <Text style={styles.fieldLabel}>{label}</Text>
       <Pressable
-        accessibilityLabel={`${label}, ${formatDate(value)}`}
+        accessibilityLabel={`${label}, ${displayValue}`}
         accessibilityRole="button"
         accessibilityState={{ expanded: active }}
         onPress={onPress}
@@ -65,7 +68,7 @@ function DateButton({
         ]}
       >
         <CalendarDays color={active ? colors.accent : colors.mutedForeground} size={18} />
-        <Text style={styles.dateValue}>{formatDate(value)}</Text>
+        <Text style={styles.dateValue}>{displayValue}</Text>
       </Pressable>
       {error ? (
         <Text selectable style={styles.error}>
@@ -89,13 +92,16 @@ export function DateRangePicker({
   startDate: string;
   startError?: string;
 }) {
-  const parsedStart = parseDateOnly(startDate) ?? new Date();
-  const parsedEnd = parseDateOnly(endDate) ?? parsedStart;
+  const validStart = parseDateOnly(startDate);
+  const validEnd = parseDateOnly(endDate);
+  const parsedStart = validStart ?? validEnd ?? new Date();
+  const parsedEnd = validEnd ?? parsedStart;
   const [activeDate, setActiveDate] = useState<ActiveDate | null>(null);
   const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(parsedStart));
 
   function openCalendar(field: ActiveDate) {
     const selectedDate = field === "start" ? parsedStart : parsedEnd;
+    Keyboard.dismiss();
     setVisibleMonth(startOfMonth(selectedDate));
     setActiveDate((current) => (current === field ? null : field));
   }
@@ -114,13 +120,13 @@ export function DateRangePicker({
     if (activeDate === "start") {
       onChange({
         startDate: selected,
-        endDate: date > parsedEnd ? selected : endDate,
+        endDate: !validEnd || date > validEnd ? selected : endDate,
       });
       setActiveDate("end");
       return;
     }
 
-    onChange({ startDate, endDate: selected });
+    onChange({ startDate: validStart ? startDate : selected, endDate: selected });
     setActiveDate(null);
   }
 
@@ -174,7 +180,9 @@ export function DateRangePicker({
           <View style={styles.weekGrid}>
             {weekdays.map((weekday) => (
               <View key={weekday} style={styles.dayCell}>
-                <Text style={styles.weekday}>{weekday.slice(0, 1)}</Text>
+                <Text accessibilityLabel={weekday} style={styles.weekday}>
+                  {weekday.slice(0, 1)}
+                </Text>
               </View>
             ))}
             {days.map(({ date, key }) => {
@@ -183,9 +191,14 @@ export function DateRangePicker({
               }
 
               const value = isoToday(date);
-              const disabled = activeDate === "end" && date < parsedStart;
+              const disabled =
+                activeDate === "end" && validStart !== null && date < validStart;
               const selected = value === startDate || value === endDate;
-              const inRange = date > parsedStart && date < parsedEnd;
+              const inRange =
+                validStart !== null &&
+                validEnd !== null &&
+                date > validStart &&
+                date < validEnd;
 
               return (
                 <View key={value} style={[styles.dayCell, inRange && styles.dayInRange]}>
@@ -194,6 +207,7 @@ export function DateRangePicker({
                     accessibilityRole="button"
                     accessibilityState={{ disabled, selected }}
                     disabled={disabled}
+                    hitSlop={4}
                     onPress={() => selectDate(date)}
                     style={({ pressed }) => [
                       styles.dayButton,
