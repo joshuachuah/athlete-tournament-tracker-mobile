@@ -84,10 +84,7 @@ function PrivateFinancesContent() {
   const financialSaveAttempt = useRef(0);
   const saveInFlight = useRef(false);
   const mounted = useRef(true);
-  const isForeground = useRef(
-    AppState.currentState !== "background" &&
-      AppState.currentState !== "inactive",
-  );
+  const isBackgrounded = useRef(AppState.currentState === "background");
 
   useEffect(() => {
     let active = true;
@@ -97,7 +94,7 @@ function PrivateFinancesContent() {
       if (
         !active ||
         attempt !== authenticationAttempt.current ||
-        !isForeground.current
+        isBackgrounded.current
       ) {
         return;
       }
@@ -117,8 +114,14 @@ function PrivateFinancesContent() {
   useEffect(() => {
     mounted.current = true;
     const subscription = AppState.addEventListener("change", (nextState) => {
-      isForeground.current = nextState === "active";
-      if (nextState !== "active") {
+      if (nextState === "active") {
+        isBackgrounded.current = false;
+      }
+
+      // iOS reports `inactive` while its Face ID prompt is on screen. Only a
+      // confirmed background transition should invalidate authentication.
+      if (nextState === "background") {
+        isBackgrounded.current = true;
         authenticationAttempt.current += 1;
         financialSaveAttempt.current += 1;
         updateViewState({
@@ -145,7 +148,7 @@ function PrivateFinancesContent() {
     updateViewState({ gateState: "authenticating", message: null });
 
     void authenticateSafely().then((result) => {
-      if (attempt !== authenticationAttempt.current || !isForeground.current) {
+      if (attempt !== authenticationAttempt.current || isBackgrounded.current) {
         return;
       }
 

@@ -387,6 +387,38 @@ describe("split profile destinations", () => {
     expect(screen.getByText(/Unlock with/)).toBeTruthy();
   });
 
+  it("allows Face ID authentication through iOS inactive transitions", async () => {
+    let appStateListener: ((state: AppStateStatus) => void) | undefined;
+    const appStateSpy = jest
+      .spyOn(AppState, "addEventListener")
+      .mockImplementation((_event, listener) => {
+        appStateListener = listener;
+        return { remove: jest.fn() };
+      });
+    let resolveAuthentication:
+      | ((result: { success: true }) => void)
+      | undefined;
+    mockAuthenticate.mockReturnValue(
+      new Promise((resolve) => {
+        resolveAuthentication = resolve;
+      }),
+    );
+
+    const screen = render(<PrivateFinancesScreen />);
+
+    act(() => {
+      appStateListener?.("inactive");
+      appStateListener?.("active");
+    });
+    await act(async () => {
+      resolveAuthentication?.({ success: true });
+    });
+
+    expect(await screen.findByText("Monthly income")).toBeTruthy();
+    expect(screen.getByText("Face ID verified")).toBeTruthy();
+    appStateSpy.mockRestore();
+  });
+
   it("ignores a pending successful authentication after the app backgrounds", async () => {
     let appStateListener: ((state: AppStateStatus) => void) | undefined;
     const appStateSpy = jest
