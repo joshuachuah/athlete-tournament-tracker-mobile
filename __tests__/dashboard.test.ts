@@ -223,6 +223,23 @@ describe("dashboard stats", () => {
     expect(stats.ytdEarnings).toBe(200);
     expect(stats.netResult).toBe(200);
   });
+
+  it("includes API date-time values in the matching season", () => {
+    const current = tournament("current", -300, 200, 500);
+    current.start_date = "2026-10-05T00:00:00";
+
+    const stats = buildDashboardStats(
+      [current],
+      profile,
+      new Date(2026, 7, 11),
+    );
+
+    expect(stats.tournamentCount).toBe(1);
+    expect(stats.projectedCount).toBe(1);
+    expect(stats.ytdEarnings).toBe(200);
+    expect(stats.ytdExpenses).toBe(500);
+    expect(stats.netResult).toBe(-300);
+  });
 });
 
 describe("dashboard projection presentation", () => {
