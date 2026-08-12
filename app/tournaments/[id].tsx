@@ -16,6 +16,7 @@ import { api } from "@/lib/api";
 import { queryClient } from "@/lib/query-client";
 import {
   formatDate,
+  formatMoney,
   getScenario,
   roundLabels,
   scenarioLabel,
@@ -193,6 +194,8 @@ function TournamentDetailContent() {
             </Text>
           </Card>
 
+          <ExpenseBreakdown tournament={data} />
+
           {data.pnl.scenarios.length === 0 ? (
             <Card>
               <Text style={{ color: colors.mutedForeground }} selectable>
@@ -207,6 +210,24 @@ function TournamentDetailContent() {
               >
                 Scenarios
               </Text>
+              <View style={{ gap: spacing.xs }}>
+                <Text style={{ color: colors.mutedForeground }} selectable>
+                  Each net result subtracts total expenses.
+                </Text>
+                <Text
+                  accessibilityLabel={`Total expenses subtracted from every scenario: ${formatMoney(data.pnl.total_expenses, data.home_currency)}`}
+                  style={{
+                    color: colors.foreground,
+                    fontSize: 18,
+                    fontWeight: "800",
+                    fontVariant: ["tabular-nums"],
+                  }}
+                  selectable
+                >
+                  {formatMoney(data.pnl.total_expenses, data.home_currency)} total
+                  expenses
+                </Text>
+              </View>
               {scenarioOrder.map((scenario) => {
                 const result = getScenario(data, scenario);
                 return result ? (
@@ -244,8 +265,6 @@ function TournamentDetailContent() {
               />
             </View>
           </Card>
-
-          <ExpenseBreakdown tournament={data} />
 
           <View style={{ flexDirection: "row", gap: spacing.md }}>
             <Button
