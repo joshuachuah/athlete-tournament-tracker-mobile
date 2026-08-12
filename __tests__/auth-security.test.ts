@@ -1,7 +1,13 @@
 import * as Crypto from "expo-crypto";
 
 import { createAppleAuthRequest } from "@/lib/apple-auth";
-import { LEGACY_AUTH_CALLBACK, oauthRedirectUri } from "@/lib/auth-redirect";
+import {
+  CUSTOM_SCHEME_AUTH_CALLBACK,
+  HTTPS_AUTH_CALLBACK,
+  isExpectedAuthCallback,
+  oauthRedirectUri,
+  supportsHttpsAuthCallback,
+} from "@/lib/auth-redirect";
 
 jest.mock("expo-crypto", () => ({
   CryptoDigestAlgorithm: { SHA256: "SHA-256" },
@@ -9,9 +15,58 @@ jest.mock("expo-crypto", () => ({
   getRandomBytesAsync: jest.fn(),
 }));
 
-describe("OAuth callback selection", () => {
-  it("uses the registered custom app scheme in every native build", () => {
-    expect(oauthRedirectUri()).toBe(LEGACY_AUTH_CALLBACK);
+describe("OAuth callback validation", () => {
+  it.each([
+    ["ios", "17.3", false],
+    ["ios", "17.4", true],
+    ["ios", "18.0", true],
+    ["android", "18", false],
+  ])("selects HTTPS support for %s %s", (os, version, supported) => {
+    expect(supportsHttpsAuthCallback(os, version)).toBe(supported);
+    expect(oauthRedirectUri(os, version, false)).toBe(
+      supported ? HTTPS_AUTH_CALLBACK : CUSTOM_SCHEME_AUTH_CALLBACK,
+    );
+  });
+
+  it("uses the registered custom scheme in development", () => {
+    expect(oauthRedirectUri("ios", "18.0", true)).toBe(
+      "athletetracker://auth/callback",
+    );
+  });
+
+  it("accepts the configured callback with query parameters", () => {
+    expect(
+      isExpectedAuthCallback(
+        new URL("athletetracker://auth/callback?code=one-time-code"),
+        CUSTOM_SCHEME_AUTH_CALLBACK,
+      ),
+    ).toBe(true);
+  });
+
+  it.each([
+    ["scheme", "othertracker://auth/callback?code=one-time-code"],
+    ["host", "athletetracker://other/callback?code=one-time-code"],
+    ["path", "athletetracker://auth/other?code=one-time-code"],
+    ["userinfo", "athletetracker://evil@auth/callback?code=one-time-code"],
+  ])("rejects a callback with an unexpected %s: %s", (_part, url) => {
+    expect(
+      isExpectedAuthCallback(new URL(url), CUSTOM_SCHEME_AUTH_CALLBACK),
+    ).toBe(false);
+  });
+
+  it("accepts only the configured HTTPS callback host and path", () => {
+    expect(
+      isExpectedAuthCallback(
+        new URL(`${HTTPS_AUTH_CALLBACK}?code=one-time-code`),
+        HTTPS_AUTH_CALLBACK,
+      ),
+    ).toBe(true);
+    expect(
+      isExpectedAuthCallback(
+        new URL("https://web-production-2fa073.up.railway.app/other?code=x"),
+        HTTPS_AUTH_CALLBACK,
+      ),
+    ).toBe(false);
   });
 });
 

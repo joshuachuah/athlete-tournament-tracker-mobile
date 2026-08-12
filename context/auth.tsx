@@ -15,7 +15,7 @@ import type { Session } from "@supabase/supabase-js";
 
 import { api } from "@/lib/api";
 import { createAppleAuthRequest } from "@/lib/apple-auth";
-import { oauthRedirectUri } from "@/lib/auth-redirect";
+import { isExpectedAuthCallback, oauthRedirectUri } from "@/lib/auth-redirect";
 import { clearOnboardingDraft } from "@/lib/onboarding";
 import { queryClient } from "@/lib/query-client";
 import { hasSupabaseConfig, supabase } from "@/lib/supabase";
@@ -128,7 +128,7 @@ async function startGoogleSignIn(
   const { data, error } = authorization;
 
   if (error) {
-    setAuthError(error.message);
+    setAuthError(GOOGLE_OAUTH_START_ERROR);
     return;
   }
 
@@ -156,22 +156,15 @@ async function startGoogleSignIn(
   }
 
   let callback: URL;
-  let expectedCallback: URL;
 
   try {
     callback = new URL(result.url);
-    expectedCallback = new URL(callbackUrl);
   } catch {
     setAuthError("OAuth callback URL was invalid.");
     return;
   }
 
-  if (
-    callback.protocol !== expectedCallback.protocol ||
-    callback.hostname !== expectedCallback.hostname ||
-    callback.port !== expectedCallback.port ||
-    callback.pathname !== expectedCallback.pathname
-  ) {
+  if (!isExpectedAuthCallback(callback, callbackUrl)) {
     setAuthError("OAuth callback URL did not match the configured redirect.");
     return;
   }
@@ -194,7 +187,7 @@ async function startGoogleSignIn(
     }
 
     if (exchange.error) {
-      setAuthError(exchange.error.message);
+      setAuthError(GOOGLE_OAUTH_SESSION_ERROR);
     }
     return;
   }
@@ -525,9 +518,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
 
     const request = startGoogleSignIn(setAuthError).finally(() => {
-      if (googleSignInPromise.current === request) {
-        googleSignInPromise.current = null;
-      }
+      googleSignInPromise.current = null;
     });
     googleSignInPromise.current = request;
     return request;

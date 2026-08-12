@@ -324,6 +324,20 @@ describe("AuthProvider OAuth callback", () => {
     );
   });
 
+  it("reports an OAuth initializer error without exposing provider details", async () => {
+    mockSignInWithOAuth.mockResolvedValue({
+      data: { provider: "google", url: null },
+      error: new Error("AuthRetryableFetchError: Network request failed"),
+    });
+
+    const screen = await startSignIn();
+
+    expect(mockOpenAuthSession).not.toHaveBeenCalled();
+    expect(screen.getByTestId("auth-error").props.children).toBe(
+      "Google sign-in couldn't start. Please try again.",
+    );
+  });
+
   it("reports a native browser launch rejection", async () => {
     mockOpenAuthSession.mockRejectedValue(new Error("native browser detail"));
 
@@ -352,6 +366,24 @@ describe("AuthProvider OAuth callback", () => {
     );
   });
 
+  it("reports a code exchange error without exposing provider details", async () => {
+    mockOpenAuthSession.mockResolvedValue({
+      type: "success",
+      url: "athletetracker://auth/callback?code=one-time-code",
+    });
+    mockExchangeCodeForSession.mockResolvedValue({
+      data: { session: null, user: null },
+      error: new Error("AuthRetryableFetchError: Network request failed"),
+    });
+
+    const screen = await startSignIn();
+
+    expect(mockExchangeCodeForSession).toHaveBeenCalledWith("one-time-code");
+    expect(screen.getByTestId("auth-error").props.children).toBe(
+      "Google sign-in couldn't be completed. Please try again.",
+    );
+  });
+
   it("reports a provider rejection without exposing callback details", async () => {
     mockOpenAuthSession.mockResolvedValue({
       type: "success",
@@ -367,12 +399,11 @@ describe("AuthProvider OAuth callback", () => {
     );
   });
 
-  it.each([
-    "othertracker://auth/callback?code=one-time-code",
-    "athletetracker://other/callback?code=one-time-code",
-    "athletetracker://auth/other?code=one-time-code",
-  ])("rejects an OAuth code from an unexpected callback URL: %s", async (url) => {
-    mockOpenAuthSession.mockResolvedValue({ type: "success", url });
+  it("rejects an OAuth code from an unexpected callback URL", async () => {
+    mockOpenAuthSession.mockResolvedValue({
+      type: "success",
+      url: "othertracker://auth/callback?code=one-time-code",
+    });
 
     const screen = await startSignIn();
 

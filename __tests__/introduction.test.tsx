@@ -158,7 +158,11 @@ describe("IntroductionScreen", () => {
         expect(screen.getByText("Continue with Google")).toBeTruthy();
       });
     } finally {
-      process.env.EXPO_OS = expoOs;
+      if (expoOs === undefined) {
+        delete process.env.EXPO_OS;
+      } else {
+        process.env.EXPO_OS = expoOs;
+      }
     }
   });
 
