@@ -1,6 +1,8 @@
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { PropsWithChildren, ReactElement } from "react";
+import { Alert } from "react-native";
+import { useNavigation, usePreventRemove } from "@react-navigation/native";
 
 import { TournamentProjectionBuilder } from "@/components/tournament/tournament-projection-builder";
 import { TournamentDraftProvider } from "@/context/tournament-draft";
@@ -31,6 +33,11 @@ jest.mock("react-native-safe-area-context", () => ({
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
 }));
 
+jest.mock("@react-navigation/native", () => ({
+  useNavigation: jest.fn(),
+  usePreventRemove: jest.fn(),
+}));
+
 jest.mock("@/hooks/use-reduced-motion", () => ({
   useReducedMotion: () => false,
 }));
@@ -46,6 +53,13 @@ jest.mock("@/lib/api", () => ({
 
 const mockPreview = api.tournaments.preview as jest.Mock;
 const mockSearch = api.tournaments.search as jest.Mock;
+const mockUseNavigation = useNavigation as jest.MockedFunction<
+  typeof useNavigation
+>;
+const mockUsePreventRemove = usePreventRemove as jest.MockedFunction<
+  typeof usePreventRemove
+>;
+const mockDispatch = jest.fn();
 const defaultDraft = createDefaultTournamentDraft(new Date(2026, 0, 1));
 const validDraft = {
   ...defaultDraft,
@@ -135,9 +149,14 @@ beforeEach(() => {
     scenarios: [],
     break_even_round: null,
   });
+  mockDispatch.mockReset();
+  mockUseNavigation.mockReturnValue({ dispatch: mockDispatch } as never);
+  mockUsePreventRemove.mockReset();
+  jest.spyOn(Alert, "alert").mockImplementation(() => {});
 });
 
 afterEach(() => {
+  jest.restoreAllMocks();
   jest.useRealTimers();
 });
 
@@ -340,6 +359,30 @@ describe("TournamentProjectionBuilder", () => {
     fireEvent.press(screen.getByText("Save changes"));
 
     expect(onSubmit).toHaveBeenCalledWith({ ...initialDraft, coaching_cost: 75 });
+  });
+
+  it("warns before leaving an edit with applied but unsaved changes", () => {
+    const initialDraft = tournamentToDraft(savedTournament);
+    const { screen } = renderBuilder(initialDraft, jest.fn());
+
+    fireEvent.press(screen.getByText("Coaching / physio"));
+    fireEvent.changeText(screen.getByLabelText("Coaching / physio (USD)"), "75");
+    fireEvent.press(screen.getByText("Apply coaching / physio"));
+
+    const preventRemove = mockUsePreventRemove.mock.calls.at(-1);
+    expect(preventRemove?.[0]).toBe(true);
+    preventRemove?.[1]({ data: { action: { type: "GO_BACK" } } });
+
+    expect(Alert.alert).toHaveBeenCalledWith(
+      "Discard unsaved changes?",
+      "Your tournament changes have not been saved.",
+      expect.any(Array),
+    );
+    const buttons = jest.mocked(Alert.alert).mock.calls.at(-1)?.[2];
+    act(() => {
+      buttons?.[1]?.onPress?.();
+    });
+    expect(mockDispatch).toHaveBeenCalledWith({ type: "GO_BACK" });
   });
 });
 

@@ -55,6 +55,11 @@ export type TournamentDraftPrefill = {
 
 const prizeRoundKeys = ["r1", "r2", "r3", "qf", "sf", "f", "w"] as const;
 
+function apiDateOnly(value: string): string {
+  const dateOnly = value.slice(0, 10);
+  return parseDateOnly(dateOnly) ? dateOnly : value;
+}
+
 function localDateOnly(date: Date): string {
   const year = String(date.getFullYear()).padStart(4, "0");
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -429,8 +434,10 @@ export function tournamentToDraft(tournament: TournamentWithPnL): TournamentDraf
     location: tournament.location,
     country: tournament.country,
     currency: tournament.currency,
-    start_date: tournament.start_date,
-    end_date: tournament.end_date,
+    // Treat API dates as calendar values. Some deployed responses still include
+    // a midnight timestamp, which should never leak into the date editor.
+    start_date: apiDateOnly(tournament.start_date),
+    end_date: apiDateOnly(tournament.end_date),
     duration_days: tournament.duration_days,
     entry_fee: tournament.entry_fee,
     prize_rounds: {

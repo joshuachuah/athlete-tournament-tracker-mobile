@@ -1,5 +1,7 @@
+import { useNavigation, usePreventRemove } from "@react-navigation/native";
 import { useEffect, useReducer, useRef } from "react";
 import {
+  Alert,
   Keyboard,
   Platform,
   Pressable,
@@ -132,7 +134,26 @@ export function TournamentProjectionBuilder({
   const identityInputRef = useRef<TextInput>(null);
   const initialDraftRef = useRef(initialDraft);
   const setPersistedDraftRef = useRef(setDraft);
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const hasUnsavedEdit =
+    Boolean(formDraft.editId) &&
+    JSON.stringify(formDraft) !== JSON.stringify(initialDraftRef.current);
+
+  usePreventRemove(hasUnsavedEdit && !loading, ({ data }) => {
+    Alert.alert(
+      "Discard unsaved changes?",
+      "Your tournament changes have not been saved.",
+      [
+        { text: "Keep editing", style: "cancel" },
+        {
+          text: "Discard changes",
+          style: "destructive",
+          onPress: () => navigation.dispatch(data.action),
+        },
+      ],
+    );
+  });
   const actionAreaBottomPadding =
     Platform.OS === "ios"
       ? insets.bottom + IOS_NATIVE_TAB_BAR_CLEARANCE

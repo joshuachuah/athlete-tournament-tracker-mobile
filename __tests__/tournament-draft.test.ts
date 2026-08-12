@@ -76,6 +76,18 @@ describe("tournamentToDraft", () => {
     );
   });
 
+  it("removes legacy midnight timestamps from editable dates", () => {
+    const draft = tournamentToDraft(
+      tournament({
+        start_date: "2026-04-01T00:00:00",
+        end_date: "2026-04-03T00:00:00Z",
+      }),
+    );
+
+    expect(draft.start_date).toBe("2026-04-01");
+    expect(draft.end_date).toBe("2026-04-03");
+  });
+
   it("merges sparse prize rounds over all-zero defaults", () => {
     const draft = tournamentToDraft(
       tournament({ prize_rounds: { r1: 100 } }),
