@@ -387,6 +387,66 @@ describe("split profile destinations", () => {
     expect(screen.getByText(/Unlock with/)).toBeTruthy();
   });
 
+  it("allows Face ID authentication through iOS inactive transitions", async () => {
+    let appStateListener: ((state: AppStateStatus) => void) | undefined;
+    const appStateSpy = jest
+      .spyOn(AppState, "addEventListener")
+      .mockImplementation((_event, listener) => {
+        appStateListener = listener;
+        return { remove: jest.fn() };
+      });
+    let resolveAuthentication:
+      | ((result: { success: true }) => void)
+      | undefined;
+    mockAuthenticate.mockReturnValue(
+      new Promise((resolve) => {
+        resolveAuthentication = resolve;
+      }),
+    );
+
+    const screen = render(<PrivateFinancesScreen />);
+
+    act(() => {
+      appStateListener?.("inactive");
+    });
+    await act(async () => {
+      resolveAuthentication?.({ success: true });
+    });
+
+    expect(screen.getByText("Authenticating…")).toBeTruthy();
+    expect(screen.queryByText("Monthly income")).toBeNull();
+
+    act(() => {
+      appStateListener?.("active");
+    });
+
+    expect(await screen.findByText("Monthly income")).toBeTruthy();
+    expect(screen.getByText("Face ID verified")).toBeTruthy();
+    appStateSpy.mockRestore();
+  });
+
+  it("locks visible finances when an unlocked app becomes inactive", async () => {
+    let appStateListener: ((state: AppStateStatus) => void) | undefined;
+    const appStateSpy = jest
+      .spyOn(AppState, "addEventListener")
+      .mockImplementation((_event, listener) => {
+        appStateListener = listener;
+        return { remove: jest.fn() };
+      });
+    mockAuthenticate.mockResolvedValue({ success: true });
+
+    const screen = render(<PrivateFinancesScreen />);
+    expect(await screen.findByText("Monthly income")).toBeTruthy();
+
+    act(() => {
+      appStateListener?.("inactive");
+    });
+
+    expect(await screen.findByText("Private finances locked")).toBeTruthy();
+    expect(screen.queryByText("Monthly income")).toBeNull();
+    appStateSpy.mockRestore();
+  });
+
   it("ignores a pending successful authentication after the app backgrounds", async () => {
     let appStateListener: ((state: AppStateStatus) => void) | undefined;
     const appStateSpy = jest
