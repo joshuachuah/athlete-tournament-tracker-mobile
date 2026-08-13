@@ -145,6 +145,7 @@ export function TournamentBuilderContainer({
           mutation.isPending && mutation.variables?.userId === session.user.id
         }
         profileId={profile.id}
+        saveCompleted={Boolean(savedProjection)}
         sport={profile.sport}
         submitError={
           submitError?.userId === session.user.id ? submitError.message : null

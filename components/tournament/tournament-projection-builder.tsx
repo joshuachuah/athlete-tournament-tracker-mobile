@@ -1,5 +1,7 @@
-import { useEffect, useReducer, useRef } from "react";
+import { useNavigation, usePreventRemove } from "@react-navigation/native";
+import { useEffect, useReducer, useRef, useState } from "react";
 import {
+  Alert,
   Keyboard,
   Platform,
   Pressable,
@@ -102,6 +104,7 @@ export function TournamentProjectionBuilder({
   loading = false,
   onSubmit,
   profileId,
+  saveCompleted = false,
   sport,
   submitError,
 }: {
@@ -111,6 +114,7 @@ export function TournamentProjectionBuilder({
   loading?: boolean;
   onSubmit: (draft: TournamentDraft) => void;
   profileId: string;
+  saveCompleted?: boolean;
   sport?: string;
   submitError?: string | null;
 }) {
@@ -130,9 +134,36 @@ export function TournamentProjectionBuilder({
     submissionSummary,
   } = builderState;
   const identityInputRef = useRef<TextInput>(null);
-  const initialDraftRef = useRef(initialDraft);
+  const [initialDraftBaseline] = useState(initialDraft);
   const setPersistedDraftRef = useRef(setDraft);
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const hasUnsavedEdit =
+    Boolean(formDraft.editId) &&
+    JSON.stringify(formDraft) !== JSON.stringify(initialDraftBaseline);
+
+  usePreventRemove(hasUnsavedEdit && !saveCompleted, ({ data }) => {
+    if (loading) {
+      Alert.alert(
+        "Saving changes",
+        "Wait for the tournament update to finish before leaving.",
+      );
+      return;
+    }
+
+    Alert.alert(
+      "Discard unsaved changes?",
+      "Your tournament changes have not been saved.",
+      [
+        { text: "Keep editing", style: "cancel" },
+        {
+          text: "Discard changes",
+          style: "destructive",
+          onPress: () => navigation.dispatch(data.action),
+        },
+      ],
+    );
+  });
   const actionAreaBottomPadding =
     Platform.OS === "ios"
       ? insets.bottom + IOS_NATIVE_TAB_BAR_CLEARANCE
@@ -141,8 +172,8 @@ export function TournamentProjectionBuilder({
   useEffect(() => {
     // The container keys the builder by create/edit identity. Seed persistence
     // once per mount without re-syncing over the user's in-progress edits.
-    setPersistedDraftRef.current(initialDraftRef.current);
-  }, []);
+    setPersistedDraftRef.current(initialDraftBaseline);
+  }, [initialDraftBaseline]);
 
   function updateDraft(next: TournamentDraft) {
     updateBuilderState({ formDraft: next, submissionSummary: null });

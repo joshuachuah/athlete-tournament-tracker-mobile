@@ -77,6 +77,29 @@ describe("tournamentToDraft", () => {
     );
   });
 
+  it("removes legacy midnight timestamps from editable dates", () => {
+    const draft = tournamentToDraft(
+      tournament({
+        start_date: "2026-04-01T00:00:00",
+        end_date: "2026-04-03T00:00:00Z",
+      }),
+    );
+
+    expect(draft.start_date).toBe("2026-04-01");
+    expect(draft.end_date).toBe("2026-04-03");
+  });
+
+  it.each([
+    "2026-04-01T",
+    "2026-04-01Totally-invalid",
+    "2026-04-01T25:00:00Z",
+    "2026-02-29T00:00:00Z",
+  ])("leaves malformed API date %s visible for form validation", (start_date) => {
+    expect(tournamentToDraft(tournament({ start_date })).start_date).toBe(
+      start_date,
+    );
+  });
+
   it("merges sparse prize rounds over all-zero defaults", () => {
     const draft = tournamentToDraft(
       tournament({ prize_rounds: { r1: 100 } }),
