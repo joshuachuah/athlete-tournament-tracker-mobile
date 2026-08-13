@@ -5,7 +5,7 @@ import {
   render,
   waitFor,
 } from "@testing-library/react-native";
-import { Alert } from "react-native";
+import { Alert, Text } from "react-native";
 import type { Session } from "@supabase/supabase-js";
 import { router, useLocalSearchParams } from "expo-router";
 
@@ -194,6 +194,31 @@ describe("TournamentDetailScreen deletion", () => {
       expect(screen.getByText("No break-even")).toBeTruthy();
       expect(screen.queryByText("Projection unavailable")).toBeNull();
     });
+    screen.unmount();
+  });
+
+  it("shows the server expense total before outcome scenarios", async () => {
+    const detail = tournament("expense-first");
+    detail.pnl.scenarios = [losingScenario];
+    const { screen } = renderDetail(detail);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Each net result subtracts total expenses."),
+      ).toBeTruthy();
+      expect(
+        screen.getByLabelText(
+          "Total expenses subtracted from every scenario: $825 USD",
+        ),
+      ).toBeTruthy();
+    });
+
+    const renderedText = screen.UNSAFE_getAllByType(Text).map(
+      (element) => element.props.children,
+    );
+    expect(renderedText.indexOf("Expense breakdown")).toBeLessThan(
+      renderedText.indexOf("Scenarios"),
+    );
     screen.unmount();
   });
 
