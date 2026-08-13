@@ -36,7 +36,14 @@ describe("date-only utilities", () => {
 
   it("extracts years without crossing a timezone boundary", () => {
     expect(dateOnlyYear("2026-01-01")).toBe(2026);
+    expect(dateOnlyYear("2026-01-01T00:00:00")).toBe(2026);
+    expect(dateOnlyYear("2026-01-01T00:00:00.123Z")).toBe(2026);
+    expect(dateOnlyYear("2026-01-01T00:00:00+08:00")).toBe(2026);
     expect(dateOnlyYear("not-a-date")).toBeNull();
+    expect(dateOnlyYear("2026-01-01T")).toBeNull();
+    expect(dateOnlyYear("2026-01-01Totally-invalid")).toBeNull();
+    expect(dateOnlyYear("2026-02-29T00:00:00Z")).toBeNull();
+    expect(dateOnlyYear("2026-01-01T25:00:00Z")).toBeNull();
   });
 
   it("does not turn invalid or reversed ranges into one-day events", () => {
