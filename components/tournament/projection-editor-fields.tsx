@@ -2,6 +2,7 @@ import { Switch, Text, View } from "react-native";
 
 import type { ProjectionEditor } from "@/components/tournament/impact-ledger";
 import { Button } from "@/components/ui/button";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Input } from "@/components/ui/input";
 import { MoneyInput } from "@/components/ui/money-input";
 import { colors, spacing } from "@/constants/theme";
@@ -67,24 +68,15 @@ export function ProjectionEditorFields({
           onChangeText={(currency) => onUpdate({ currency: currency.toUpperCase() })}
           error={errors.currency}
         />
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.md }}>
-          <Input
-            label="Start date"
-            value={workingDraft.start_date}
-            onChangeText={(start_date) => onUpdate({ start_date })}
-            error={errors.start_date}
-            placeholder="YYYY-MM-DD"
-            style={{ minWidth: 144 }}
-          />
-          <Input
-            label="End date"
-            value={workingDraft.end_date}
-            onChangeText={(end_date) => onUpdate({ end_date })}
-            error={errors.end_date}
-            placeholder="YYYY-MM-DD"
-            style={{ minWidth: 144 }}
-          />
-        </View>
+        <DateRangePicker
+          startDate={workingDraft.start_date}
+          endDate={workingDraft.end_date}
+          startError={errors.start_date}
+          endError={errors.end_date}
+          onChange={({ startDate, endDate }) =>
+            onUpdate({ start_date: startDate, end_date: endDate })
+          }
+        />
         <Text style={{ color: colors.mutedForeground }}>
           Duration: {workingDraft.duration_days} day
           {workingDraft.duration_days === 1 ? "" : "s"}
