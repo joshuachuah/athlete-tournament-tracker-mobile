@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react-native";
-import { Keyboard } from "react-native";
+import { Keyboard, StyleSheet } from "react-native";
 
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 
@@ -54,6 +54,24 @@ describe("DateRangePicker", () => {
     expect(screen.getByLabelText("Sun")).toBeTruthy();
     expect(screen.getByLabelText("Sat")).toBeTruthy();
     dismiss.mockRestore();
+  });
+
+  it("keeps every calendar day at least 44 points tall and wide", () => {
+    render(
+      <DateRangePicker
+        endDate="2026-08-15"
+        onChange={jest.fn()}
+        startDate="2026-08-13"
+      />,
+    );
+
+    fireEvent.press(screen.getByLabelText("Start date, Aug 13, 2026"));
+    const dayStyle = StyleSheet.flatten(
+      screen.getByLabelText("Choose Aug 14, 2026 as start date").props.style,
+    );
+
+    expect(dayStyle.width).toBeGreaterThanOrEqual(44);
+    expect(dayStyle.height).toBeGreaterThanOrEqual(44);
   });
 
   it("moves both dates when a new start is after the current end", () => {

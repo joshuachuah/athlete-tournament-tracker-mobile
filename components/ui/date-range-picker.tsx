@@ -207,7 +207,6 @@ export function DateRangePicker({
                     accessibilityRole="button"
                     accessibilityState={{ disabled, selected }}
                     disabled={disabled}
-                    hitSlop={4}
                     onPress={() => selectDate(date)}
                     style={({ pressed }) => [
                       styles.dayButton,
@@ -294,8 +293,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   monthButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: radii.sm,
@@ -311,7 +310,7 @@ const styles = StyleSheet.create({
   },
   dayCell: {
     width: "14.2857%",
-    minHeight: 40,
+    minHeight: 44,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -324,8 +323,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   dayButton: {
-    width: 36,
-    height: 36,
+    width: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: radii.sm,
