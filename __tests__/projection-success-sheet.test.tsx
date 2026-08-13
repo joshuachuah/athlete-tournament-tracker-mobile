@@ -34,11 +34,11 @@ const saved: TournamentWithPnL = {
   pnl: {
     total_expenses: 100,
     total_income_base: 0,
-    break_even_round: "r2",
+    break_even_round: null,
     scenarios: [
-      { scenario: "worst", round: "r1", prize_money: 0, prize_money_after_tax: 0, net_result: -100, profitable: false },
-      { scenario: "realistic", round: "r2", prize_money: 100, prize_money_after_tax: 100, net_result: 0, profitable: true },
-      { scenario: "best", round: "w", prize_money: 500, prize_money_after_tax: 350, net_result: 250, profitable: true },
+      { scenario: "worst", round: "r2", prize_money: 100, prize_money_after_tax: 70, net_result: -30, profitable: false },
+      { scenario: "realistic", round: "r2", prize_money: 100, prize_money_after_tax: 70, net_result: -30, profitable: false },
+      { scenario: "best", round: "r2", prize_money: 100, prize_money_after_tax: 70, net_result: -30, profitable: false },
     ],
   },
 };
@@ -54,7 +54,7 @@ it("renders the actual returned projection and delegates view or dismiss", () =>
   expect(screen.getByText("Middle case")).toBeTruthy();
   expect(screen.getByText("R2")).toBeTruthy();
   expect(screen.queryByText("QF")).toBeNull();
-  expect(screen.getByText("Break even · MYR 0 MYR")).toBeTruthy();
+  expect(screen.getByText("−MYR 30 MYR")).toBeTruthy();
   fireEvent.press(screen.getByText("View projection"));
   fireEvent.press(screen.getAllByLabelText("Dismiss saved projection")[0]);
 

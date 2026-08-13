@@ -489,7 +489,14 @@ export function toTournamentPayload(
     subsidy_amount: normalized.subsidy_enabled ? normalized.subsidy_amount : 0,
     subsidy_covers: normalized.subsidy_enabled ? normalized.subsidy_covers : null,
     sponsorship_allocated: normalized.sponsorship_allocated,
-    prize_rounds: normalized.prize_rounds,
+    // Zero is the form's empty value. Omitting those rounds keeps saved
+    // projections aligned with previews and lets the server choose scenarios
+    // from the rounds the athlete actually entered.
+    prize_rounds: Object.fromEntries(
+      Object.entries(normalized.prize_rounds).filter(
+        ([, amount]) => (amount ?? 0) > 0,
+      ),
+    ),
     prize_tax_rate: normalized.prize_tax_rate,
   };
 }
@@ -498,14 +505,7 @@ export function toTournamentPreviewPayload(
   draft: TournamentDraft,
   userId: string,
 ): Omit<Tournament, "id" | "created_at"> {
-  const payload = toTournamentPayload(draft, userId);
-
-  return {
-    ...payload,
-    prize_rounds: Object.fromEntries(
-      Object.entries(payload.prize_rounds).filter(([, amount]) => (amount ?? 0) > 0),
-    ),
-  };
+  return toTournamentPayload(draft, userId);
 }
 
 type TournamentWriter = {
