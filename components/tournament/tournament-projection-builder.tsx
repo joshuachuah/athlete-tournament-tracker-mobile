@@ -142,7 +142,15 @@ export function TournamentProjectionBuilder({
     Boolean(formDraft.editId) &&
     JSON.stringify(formDraft) !== JSON.stringify(initialDraftBaseline);
 
-  usePreventRemove(hasUnsavedEdit && !loading && !saveCompleted, ({ data }) => {
+  usePreventRemove(hasUnsavedEdit && !saveCompleted, ({ data }) => {
+    if (loading) {
+      Alert.alert(
+        "Saving changes",
+        "Wait for the tournament update to finish before leaving.",
+      );
+      return;
+    }
+
     Alert.alert(
       "Discard unsaved changes?",
       "Your tournament changes have not been saved.",

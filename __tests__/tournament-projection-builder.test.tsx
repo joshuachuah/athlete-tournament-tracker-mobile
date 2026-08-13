@@ -412,6 +412,39 @@ describe("TournamentProjectionBuilder", () => {
 
     expect(mockUsePreventRemove.mock.calls.at(-1)?.[0]).toBe(false);
   });
+
+  it("keeps navigation blocked while an edit save is pending", () => {
+    const initialDraft = tournamentToDraft(savedTournament);
+    const { screen } = renderBuilder(initialDraft, jest.fn());
+
+    fireEvent.press(screen.getByText("Coaching / physio"));
+    fireEvent.changeText(screen.getByLabelText("Coaching / physio (USD)"), "75");
+    fireEvent.press(screen.getByText("Apply coaching / physio"));
+
+    screen.rerender(
+      <TournamentDraftProvider userId="account-1">
+        <TournamentProjectionBuilder
+          authenticatedUserId="account-1"
+          homeCurrency="USD"
+          initialDraft={initialDraft}
+          loading
+          onSubmit={jest.fn()}
+          profileId="athlete-1"
+          sport="tennis"
+        />
+      </TournamentDraftProvider>,
+    );
+
+    const preventRemove = mockUsePreventRemove.mock.calls.at(-1);
+    expect(preventRemove?.[0]).toBe(true);
+    preventRemove?.[1]({ data: { action: { type: "GO_BACK" } } });
+
+    expect(Alert.alert).toHaveBeenCalledWith(
+      "Saving changes",
+      "Wait for the tournament update to finish before leaving.",
+    );
+    expect(mockDispatch).not.toHaveBeenCalled();
+  });
 });
 
 describe("save completion helpers", () => {
