@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react-native";
 import { Keyboard, StyleSheet } from "react-native";
 
 import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { spacing } from "@/constants/theme";
 
 describe("DateRangePicker", () => {
   it("chooses a start and end date from the calendar", () => {
@@ -72,6 +73,28 @@ describe("DateRangePicker", () => {
 
     expect(dayStyle.width).toBeGreaterThanOrEqual(44);
     expect(dayStyle.height).toBeGreaterThanOrEqual(44);
+  });
+
+  it("uses the sheet edges to fit seven 44-point columns on narrow phones", () => {
+    render(
+      <DateRangePicker
+        endDate="2026-08-15"
+        onChange={jest.fn()}
+        startDate="2026-08-13"
+      />,
+    );
+
+    fireEvent.press(screen.getByLabelText("Start date, Aug 13, 2026"));
+    const calendarStyle = StyleSheet.flatten(
+      screen.getByLabelText("start date calendar").props.style,
+    );
+    const narrowPhoneWidth = 320;
+    const calendarWidth =
+      narrowPhoneWidth - spacing.xl * 2 - calendarStyle.marginHorizontal * 2;
+    const gridWidth =
+      calendarWidth - calendarStyle.borderWidth * 2 - calendarStyle.paddingHorizontal * 2;
+
+    expect(gridWidth / 7).toBeGreaterThanOrEqual(44);
   });
 
   it("moves both dates when a new start is after the current end", () => {

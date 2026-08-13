@@ -284,7 +284,9 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radii.md,
     borderCurve: "continuous",
-    padding: spacing.md,
+    marginHorizontal: -spacing.xl,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.md,
     backgroundColor: colors.surface,
   },
   monthHeader: {
