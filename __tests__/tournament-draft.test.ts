@@ -9,6 +9,7 @@ import {
   persistedTournamentDraft,
   prizesSchema,
   resumableDraft,
+  saveTournamentDraft,
   toTournamentPayload,
   toTournamentPreviewPayload,
   tournamentDraftFromKnown,
@@ -142,11 +143,7 @@ describe("tournamentToDraft", () => {
         sponsorship_allocated: 30,
         prize_rounds: {
           r1: 150,
-          r2: 0,
-          r3: 0,
           qf: 900,
-          sf: 0,
-          f: 0,
           w: 2_500,
         },
       }),
@@ -170,15 +167,7 @@ describe("tournamentToDraft", () => {
         misc_cost: expect.any(Number),
         subsidy_amount: expect.any(Number),
         sponsorship_allocated: expect.any(Number),
-        prize_rounds: {
-          r1: expect.any(Number),
-          r2: expect.any(Number),
-          r3: expect.any(Number),
-          qf: expect.any(Number),
-          sf: expect.any(Number),
-          f: expect.any(Number),
-          w: expect.any(Number),
-        },
+        prize_rounds: { r1: expect.any(Number) },
       }),
     );
   });
@@ -652,6 +641,46 @@ describe("toTournamentPayload", () => {
     );
 
     expect(payload.prize_tax_rate).toBe(30);
+  });
+
+  it("omits unentered prize rounds from saved projections", () => {
+    const payload = toTournamentPayload(
+      {
+        ...defaultTournamentDraft,
+        prize_rounds: { ...defaultTournamentDraft.prize_rounds, r2: 500 },
+      },
+      "athlete-1",
+    );
+
+    expect(payload.prize_rounds).toEqual({ r2: 500 });
+  });
+
+  it("sends only entered prize rounds through create and update", async () => {
+    const saved = tournament();
+    const writer = {
+      create: jest.fn().mockResolvedValue(saved),
+      update: jest.fn().mockResolvedValue(saved),
+    };
+    const prize_rounds = { ...defaultTournamentDraft.prize_rounds, r2: 500 };
+
+    await saveTournamentDraft(
+      { ...defaultTournamentDraft, prize_rounds },
+      "athlete-1",
+      writer,
+    );
+    await saveTournamentDraft(
+      { ...defaultTournamentDraft, editId: "tournament-1", prize_rounds },
+      "athlete-1",
+      writer,
+    );
+
+    expect(writer.create).toHaveBeenCalledWith(
+      expect.objectContaining({ prize_rounds: { r2: 500 } }),
+    );
+    expect(writer.update).toHaveBeenCalledWith(
+      "tournament-1",
+      expect.objectContaining({ prize_rounds: { r2: 500 } }),
+    );
   });
 });
 

@@ -102,7 +102,7 @@ export function ProjectionSuccessSheet({
             {realistic ? (
               <View style={{ flexDirection: "row", justifyContent: "space-between", gap: spacing.md }}>
                 <View style={{ gap: 3 }}>
-                  <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>Realistic outcome</Text>
+                  <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>Middle case</Text>
                   <Text style={{ color: colors.foreground, fontSize: 18, fontWeight: "900" }}>
                     {roundLabels[realistic.round]}
                   </Text>

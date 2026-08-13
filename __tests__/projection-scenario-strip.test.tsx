@@ -50,21 +50,35 @@ beforeEach(() => {
 
 afterEach(() => jest.useRealTimers());
 
-it("renders server-provided dynamic rounds and treats zero net as break-even", async () => {
+it("renders a server-provided non-QF middle case and treats zero net as break-even", async () => {
   mockPreview.mockResolvedValue({
-    total_expenses: 400,
+    total_expenses: 200,
     total_income_base: 0,
-    break_even_round: "qf",
+    break_even_round: "r2",
     scenarios: [
-      { scenario: "worst", round: "r1", prize_money: 100, prize_money_after_tax: 100, net_result: -300, profitable: false },
-      { scenario: "realistic", round: "qf", prize_money: 400, prize_money_after_tax: 400, net_result: 0, profitable: false },
-      { scenario: "best", round: "w", prize_money: 700, prize_money_after_tax: 700, net_result: 300, profitable: true },
+      { scenario: "worst", round: "r1", prize_money: 100, prize_money_after_tax: 100, net_result: -100, profitable: false },
+      { scenario: "realistic", round: "r2", prize_money: 200, prize_money_after_tax: 200, net_result: 0, profitable: true },
+      { scenario: "best", round: "w", prize_money: 700, prize_money_after_tax: 700, net_result: 500, profitable: true },
     ],
   });
-  const screen = renderStrip();
+  const screen = renderStrip({
+    ...draft,
+    prize_rounds: {
+      ...draft.prize_rounds,
+      r3: 0,
+      qf: 0,
+      sf: 0,
+      f: 0,
+    },
+  });
   await settlePreview();
 
-  await waitFor(() => expect(screen.getByText("QF")).toBeTruthy());
+  await waitFor(() => expect(screen.getByText("R2")).toBeTruthy());
+  expect(screen.queryByText("QF")).toBeNull();
+  expect(screen.getByText("Middle case")).toBeTruthy();
+  expect(
+    screen.getByText("Based on your earliest, middle, and latest entered prize rounds."),
+  ).toBeTruthy();
   expect(screen.getByText("Win")).toBeTruthy();
   expect(screen.getByText("Break even")).toBeTruthy();
   expect(screen.getByText("$0 USD")).toBeTruthy();

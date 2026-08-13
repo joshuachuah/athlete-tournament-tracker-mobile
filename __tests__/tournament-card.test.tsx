@@ -137,7 +137,7 @@ describe("TournamentCard", () => {
 
     const link = screen.getByRole("link");
     expect(link.props.accessibilityLabel).toBe(
-      "Open Championship. Detroit, Apr 1, 2026. realistic net Profit · $300 USD.",
+      "Open Championship. Detroit, Apr 1, 2026. middle-case net Profit · $300 USD.",
     );
     expect(link.props.accessibilityHint).toBe("Opens tournament details");
   });

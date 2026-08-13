@@ -146,7 +146,9 @@ export function scenarioLabel(scenario: Scenario): string {
     case "worst":
       return "Worst";
     case "realistic":
-      return "Realistic";
+      // The API keeps this identifier for compatibility, but it selects the
+      // middle available prize round rather than making a personal prediction.
+      return "Middle case";
     case "best":
       return "Best";
   }

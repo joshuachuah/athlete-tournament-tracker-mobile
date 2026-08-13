@@ -74,8 +74,8 @@ export function RunwayBanner({
       </View>
       <Text style={{ color: colors.mutedForeground, lineHeight: 20 }} selectable>
         {profitable
-          ? "Your realistic scenarios are not averaging a loss."
-          : `Average realistic loss: ${formatMoney(averageNetSpend, currency)}.`}
+          ? "Your middle-case scenarios are not averaging a loss."
+          : `Average middle-case loss: ${formatMoney(averageNetSpend, currency)}.`}
       </Text>
     </Card>
   );
