@@ -81,6 +81,7 @@ function PrivateFinancesContent() {
     });
   });
   const authenticationAttempt = useRef(0);
+  const authenticationPending = useRef(true);
   const financialSaveAttempt = useRef(0);
   const saveInFlight = useRef(false);
   const mounted = useRef(true);
@@ -99,6 +100,8 @@ function PrivateFinancesContent() {
         return;
       }
 
+      authenticationPending.current = false;
+
       if (result.success) {
         updateViewState({ gateState: "unlocked", message: null });
       } else {
@@ -116,11 +119,18 @@ function PrivateFinancesContent() {
     const subscription = AppState.addEventListener("change", (nextState) => {
       if (nextState === "active") {
         isBackgrounded.current = false;
+        return;
       }
 
-      // iOS reports `inactive` while its Face ID prompt is on screen. Only a
-      // confirmed background transition should invalidate authentication.
-      if (nextState === "background") {
+      // iOS reports `inactive` while its Face ID prompt is on screen. Ignore
+      // only that pending prompt; an already-unlocked view must be masked as
+      // soon as any system interruption can snapshot it.
+      if (nextState === "inactive" && authenticationPending.current) {
+        return;
+      }
+
+      if (nextState === "inactive" || nextState === "background") {
+        authenticationPending.current = false;
         isBackgrounded.current = true;
         authenticationAttempt.current += 1;
         financialSaveAttempt.current += 1;
@@ -138,6 +148,8 @@ function PrivateFinancesContent() {
 
     return () => {
       mounted.current = false;
+      authenticationPending.current = false;
+      authenticationAttempt.current += 1;
       financialSaveAttempt.current += 1;
       subscription?.remove();
     };
@@ -145,12 +157,15 @@ function PrivateFinancesContent() {
 
   function handleUnlock() {
     const attempt = ++authenticationAttempt.current;
+    authenticationPending.current = true;
     updateViewState({ gateState: "authenticating", message: null });
 
     void authenticateSafely().then((result) => {
       if (attempt !== authenticationAttempt.current || isBackgrounded.current) {
         return;
       }
+
+      authenticationPending.current = false;
 
       if (result.success) {
         updateViewState({ gateState: "unlocked" });

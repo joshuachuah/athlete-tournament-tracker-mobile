@@ -419,6 +419,28 @@ describe("split profile destinations", () => {
     appStateSpy.mockRestore();
   });
 
+  it("locks visible finances when an unlocked app becomes inactive", async () => {
+    let appStateListener: ((state: AppStateStatus) => void) | undefined;
+    const appStateSpy = jest
+      .spyOn(AppState, "addEventListener")
+      .mockImplementation((_event, listener) => {
+        appStateListener = listener;
+        return { remove: jest.fn() };
+      });
+    mockAuthenticate.mockResolvedValue({ success: true });
+
+    const screen = render(<PrivateFinancesScreen />);
+    expect(await screen.findByText("Monthly income")).toBeTruthy();
+
+    act(() => {
+      appStateListener?.("inactive");
+    });
+
+    expect(await screen.findByText("Private finances locked")).toBeTruthy();
+    expect(screen.queryByText("Monthly income")).toBeNull();
+    appStateSpy.mockRestore();
+  });
+
   it("ignores a pending successful authentication after the app backgrounds", async () => {
     let appStateListener: ((state: AppStateStatus) => void) | undefined;
     const appStateSpy = jest
