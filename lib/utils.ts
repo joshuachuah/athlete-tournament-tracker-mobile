@@ -15,7 +15,8 @@ export const roundLabels: Record<keyof PrizeRounds, string> = {
 const moneyFormatters = new Map<string, Intl.NumberFormat>();
 const currencyFractionDigits = new Map<string, number>();
 const isoDateOnlyPattern = /^(\d{4})-(\d{2})-(\d{2})$/;
-const isoDatePrefixPattern = /^(\d{4}-\d{2}-\d{2})(?:T|$)/;
+const isoDateTimePattern =
+  /^(\d{4}-\d{2}-\d{2})T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?$/;
 
 function getMoneyFormatter(currency: string): Intl.NumberFormat {
   const cached = moneyFormatters.get(currency);
@@ -77,11 +78,19 @@ export function parseDateOnly(value: string): Date | null {
 }
 
 export function dateOnlyYear(value: string): number | null {
-  const dateOnlyValue = isoDatePrefixPattern.exec(value)?.[1];
+  const dateOnly = parseDateOnly(value);
 
-  return dateOnlyValue
-    ? (parseDateOnly(dateOnlyValue)?.getFullYear() ?? null)
-    : null;
+  if (dateOnly) {
+    return dateOnly.getFullYear();
+  }
+
+  const dateTimeMatch = isoDateTimePattern.exec(value);
+
+  if (!dateTimeMatch || Number.isNaN(Date.parse(value))) {
+    return null;
+  }
+
+  return parseDateOnly(dateTimeMatch[1])?.getFullYear() ?? null;
 }
 
 export function calculateDurationDays(startDate: string, endDate: string): number {
