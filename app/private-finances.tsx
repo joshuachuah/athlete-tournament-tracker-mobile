@@ -82,6 +82,8 @@ function PrivateFinancesContent() {
   });
   const authenticationAttempt = useRef(0);
   const authenticationPending = useRef(true);
+  const deferredAuthenticationSuccess = useRef(false);
+  const waitingForActiveAfterInactive = useRef(false);
   const financialSaveAttempt = useRef(0);
   const saveInFlight = useRef(false);
   const mounted = useRef(true);
@@ -103,6 +105,10 @@ function PrivateFinancesContent() {
       authenticationPending.current = false;
 
       if (result.success) {
+        if (waitingForActiveAfterInactive.current) {
+          deferredAuthenticationSuccess.current = true;
+          return;
+        }
         updateViewState({ gateState: "unlocked", message: null });
       } else {
         updateViewState({ gateState: "locked", message: result.message });
@@ -119,6 +125,11 @@ function PrivateFinancesContent() {
     const subscription = AppState.addEventListener("change", (nextState) => {
       if (nextState === "active") {
         isBackgrounded.current = false;
+        waitingForActiveAfterInactive.current = false;
+        if (deferredAuthenticationSuccess.current) {
+          deferredAuthenticationSuccess.current = false;
+          updateViewState({ gateState: "unlocked", message: null });
+        }
         return;
       }
 
@@ -126,10 +137,13 @@ function PrivateFinancesContent() {
       // only that pending prompt; an already-unlocked view must be masked as
       // soon as any system interruption can snapshot it.
       if (nextState === "inactive" && authenticationPending.current) {
+        waitingForActiveAfterInactive.current = true;
         return;
       }
 
       if (nextState === "inactive" || nextState === "background") {
+        deferredAuthenticationSuccess.current = false;
+        waitingForActiveAfterInactive.current = false;
         authenticationPending.current = false;
         isBackgrounded.current = true;
         authenticationAttempt.current += 1;
@@ -148,6 +162,8 @@ function PrivateFinancesContent() {
 
     return () => {
       mounted.current = false;
+      deferredAuthenticationSuccess.current = false;
+      waitingForActiveAfterInactive.current = false;
       authenticationPending.current = false;
       authenticationAttempt.current += 1;
       financialSaveAttempt.current += 1;
@@ -157,6 +173,8 @@ function PrivateFinancesContent() {
 
   function handleUnlock() {
     const attempt = ++authenticationAttempt.current;
+    deferredAuthenticationSuccess.current = false;
+    waitingForActiveAfterInactive.current = false;
     authenticationPending.current = true;
     updateViewState({ gateState: "authenticating", message: null });
 
@@ -168,6 +186,10 @@ function PrivateFinancesContent() {
       authenticationPending.current = false;
 
       if (result.success) {
+        if (waitingForActiveAfterInactive.current) {
+          deferredAuthenticationSuccess.current = true;
+          return;
+        }
         updateViewState({ gateState: "unlocked" });
         return;
       }

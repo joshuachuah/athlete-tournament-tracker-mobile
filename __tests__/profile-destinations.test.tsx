@@ -408,10 +408,16 @@ describe("split profile destinations", () => {
 
     act(() => {
       appStateListener?.("inactive");
-      appStateListener?.("active");
     });
     await act(async () => {
       resolveAuthentication?.({ success: true });
+    });
+
+    expect(screen.getByText("Authenticating…")).toBeTruthy();
+    expect(screen.queryByText("Monthly income")).toBeNull();
+
+    act(() => {
+      appStateListener?.("active");
     });
 
     expect(await screen.findByText("Monthly income")).toBeTruthy();
