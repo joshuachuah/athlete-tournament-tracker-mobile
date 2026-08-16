@@ -287,6 +287,9 @@ export function PrizeDistributionSelector({
 
   function selectTemplate(templateId: DrawTemplateId) {
     onUpdate({
+      ...(selectedTier?.category === "world"
+        ? { prize_tier_id: null, prize_player_total: 0 }
+        : {}),
       prize_draw_template_id: templateId,
       prize_rounds: activeTier
         ? roundsFor(activeTier, templateId)
@@ -505,7 +508,22 @@ export function PrizeDistributionSelector({
       <Button
         label="Enter payouts manually"
         variant="ghost"
-        onPress={() => onUpdate({ prize_distribution_mode: "manual" })}
+        onPress={() => {
+          const hasGeneratedPayouts =
+            currencyMatches &&
+            Object.values(draft.prize_rounds).some((amount) => amount > 0);
+
+          onUpdate({
+            prize_distribution_mode: "manual",
+            ...(!hasGeneratedPayouts
+              ? {
+                  prize_tier_id: null,
+                  prize_draw_template_id: null,
+                  prize_player_total: 0,
+                }
+              : {}),
+          });
+        }}
       />
       <Text style={[styles.helper, { fontSize: 12, textAlign: "center" }]}>
         Source: {prizeDistributionRevision}

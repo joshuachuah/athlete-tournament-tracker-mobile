@@ -1,6 +1,7 @@
 import { fireEvent, render } from "@testing-library/react-native";
 import { useState } from "react";
 
+import { PrizeDistributionSelector } from "@/components/tournament/prize-distribution-selector";
 import { ProjectionEditorFields } from "@/components/tournament/projection-editor-fields";
 import {
   createDefaultTournamentDraft,
@@ -90,6 +91,38 @@ describe("PrizeDistributionSelector", () => {
     expect(screen.getByText("$1,200 USD")).toBeTruthy();
   });
 
+  it("clears an incompatible World tier when a Challenger draw is chosen", () => {
+    const onUpdate = jest.fn();
+    const draft: TournamentDraft = {
+      ...createDefaultTournamentDraft(),
+      prize_tier_id: "world_bronze",
+      prize_draw_template_id: "draw_32_entries_24",
+      prize_player_total: 47_500,
+      prize_rounds: {
+        r1: 831.25,
+        r2: 1_306.25,
+        r3: 0,
+        qf: 2_137.5,
+        sf: 3_562.5,
+        f: 5_700,
+        w: 9_025,
+      },
+    };
+    const screen = render(
+      <PrizeDistributionSelector draft={draft} onUpdate={onUpdate} />,
+    );
+
+    fireEvent.press(screen.getByText("Challenger"));
+    fireEvent.press(screen.getByText("16 draw · 16 entries"));
+
+    expect(onUpdate).toHaveBeenCalledWith({
+      prize_tier_id: null,
+      prize_player_total: 0,
+      prize_draw_template_id: "draw_16_entries_16",
+      prize_rounds: { r1: 0, r2: 0, r3: 0, qf: 0, sf: 0, f: 0, w: 0 },
+    });
+  });
+
   it("only offers accommodation options the level actually has", () => {
     const screen = renderPrizeEditor();
 
@@ -122,6 +155,29 @@ describe("PrizeDistributionSelector", () => {
     expect(screen.getByText("USD required for official tiers")).toBeTruthy();
     expect(screen.getAllByText("€0 EUR").length).toBeGreaterThan(0);
     expect(screen.queryByText("$831.25 USD")).toBeNull();
+  });
+
+  it("drops unused selector metadata when blocked payouts switch to manual", () => {
+    const onUpdate = jest.fn();
+    const draft: TournamentDraft = {
+      ...createDefaultTournamentDraft(),
+      currency: "EUR",
+      prize_tier_id: "world_bronze",
+      prize_draw_template_id: "draw_32_entries_24",
+      prize_player_total: 47_500,
+    };
+    const screen = render(
+      <PrizeDistributionSelector draft={draft} onUpdate={onUpdate} />,
+    );
+
+    fireEvent.press(screen.getByText("Enter payouts manually"));
+
+    expect(onUpdate).toHaveBeenCalledWith({
+      prize_distribution_mode: "manual",
+      prize_tier_id: null,
+      prize_draw_template_id: null,
+      prize_player_total: 0,
+    });
   });
 
   it.each(["generated", "manual"] as const)(
