@@ -124,44 +124,47 @@ describe("PrizeDistributionSelector", () => {
     expect(screen.queryByText("$831.25 USD")).toBeNull();
   });
 
-  it("clears generated payouts when the tournament currency changes", () => {
-    const onUpdate = jest.fn();
-    const draft: TournamentDraft = {
-      ...createDefaultTournamentDraft(),
-      prize_distribution_mode: "generated",
-      prize_tier_id: "world_bronze",
-      prize_draw_template_id: "draw_32_entries_24",
-      prize_player_total: 47_500,
-      prize_rounds: {
-        r1: 831.25,
-        r2: 1_306.25,
-        r3: 0,
-        qf: 2_137.5,
-        sf: 3_562.5,
-        f: 5_700,
-        w: 9_025,
-      },
-    };
-    const screen = render(
-      <ProjectionEditorFields
-        editor="details"
-        errors={{}}
-        workingDraft={draft}
-        onUpdate={onUpdate}
-        onUpdateAccommodation={() => undefined}
-      />,
-    );
+  it.each(["generated", "manual"] as const)(
+    "clears selector payouts when the tournament currency changes in %s mode",
+    (prizeDistributionMode) => {
+      const onUpdate = jest.fn();
+      const draft: TournamentDraft = {
+        ...createDefaultTournamentDraft(),
+        prize_distribution_mode: prizeDistributionMode,
+        prize_tier_id: "world_bronze",
+        prize_draw_template_id: "draw_32_entries_24",
+        prize_player_total: 47_500,
+        prize_rounds: {
+          r1: 831.25,
+          r2: 1_306.25,
+          r3: 0,
+          qf: 2_137.5,
+          sf: 3_562.5,
+          f: 5_700,
+          w: 9_025,
+        },
+      };
+      const screen = render(
+        <ProjectionEditorFields
+          editor="details"
+          errors={{}}
+          workingDraft={draft}
+          onUpdate={onUpdate}
+          onUpdateAccommodation={() => undefined}
+        />,
+      );
 
-    fireEvent.changeText(screen.getByLabelText("Currency"), "EUR");
+      fireEvent.changeText(screen.getByLabelText("Currency"), "EUR");
 
-    expect(onUpdate).toHaveBeenCalledWith({
-      currency: "EUR",
-      prize_tier_id: null,
-      prize_draw_template_id: null,
-      prize_player_total: 0,
-      prize_rounds: { r1: 0, r2: 0, r3: 0, qf: 0, sf: 0, f: 0, w: 0 },
-    });
-  });
+      expect(onUpdate).toHaveBeenCalledWith({
+        currency: "EUR",
+        prize_tier_id: null,
+        prize_draw_template_id: null,
+        prize_player_total: 0,
+        prize_rounds: { r1: 0, r2: 0, r3: 0, qf: 0, sf: 0, f: 0, w: 0 },
+      });
+    },
+  );
 
   it("shows Tour Finals as manual-only", () => {
     const screen = renderPrizeEditor();
