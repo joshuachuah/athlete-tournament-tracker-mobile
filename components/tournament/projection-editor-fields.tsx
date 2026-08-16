@@ -1,16 +1,18 @@
-import { Switch, Text, View } from "react-native";
+import { Pencil } from "lucide-react-native";
+import { useState } from "react";
+import { Pressable, Switch, Text, View } from "react-native";
 
 import type { ProjectionEditor } from "@/components/tournament/impact-ledger";
+import { PrizeDistributionSelector } from "@/components/tournament/prize-distribution-selector";
 import { Button } from "@/components/ui/button";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Input } from "@/components/ui/input";
 import { MoneyInput } from "@/components/ui/money-input";
-import { colors, spacing } from "@/constants/theme";
+import { colors, radii, spacing } from "@/constants/theme";
 import type { TournamentDraft } from "@/lib/tournament-draft";
+import { getDrawTemplate, prizeRoundKeys } from "@/lib/prize-distributions";
 import { formatMoney, roundLabels } from "@/lib/utils";
 import type { PrizeRounds, SubsidyCovers } from "@/types";
-
-const rounds: Array<keyof PrizeRounds> = ["r1", "r2", "r3", "qf", "sf", "f", "w"];
 
 const coverOptions: Array<{ value: SubsidyCovers; label: string }> = [
   { value: "flights", label: "Flights" },
@@ -18,6 +20,87 @@ const coverOptions: Array<{ value: SubsidyCovers; label: string }> = [
   { value: "full_expenses", label: "Full expenses" },
   { value: "flat_stipend", label: "Flat stipend" },
 ];
+
+const taxRatePresets = [0, 10, 15, 20];
+
+/**
+ * Generated payouts render as quiet read-only rows; tapping one swaps in a
+ * money input so overriding an amount is a deliberate act instead of seven
+ * always-open form fields.
+ */
+function PrizeRoundRow({
+  currency,
+  editing,
+  error,
+  label,
+  onChangeValue,
+  onDone,
+  onEdit,
+  players,
+  value,
+}: {
+  currency: string;
+  editing: boolean;
+  error?: string;
+  label: string;
+  onChangeValue: (value: number) => void;
+  onDone: () => void;
+  onEdit: () => void;
+  players: number;
+  value: number;
+}) {
+  if (editing) {
+    return (
+      <MoneyInput
+        label={`${label} (${currency})`}
+        value={value}
+        onChangeValue={onChangeValue}
+        error={error}
+        autoFocus
+        onBlur={onDone}
+      />
+    );
+  }
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Edit ${label} payout`}
+      onPress={onEdit}
+      style={({ pressed }) => ({
+        minHeight: 56,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: spacing.md,
+        paddingHorizontal: spacing.md,
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: radii.sm,
+        borderCurve: "continuous",
+        backgroundColor: colors.surface,
+        opacity: pressed ? 0.7 : 1,
+      })}
+    >
+      <View style={{ gap: spacing.xs }}>
+        <Text style={{ color: colors.foreground, fontWeight: "800" }}>
+          {label}
+        </Text>
+        <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>
+          {players} player{players === 1 ? "" : "s"} paid
+        </Text>
+      </View>
+      <View
+        style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}
+      >
+        <Text style={{ color: colors.foreground, fontWeight: "800" }}>
+          {formatMoney(value, currency)}
+        </Text>
+        <Pencil color={colors.mutedForeground} size={14} />
+      </View>
+    </Pressable>
+  );
+}
 
 export function ProjectionEditorFields({
   editor,
@@ -35,6 +118,13 @@ export function ProjectionEditorFields({
   }) => void;
   workingDraft: TournamentDraft;
 }) {
+  const [editingRound, setEditingRound] = useState<keyof PrizeRounds | null>(
+    null,
+  );
+  const [customTaxRate, setCustomTaxRate] = useState(
+    () => !taxRatePresets.includes(workingDraft.prize_tax_rate),
+  );
+
   if (editor === "details") {
     return (
       <>
@@ -92,35 +182,126 @@ export function ProjectionEditorFields({
   }
 
   if (editor === "prize") {
+    const selectedTemplate = workingDraft.prize_draw_template_id
+      ? getDrawTemplate(workingDraft.prize_draw_template_id)
+      : null;
+    const generated =
+      workingDraft.prize_distribution_mode === "generated" && selectedTemplate;
+    const rounds = generated
+      ? prizeRoundKeys.filter(
+          (round) => selectedTemplate.percentages[round] !== undefined,
+        )
+      : prizeRoundKeys;
+
     return (
       <>
+        <PrizeDistributionSelector
+          draft={workingDraft}
+          onUpdate={(changes) => {
+            setEditingRound(null);
+            onUpdate(changes);
+          }}
+        />
         <Text style={{ color: colors.mutedForeground, lineHeight: 20 }}>
           Prize amounts remain in tournament currency. The server is the source of truth for
           tax-aware P&amp;L.
         </Text>
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.md }}>
-          {rounds.map((round, index) => (
-            <MoneyInput
-              key={round}
-              label={`${roundLabels[round]} (${workingDraft.currency})`}
-              value={workingDraft.prize_rounds[round]}
-              onChangeValue={(amount) =>
-                onUpdate({
-                  prize_rounds: { ...workingDraft.prize_rounds, [round]: amount },
-                })
-              }
-              error={errors[`prize_rounds.${round}`]}
-              autoFocus={index === 0}
-              style={{ minWidth: 136, flexGrow: 1 }}
+        {generated ? (
+          <View style={{ gap: spacing.sm }}>
+            {rounds.map((round) => (
+              <PrizeRoundRow
+                key={round}
+                label={roundLabels[round]}
+                currency={workingDraft.currency}
+                players={selectedTemplate.players[round] ?? 0}
+                value={workingDraft.prize_rounds[round]}
+                editing={editingRound === round}
+                error={errors[`prize_rounds.${round}`]}
+                onEdit={() => setEditingRound(round)}
+                onDone={() => setEditingRound(null)}
+                onChangeValue={(amount) =>
+                  onUpdate({
+                    prize_rounds: {
+                      ...workingDraft.prize_rounds,
+                      [round]: amount,
+                    },
+                  })
+                }
+              />
+            ))}
+          </View>
+        ) : (
+          <View
+            style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.md }}
+          >
+            {rounds.map((round, index) => (
+              <MoneyInput
+                key={round}
+                label={`${roundLabels[round]} (${workingDraft.currency})`}
+                value={workingDraft.prize_rounds[round]}
+                onChangeValue={(amount) =>
+                  onUpdate({
+                    prize_rounds: { ...workingDraft.prize_rounds, [round]: amount },
+                  })
+                }
+                error={errors[`prize_rounds.${round}`]}
+                autoFocus={
+                  workingDraft.prize_distribution_mode === "manual" && index === 0
+                }
+                style={{ minWidth: 136, flexGrow: 1 }}
+              />
+            ))}
+          </View>
+        )}
+        <View style={{ gap: spacing.sm }}>
+          <Text
+            style={{
+              color: colors.mutedForeground,
+              fontSize: 12,
+              fontWeight: "800",
+              textTransform: "uppercase",
+            }}
+          >
+            Prize tax withholding
+          </Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}>
+            {taxRatePresets.map((rate) => {
+              const selected =
+                !customTaxRate && workingDraft.prize_tax_rate === rate;
+
+              return (
+                <Button
+                  key={rate}
+                  label={`${rate}%`}
+                  variant={selected ? "primary" : "secondary"}
+                  accessibilityState={{ selected }}
+                  onPress={() => {
+                    setCustomTaxRate(false);
+                    onUpdate({ prize_tax_rate: rate });
+                  }}
+                />
+              );
+            })}
+            <Button
+              label="Custom"
+              variant={customTaxRate ? "primary" : "secondary"}
+              accessibilityState={{ selected: customTaxRate }}
+              onPress={() => setCustomTaxRate(true)}
             />
-          ))}
+          </View>
+          {customTaxRate ? (
+            <MoneyInput
+              label="Prize tax withholding %"
+              value={workingDraft.prize_tax_rate}
+              onChangeValue={(prize_tax_rate) => onUpdate({ prize_tax_rate })}
+              error={errors.prize_tax_rate}
+              autoFocus
+            />
+          ) : null}
+          <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>
+            The server applies withholding — this only records the rate.
+          </Text>
         </View>
-        <MoneyInput
-          label="Prize tax withholding %"
-          value={workingDraft.prize_tax_rate}
-          onChangeValue={(prize_tax_rate) => onUpdate({ prize_tax_rate })}
-          error={errors.prize_tax_rate}
-        />
       </>
     );
   }
