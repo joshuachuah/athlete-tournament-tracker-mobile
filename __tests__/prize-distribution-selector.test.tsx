@@ -73,6 +73,23 @@ describe("PrizeDistributionSelector", () => {
     expect(screen.getByText("$1,000 USD")).toBeTruthy();
   });
 
+  it("keeps a Challenger draw chosen before the level", () => {
+    const screen = renderPrizeEditor();
+
+    fireEvent.press(screen.getByText("Challenger"));
+    fireEvent.press(screen.getByText("16 draw · 16 entries"));
+    fireEvent.press(screen.getByText("6K"));
+
+    expect(
+      screen.getByRole("radio", {
+        name: "16 draw · 16 entries",
+        checked: true,
+      }),
+    ).toBeTruthy();
+    expect(screen.getByText("$195 USD")).toBeTruthy();
+    expect(screen.getByText("$1,200 USD")).toBeTruthy();
+  });
+
   it("only offers accommodation options the level actually has", () => {
     const screen = renderPrizeEditor();
 
@@ -105,6 +122,45 @@ describe("PrizeDistributionSelector", () => {
     expect(screen.getByText("USD required for official tiers")).toBeTruthy();
     expect(screen.getAllByText("€0 EUR").length).toBeGreaterThan(0);
     expect(screen.queryByText("$831.25 USD")).toBeNull();
+  });
+
+  it("clears generated payouts when the tournament currency changes", () => {
+    const onUpdate = jest.fn();
+    const draft: TournamentDraft = {
+      ...createDefaultTournamentDraft(),
+      prize_distribution_mode: "generated",
+      prize_tier_id: "world_bronze",
+      prize_draw_template_id: "draw_32_entries_24",
+      prize_player_total: 47_500,
+      prize_rounds: {
+        r1: 831.25,
+        r2: 1_306.25,
+        r3: 0,
+        qf: 2_137.5,
+        sf: 3_562.5,
+        f: 5_700,
+        w: 9_025,
+      },
+    };
+    const screen = render(
+      <ProjectionEditorFields
+        editor="details"
+        errors={{}}
+        workingDraft={draft}
+        onUpdate={onUpdate}
+        onUpdateAccommodation={() => undefined}
+      />,
+    );
+
+    fireEvent.changeText(screen.getByLabelText("Currency"), "EUR");
+
+    expect(onUpdate).toHaveBeenCalledWith({
+      currency: "EUR",
+      prize_tier_id: null,
+      prize_draw_template_id: null,
+      prize_player_total: 0,
+      prize_rounds: { r1: 0, r2: 0, r3: 0, qf: 0, sf: 0, f: 0, w: 0 },
+    });
   });
 
   it("shows Tour Finals as manual-only", () => {

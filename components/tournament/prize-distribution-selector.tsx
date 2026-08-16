@@ -275,9 +275,7 @@ export function PrizeDistributionSelector({
     const templateId =
       tier.category === "world"
         ? tier.drawTemplateId
-        : selectedTier?.category === "challenger"
-          ? draft.prize_draw_template_id
-          : null;
+        : draft.prize_draw_template_id;
 
     onUpdate({
       prize_tier_id: tierId,
