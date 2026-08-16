@@ -147,6 +147,44 @@ describe("PrizeDistributionSelector", () => {
     expect(screen.getByText("Use PSA selector")).toBeTruthy();
   });
 
+  it("clears rounds outside the template when returning to generated mode", () => {
+    const onUpdate = jest.fn();
+    const draft: TournamentDraft = {
+      ...createDefaultTournamentDraft(),
+      prize_distribution_mode: "manual",
+      prize_tier_id: "world_bronze",
+      prize_draw_template_id: "draw_32_entries_24",
+      prize_player_total: 47_500,
+      prize_rounds: {
+        r1: 800,
+        r2: 1_300,
+        r3: 500,
+        qf: 2_100,
+        sf: 3_500,
+        f: 5_700,
+        w: 9_000,
+      },
+    };
+    const screen = render(
+      <PrizeDistributionSelector draft={draft} onUpdate={onUpdate} />,
+    );
+
+    fireEvent.press(screen.getByText("Use PSA selector"));
+
+    expect(onUpdate).toHaveBeenCalledWith({
+      prize_distribution_mode: "generated",
+      prize_rounds: {
+        r1: 800,
+        r2: 1_300,
+        r3: 0,
+        qf: 2_100,
+        sf: 3_500,
+        f: 5_700,
+        w: 9_000,
+      },
+    });
+  });
+
   it("blocks official generation when the tournament currency is not USD", () => {
     const screen = renderPrizeEditor({ currency: "EUR" });
 

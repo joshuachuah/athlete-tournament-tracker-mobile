@@ -12,6 +12,7 @@ import {
   isPrizeTierId,
   prizeDistributionCurrency,
   prizeDistributionRevision,
+  prizeRoundKeys,
   prizeTiers,
   type DrawTemplateId,
   type PrizeTier,
@@ -309,7 +310,24 @@ export function PrizeDistributionSelector({
         <Button
           label="Use PSA selector"
           variant="secondary"
-          onPress={() => onUpdate({ prize_distribution_mode: "generated" })}
+          onPress={() => {
+            if (!selectedTemplate) {
+              onUpdate({ prize_distribution_mode: "generated" });
+              return;
+            }
+
+            const supportedRounds = emptyPrizeRounds();
+            for (const round of prizeRoundKeys) {
+              if (selectedTemplate.percentages[round] !== undefined) {
+                supportedRounds[round] = draft.prize_rounds[round];
+              }
+            }
+
+            onUpdate({
+              prize_distribution_mode: "generated",
+              prize_rounds: supportedRounds,
+            });
+          }}
         />
       </View>
     );
