@@ -392,7 +392,7 @@ const styles = StyleSheet.create({
   },
   googleLabel: {
     color: colors.foreground,
-    fontSize: 19,
+    fontSize: 21,
     fontWeight: "600",
     letterSpacing: -0.2,
   },
