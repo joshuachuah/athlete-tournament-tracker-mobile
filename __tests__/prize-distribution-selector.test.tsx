@@ -58,6 +58,18 @@ describe("PrizeDistributionSelector", () => {
     expect(screen.getByText("$2,200 USD")).toBeTruthy();
   });
 
+  it("ends an active round edit when a tier regenerates payouts", () => {
+    const screen = renderPrizeEditor();
+
+    fireEvent.press(screen.getByText("Bronze"));
+    fireEvent.press(screen.getByLabelText("Edit QF payout"));
+    fireEvent.changeText(screen.getByLabelText("QF (USD)"), "2200");
+    fireEvent.press(screen.getByText("Gold"));
+
+    expect(screen.queryByLabelText("QF (USD)")).toBeNull();
+    expect(screen.getByText("$4,275 USD")).toBeTruthy();
+  });
+
   it("fills Challenger payouts from the accommodation-adjusted base once a draw is chosen", () => {
     const screen = renderPrizeEditor();
 

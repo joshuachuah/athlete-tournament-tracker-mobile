@@ -195,7 +195,13 @@ export function ProjectionEditorFields({
 
     return (
       <>
-        <PrizeDistributionSelector draft={workingDraft} onUpdate={onUpdate} />
+        <PrizeDistributionSelector
+          draft={workingDraft}
+          onUpdate={(changes) => {
+            setEditingRound(null);
+            onUpdate(changes);
+          }}
+        />
         <Text style={{ color: colors.mutedForeground, lineHeight: 20 }}>
           Prize amounts remain in tournament currency. The server is the source of truth for
           tax-aware P&amp;L.
