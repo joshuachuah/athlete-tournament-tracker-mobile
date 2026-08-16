@@ -82,7 +82,7 @@ function PrizeRoundRow({
         opacity: pressed ? 0.7 : 1,
       })}
     >
-      <View style={{ gap: 2 }}>
+      <View style={{ gap: spacing.xs }}>
         <Text style={{ color: colors.foreground, fontWeight: "800" }}>
           {label}
         </Text>
@@ -159,7 +159,6 @@ export function ProjectionEditorFields({
             const nextCurrency = currency.toUpperCase();
             const currencyChanged = nextCurrency !== workingDraft.currency;
             const hasSelectorPayouts =
-              workingDraft.prize_distribution_mode === "generated" ||
               workingDraft.prize_tier_id !== null ||
               workingDraft.prize_draw_template_id !== null ||
               workingDraft.prize_player_total > 0;

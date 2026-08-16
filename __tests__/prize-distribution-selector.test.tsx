@@ -166,6 +166,31 @@ describe("PrizeDistributionSelector", () => {
     },
   );
 
+  it("preserves typed payouts without selector provenance when currency changes", () => {
+    const onUpdate = jest.fn();
+    const defaultDraft = createDefaultTournamentDraft();
+    const draft: TournamentDraft = {
+      ...defaultDraft,
+      prize_rounds: {
+        ...defaultDraft.prize_rounds,
+        qf: 500,
+      },
+    };
+    const screen = render(
+      <ProjectionEditorFields
+        editor="details"
+        errors={{}}
+        workingDraft={draft}
+        onUpdate={onUpdate}
+        onUpdateAccommodation={() => undefined}
+      />,
+    );
+
+    fireEvent.changeText(screen.getByLabelText("Currency"), "EUR");
+
+    expect(onUpdate).toHaveBeenCalledWith({ currency: "EUR" });
+  });
+
   it("shows Tour Finals as manual-only", () => {
     const screen = renderPrizeEditor();
 

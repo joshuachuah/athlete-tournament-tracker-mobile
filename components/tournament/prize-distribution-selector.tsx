@@ -62,7 +62,7 @@ const styles = StyleSheet.create({
   },
   choiceText: {
     flex: 1,
-    gap: 2,
+    gap: spacing.xs,
   },
   choiceLabel: {
     color: colors.foreground,
