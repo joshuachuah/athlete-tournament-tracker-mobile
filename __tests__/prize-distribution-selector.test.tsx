@@ -231,6 +231,30 @@ describe("PrizeDistributionSelector", () => {
     });
   });
 
+  it("drops incomplete selector metadata before keeping typed manual payouts", () => {
+    const onUpdate = jest.fn();
+    const defaultDraft = createDefaultTournamentDraft();
+    const draft: TournamentDraft = {
+      ...defaultDraft,
+      prize_tier_id: "challenger_6_none",
+      prize_draw_template_id: null,
+      prize_player_total: 6_000,
+      prize_rounds: { ...defaultDraft.prize_rounds, qf: 500 },
+    };
+    const screen = render(
+      <PrizeDistributionSelector draft={draft} onUpdate={onUpdate} />,
+    );
+
+    fireEvent.press(screen.getByText("Enter payouts manually"));
+
+    expect(onUpdate).toHaveBeenCalledWith({
+      prize_distribution_mode: "manual",
+      prize_tier_id: null,
+      prize_draw_template_id: null,
+      prize_player_total: 0,
+    });
+  });
+
   it.each(["generated", "manual"] as const)(
     "clears selector payouts when the tournament currency changes in %s mode",
     async (prizeDistributionMode) => {

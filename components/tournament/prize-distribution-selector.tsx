@@ -529,6 +529,8 @@ export function PrizeDistributionSelector({
         onPress={() => {
           const hasGeneratedPayouts =
             currencyMatches &&
+            selectedTier !== null &&
+            selectedTemplate !== null &&
             Object.values(draft.prize_rounds).some((amount) => amount > 0);
 
           onUpdate({
