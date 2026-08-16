@@ -6,7 +6,7 @@ const expectedVersions = new Map([
   ["brace-expansion", new Set(["1.1.18", "2.1.4", "5.0.9"])],
   ["image-size", new Set(["1.2.1"])],
   ["js-yaml", new Set(["3.15.1", "4.3.1"])],
-  ["nanoid", new Set(["3.3.17"])],
+  ["nanoid", new Set(["3.3.18"])],
 ]);
 
 for (const [packageName, expected] of expectedVersions) {

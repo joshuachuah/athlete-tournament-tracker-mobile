@@ -73,6 +73,9 @@ describe("tournamentToDraft", () => {
         entry_fee: 100,
         flight_cost: 200,
         daily_spending_cap: 75,
+        prize_distribution_mode: "manual",
+        prize_tier_id: null,
+        prize_draw_template_id: null,
       }),
     );
   });
@@ -570,11 +573,63 @@ describe("normalizeTournamentDraft", () => {
     const storedDraft = {
       ...defaultTournamentDraft,
       name: "Current stored draft",
+      prize_tier_id: "world_bronze" as const,
+      prize_draw_template_id: "draw_32_entries_24" as const,
+      prize_player_total: 47_500,
+      prize_rounds: { ...defaultTournamentDraft.prize_rounds, qf: 2_137.5 },
     };
 
     expect(
       normalizeTournamentDraft(persistedTournamentDraft(storedDraft)),
     ).toEqual(storedDraft);
+  });
+
+  it("migrates a v1 draft with entered rounds to manual mode without data loss", () => {
+    const {
+      prize_distribution_mode: _mode,
+      prize_tier_id: _tier,
+      prize_draw_template_id: _template,
+      prize_player_total: _total,
+      ...v1Draft
+    } = {
+      ...defaultTournamentDraft,
+      name: "Interrupted draft",
+      prize_rounds: { ...defaultTournamentDraft.prize_rounds, qf: 500 },
+    };
+
+    const migrated = normalizeTournamentDraft({ version: 1, draft: v1Draft });
+
+    expect(migrated).toEqual(
+      expect.objectContaining({
+        name: "Interrupted draft",
+        prize_distribution_mode: "manual",
+        prize_tier_id: null,
+        prize_draw_template_id: null,
+        prize_player_total: 0,
+      }),
+    );
+    expect(migrated.prize_rounds.qf).toBe(500);
+  });
+
+  it("migrates an empty v1 draft into the primary generated flow", () => {
+    const {
+      prize_distribution_mode: _mode,
+      prize_tier_id: _tier,
+      prize_draw_template_id: _template,
+      prize_player_total: _total,
+      ...v1Draft
+    } = defaultTournamentDraft;
+
+    expect(
+      normalizeTournamentDraft({ version: 1, draft: v1Draft }),
+    ).toEqual(
+      expect.objectContaining({
+        prize_distribution_mode: "generated",
+        prize_tier_id: null,
+        prize_draw_template_id: null,
+        prize_player_total: 0,
+      }),
+    );
   });
 
   it.each([

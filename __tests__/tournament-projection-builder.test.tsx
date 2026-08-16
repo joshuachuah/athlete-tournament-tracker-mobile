@@ -228,6 +228,7 @@ describe("TournamentProjectionBuilder", () => {
     fireEvent.changeText(screen.getByLabelText("Country"), "Malaysia");
     fireEvent.press(screen.getByText("Apply tournament details"));
     fireEvent.press(screen.getByText("Add prize estimate"));
+    fireEvent.press(screen.getByText("Enter payouts manually"));
     fireEvent.changeText(screen.getByLabelText("QF (USD)"), "250");
     fireEvent.press(screen.getByText("Apply prize and tax"));
     fireEvent.press(screen.getByText("Create projection"));

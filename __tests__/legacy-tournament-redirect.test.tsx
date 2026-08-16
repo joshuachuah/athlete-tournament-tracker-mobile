@@ -2,7 +2,10 @@ import { render } from "@testing-library/react-native";
 
 import { LegacyTournamentRedirect } from "@/components/tournament/legacy-tournament-redirect";
 import { TournamentDraftProvider } from "@/context/tournament-draft";
-import { createDefaultTournamentDraft } from "@/lib/tournament-draft";
+import {
+  createDefaultTournamentDraft,
+  persistedTournamentDraft,
+} from "@/lib/tournament-draft";
 import { draftStorage, tournamentDraftStorageKey } from "@/lib/storage";
 
 jest.mock("expo-router", () => {
@@ -37,11 +40,14 @@ describe("LegacyTournamentRedirect", () => {
   });
 
   it("forwards a restored persisted edit id to the canonical form", () => {
-    draftStorage.set(tournamentDraftStorageKey("athlete-1"), {
-      ...createDefaultTournamentDraft(new Date(2026, 0, 1)),
-      editId: "tournament-1",
-      name: "Restored edit",
-    });
+    draftStorage.set(
+      tournamentDraftStorageKey("athlete-1"),
+      persistedTournamentDraft({
+        ...createDefaultTournamentDraft(new Date(2026, 0, 1)),
+        editId: "tournament-1",
+        name: "Restored edit",
+      }),
+    );
 
     const screen = render(
       <TournamentDraftProvider userId="athlete-1">
