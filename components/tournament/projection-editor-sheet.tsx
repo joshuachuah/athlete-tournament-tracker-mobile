@@ -79,6 +79,10 @@ function schemaForEditor(editor: ProjectionEditor) {
   return spendingSchema;
 }
 
+function emptyPrizeRounds(): TournamentDraft["prize_rounds"] {
+  return { r1: 0, r2: 0, r3: 0, qf: 0, sf: 0, f: 0, w: 0 };
+}
+
 export function ProjectionEditorSheet({
   draft,
   editor,
@@ -125,7 +129,25 @@ export function ProjectionEditorSheet({
       return;
     }
 
-    onApply(deriveDraftDates(workingDraft));
+    const currencyChanged =
+      editor === "details" &&
+      workingDraft.currency.toUpperCase() !== draft.currency.toUpperCase();
+    const hasSelectorPayouts =
+      workingDraft.prize_tier_id !== null ||
+      workingDraft.prize_draw_template_id !== null ||
+      workingDraft.prize_player_total > 0;
+    const appliedDraft =
+      currencyChanged && hasSelectorPayouts
+        ? {
+            ...workingDraft,
+            prize_tier_id: null,
+            prize_draw_template_id: null,
+            prize_player_total: 0,
+            prize_rounds: emptyPrizeRounds(),
+          }
+        : workingDraft;
+
+    onApply(deriveDraftDates(appliedDraft));
   }
 
   return (

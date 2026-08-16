@@ -155,34 +155,7 @@ export function ProjectionEditorFields({
           value={workingDraft.currency}
           maxLength={3}
           autoCapitalize="characters"
-          onChangeText={(currency) => {
-            const nextCurrency = currency.toUpperCase();
-            const currencyChanged = nextCurrency !== workingDraft.currency;
-            const hasSelectorPayouts =
-              workingDraft.prize_tier_id !== null ||
-              workingDraft.prize_draw_template_id !== null ||
-              workingDraft.prize_player_total > 0;
-
-            onUpdate({
-              currency: nextCurrency,
-              ...(currencyChanged && hasSelectorPayouts
-                ? {
-                    prize_tier_id: null,
-                    prize_draw_template_id: null,
-                    prize_player_total: 0,
-                    prize_rounds: {
-                      r1: 0,
-                      r2: 0,
-                      r3: 0,
-                      qf: 0,
-                      sf: 0,
-                      f: 0,
-                      w: 0,
-                    },
-                  }
-                : {}),
-            });
-          }}
+          onChangeText={(currency) => onUpdate({ currency: currency.toUpperCase() })}
           error={errors.currency}
         />
         <DateRangePicker

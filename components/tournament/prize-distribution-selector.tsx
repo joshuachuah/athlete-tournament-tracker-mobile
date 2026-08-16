@@ -204,7 +204,7 @@ function HeroPill({
       style={({ pressed }) => [
         styles.heroPill,
         {
-          backgroundColor: selected ? colors.surface : "transparent",
+          backgroundColor: selected ? colors.surface : colors.transparent,
           opacity: disabled ? 0.35 : pressed ? 0.7 : 1,
         },
       ]}

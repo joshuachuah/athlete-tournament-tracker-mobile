@@ -1,8 +1,9 @@
-import { fireEvent, render } from "@testing-library/react-native";
+import { act, fireEvent, render } from "@testing-library/react-native";
 import { useState } from "react";
 
 import { PrizeDistributionSelector } from "@/components/tournament/prize-distribution-selector";
 import { ProjectionEditorFields } from "@/components/tournament/projection-editor-fields";
+import { ProjectionEditorSheet } from "@/components/tournament/projection-editor-sheet";
 import {
   createDefaultTournamentDraft,
   type TournamentDraft,
@@ -220,10 +221,13 @@ describe("PrizeDistributionSelector", () => {
 
   it.each(["generated", "manual"] as const)(
     "clears selector payouts when the tournament currency changes in %s mode",
-    (prizeDistributionMode) => {
-      const onUpdate = jest.fn();
+    async (prizeDistributionMode) => {
+      const onApply = jest.fn();
       const draft: TournamentDraft = {
         ...createDefaultTournamentDraft(),
+        name: "Malaysia Open",
+        location: "Kuala Lumpur",
+        country: "Malaysia",
         prize_distribution_mode: prizeDistributionMode,
         prize_tier_id: "world_bronze",
         prize_draw_template_id: "draw_32_entries_24",
@@ -239,50 +243,118 @@ describe("PrizeDistributionSelector", () => {
         },
       };
       const screen = render(
-        <ProjectionEditorFields
+        <ProjectionEditorSheet
           editor="details"
-          errors={{}}
-          workingDraft={draft}
-          onUpdate={onUpdate}
-          onUpdateAccommodation={() => undefined}
+          draft={draft}
+          onApply={onApply}
+          onClose={() => undefined}
         />,
       );
 
-      fireEvent.changeText(screen.getByLabelText("Currency"), "EUR");
-
-      expect(onUpdate).toHaveBeenCalledWith({
-        currency: "EUR",
-        prize_tier_id: null,
-        prize_draw_template_id: null,
-        prize_player_total: 0,
-        prize_rounds: { r1: 0, r2: 0, r3: 0, qf: 0, sf: 0, f: 0, w: 0 },
+      await act(async () => {
+        fireEvent.changeText(screen.getByLabelText("Currency"), "EUR");
       });
+      await act(async () => {
+        fireEvent.press(screen.getByText("Apply tournament details"));
+      });
+
+      expect(onApply).toHaveBeenCalledWith(
+        expect.objectContaining({
+          currency: "EUR",
+          prize_tier_id: null,
+          prize_draw_template_id: null,
+          prize_player_total: 0,
+          prize_rounds: { r1: 0, r2: 0, r3: 0, qf: 0, sf: 0, f: 0, w: 0 },
+        }),
+      );
     },
   );
 
-  it("preserves typed payouts without selector provenance when currency changes", () => {
-    const onUpdate = jest.fn();
+  it("preserves selector payouts when the final currency is unchanged", async () => {
+    const onApply = jest.fn();
+    const draft: TournamentDraft = {
+      ...createDefaultTournamentDraft(),
+      name: "Malaysia Open",
+      location: "Kuala Lumpur",
+      country: "Malaysia",
+      prize_tier_id: "world_bronze",
+      prize_draw_template_id: "draw_32_entries_24",
+      prize_player_total: 47_500,
+      prize_rounds: {
+        r1: 831.25,
+        r2: 1_306.25,
+        r3: 0,
+        qf: 2_137.5,
+        sf: 3_562.5,
+        f: 5_700,
+        w: 9_025,
+      },
+    };
+    const screen = render(
+      <ProjectionEditorSheet
+        editor="details"
+        draft={draft}
+        onApply={onApply}
+        onClose={() => undefined}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.changeText(screen.getByLabelText("Currency"), "US");
+    });
+    await act(async () => {
+      fireEvent.changeText(screen.getByLabelText("Currency"), "USD");
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByText("Apply tournament details"));
+    });
+
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        currency: "USD",
+        prize_tier_id: "world_bronze",
+        prize_draw_template_id: "draw_32_entries_24",
+        prize_player_total: 47_500,
+        prize_rounds: draft.prize_rounds,
+      }),
+    );
+  });
+
+  it("preserves typed payouts without selector provenance when currency changes", async () => {
+    const onApply = jest.fn();
     const defaultDraft = createDefaultTournamentDraft();
     const draft: TournamentDraft = {
       ...defaultDraft,
+      name: "Malaysia Open",
+      location: "Kuala Lumpur",
+      country: "Malaysia",
       prize_rounds: {
         ...defaultDraft.prize_rounds,
         qf: 500,
       },
     };
     const screen = render(
-      <ProjectionEditorFields
+      <ProjectionEditorSheet
         editor="details"
-        errors={{}}
-        workingDraft={draft}
-        onUpdate={onUpdate}
-        onUpdateAccommodation={() => undefined}
+        draft={draft}
+        onApply={onApply}
+        onClose={() => undefined}
       />,
     );
 
-    fireEvent.changeText(screen.getByLabelText("Currency"), "EUR");
+    await act(async () => {
+      fireEvent.changeText(screen.getByLabelText("Currency"), "EUR");
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByText("Apply tournament details"));
+    });
 
-    expect(onUpdate).toHaveBeenCalledWith({ currency: "EUR" });
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        currency: "EUR",
+        prize_rounds: draft.prize_rounds,
+      }),
+    );
   });
 
   it("shows Tour Finals as manual-only", () => {
