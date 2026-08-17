@@ -12,7 +12,6 @@ import {
   isPrizeTierId,
   prizeDistributionCurrency,
   prizeDistributionRevision,
-  prizeRoundKeys,
   prizeTiers,
   type DrawTemplateId,
   type PrizeTier,
@@ -250,9 +249,8 @@ export function PrizeDistributionSelector({
   const [, activeLevel, activeStay] =
     activeTier?.category === "challenger" ? activeTier.id.split("_") : [];
 
-  // Payouts fill as soon as a tier and draw are both known; there is no
-  // separate "generate" step. Falls back to zeros when generation is blocked
-  // (manual-only tier, missing draw, or non-USD currency).
+  // Payouts fill as soon as a tier and draw are both known; athletes edit the
+  // defining PSA choices, while the resulting round amounts stay read-only.
   function roundsFor(
     tier: PrizeTier,
     templateId: DrawTemplateId | null,
@@ -279,6 +277,7 @@ export function PrizeDistributionSelector({
         : draft.prize_draw_template_id;
 
     onUpdate({
+      prize_distribution_mode: "generated",
       prize_tier_id: tierId,
       prize_player_total: tier.playerPrizeMoney,
       prize_draw_template_id: templateId,
@@ -288,6 +287,7 @@ export function PrizeDistributionSelector({
 
   function selectTemplate(templateId: DrawTemplateId) {
     onUpdate({
+      prize_distribution_mode: "generated",
       ...(selectedTier?.category === "world"
         ? { prize_tier_id: null, prize_player_total: 0 }
         : {}),
@@ -296,41 +296,6 @@ export function PrizeDistributionSelector({
         ? roundsFor(activeTier, templateId)
         : emptyPrizeRounds(),
     });
-  }
-
-  if (draft.prize_distribution_mode === "manual") {
-    return (
-      <View style={styles.section}>
-        <View style={{ gap: spacing.xs }}>
-          <Text style={styles.sectionHeading}>Manual payouts</Text>
-          <Text style={styles.helper}>
-            Enter any confirmed payout. Existing generated amounts stay editable.
-          </Text>
-        </View>
-        <Button
-          label="Use PSA selector"
-          variant="secondary"
-          onPress={() => {
-            if (!selectedTemplate) {
-              onUpdate({ prize_distribution_mode: "generated" });
-              return;
-            }
-
-            const supportedRounds = emptyPrizeRounds();
-            for (const round of prizeRoundKeys) {
-              if (selectedTemplate.percentages[round] !== undefined) {
-                supportedRounds[round] = draft.prize_rounds[round];
-              }
-            }
-
-            onUpdate({
-              prize_distribution_mode: "generated",
-              prize_rounds: supportedRounds,
-            });
-          }}
-        />
-      </View>
-    );
   }
 
   return (
@@ -372,7 +337,7 @@ export function PrizeDistributionSelector({
                   label={tier.label}
                   detail={
                     manualOnly
-                      ? "Manual only · group format"
+                      ? "Payout schedule unavailable"
                       : formatMoney(tier.playerPrizeMoney, prizeDistributionCurrency)
                   }
                   disabled={manualOnly}
@@ -507,8 +472,8 @@ export function PrizeDistributionSelector({
         <View style={[styles.notice, { backgroundColor: colors.warningSoft }]}>
           <Text style={styles.noticeTitle}>Confirm bye adjustments</Text>
           <Text style={styles.noticeText}>
-            This draw includes byes. Check the tournament&apos;s written PSA payout
-            instructions and edit any amount that differs.
+            This draw includes byes. Confirm the tournament uses this PSA draw
+            structure before relying on the generated schedule.
           </Text>
         </View>
       ) : null}
@@ -517,34 +482,11 @@ export function PrizeDistributionSelector({
         <View style={[styles.notice, { backgroundColor: colors.lossSoft }]}>
           <Text style={styles.noticeTitle}>USD required for official tiers</Text>
           <Text style={styles.noticeText}>
-            PSA publishes these tier amounts in USD. Change the tournament currency to USD or
-            enter payouts manually so amounts are not mislabeled.
+            PSA publishes these tier amounts in USD. Change the tournament currency to USD
+            to generate the official payout schedule.
           </Text>
         </View>
       ) : null}
-
-      <Button
-        label="Enter payouts manually"
-        variant="ghost"
-        onPress={() => {
-          const hasGeneratedPayouts =
-            currencyMatches &&
-            selectedTier !== null &&
-            selectedTemplate !== null &&
-            Object.values(draft.prize_rounds).some((amount) => amount > 0);
-
-          onUpdate({
-            prize_distribution_mode: "manual",
-            ...(!hasGeneratedPayouts
-              ? {
-                  prize_tier_id: null,
-                  prize_draw_template_id: null,
-                  prize_player_total: 0,
-                }
-              : {}),
-          });
-        }}
-      />
       <Text style={[styles.helper, { fontSize: 12, textAlign: "center" }]}>
         Source: {prizeDistributionRevision}
       </Text>

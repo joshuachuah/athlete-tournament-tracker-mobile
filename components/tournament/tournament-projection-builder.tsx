@@ -89,8 +89,8 @@ function actionLabel(draft: TournamentDraft, identityResolved: boolean) {
   if (invalid === "details") return "Complete tournament details";
   if (invalid === "prize") {
     return Object.values(draft.prize_rounds).some((amount) => amount > 0)
-      ? "Review prize and tax"
-      : "Add prize estimate";
+      ? "Review prize money"
+      : "Add prize money";
   }
   if (invalid === "travel") return "Review travel and stay";
   if (invalid) return "Review optional assumptions";

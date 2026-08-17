@@ -227,10 +227,9 @@ describe("TournamentProjectionBuilder", () => {
     fireEvent.changeText(screen.getByLabelText("Location"), "Kuala Lumpur");
     fireEvent.changeText(screen.getByLabelText("Country"), "Malaysia");
     fireEvent.press(screen.getByText("Apply tournament details"));
-    fireEvent.press(screen.getByText("Add prize estimate"));
-    fireEvent.press(screen.getByText("Enter payouts manually"));
-    fireEvent.changeText(screen.getByLabelText("QF (USD)"), "250");
-    fireEvent.press(screen.getByText("Apply prize and tax"));
+    fireEvent.press(screen.getByText("Add prize money"));
+    fireEvent.press(screen.getByText("Bronze"));
+    fireEvent.press(screen.getByText("Apply prize money"));
     fireEvent.press(screen.getByText("Create projection"));
 
     expect(onSubmit).toHaveBeenCalledWith(
@@ -268,9 +267,9 @@ describe("TournamentProjectionBuilder", () => {
   it("uses the adaptive CTA to open and validate the first invalid editor", () => {
     const { screen } = renderBuilder({ ...validDraft, prize_tax_rate: 101 });
 
-    expect(screen.getByText("Review prize and tax")).toBeTruthy();
-    fireEvent.press(screen.getByText("Review prize and tax"));
-    fireEvent.press(screen.getByText("Apply prize and tax"));
+    expect(screen.getByText("Review prize money")).toBeTruthy();
+    fireEvent.press(screen.getByText("Review prize money"));
+    fireEvent.press(screen.getByText("Apply prize money"));
 
     expect(screen.getByText("Must be between 0 and 100.")).toBeTruthy();
   });
@@ -344,8 +343,8 @@ describe("TournamentProjectionBuilder", () => {
       prize_rounds: { ...defaultDraft.prize_rounds },
     });
 
-    fireEvent.press(screen.getByText("Add prize estimate"));
-    expect(screen.getAllByText("Prize and tax").length).toBeGreaterThan(1);
+    fireEvent.press(screen.getByText("Add prize money"));
+    expect(screen.getAllByText("Prize money").length).toBeGreaterThan(1);
     expect(onSubmit).not.toHaveBeenCalled();
   });
 

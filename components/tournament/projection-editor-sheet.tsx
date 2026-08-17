@@ -42,8 +42,8 @@ const editorTitles: Record<ProjectionEditor, { title: string; description: strin
     description: "Set the identity, dates, currency, and entry fee.",
   },
   prize: {
-    title: "Prize and tax",
-    description: "Enter server-projected prize outcomes and withholding.",
+    title: "Prize money",
+    description: "Choose the PSA event details.",
   },
   travel: {
     title: "Travel and stay",
@@ -207,7 +207,7 @@ export function ProjectionEditorSheet({
           </View>
 
           <ScrollView
-            keyboardDismissMode="interactive"
+            keyboardDismissMode="on-drag"
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.editorContent}
           >

@@ -204,7 +204,7 @@ export function ImpactLedger({
   const prizeSummary =
     prizes.length > 0
       ? `${prizes.length} round estimate${prizes.length === 1 ? "" : "s"}${draft.prize_tax_rate > 0 ? ` · ${draft.prize_tax_rate}% tax` : ""}`
-      : "Prize rounds and tax withholding";
+      : "Choose a PSA tier and draw";
   const prizeImpact =
     prizes.length === 0
       ? formatMoney(0, draft.currency)
@@ -246,7 +246,7 @@ export function ImpactLedger({
         <View style={{ height: 1, backgroundColor: colors.border }} />
         <ImpactLedgerRow
           icon={Trophy}
-          title="Prize and tax"
+          title="Prize money"
           summary={prizeSummary}
           impact={prizeImpact}
           impactTone={prizes.length > 0 ? "positive" : "neutral"}
