@@ -110,6 +110,18 @@ describe("API response schemas", () => {
       expect(tournamentWithPnLSchema.safeParse(response).success).toBe(true);
     });
 
+    it.each([-1, Number.POSITIVE_INFINITY])(
+      "rejects an invalid prize round amount of %s",
+      (prizeAmount) => {
+        const response = {
+          ...tournament,
+          prize_rounds: { ...tournament.prize_rounds, qf: prizeAmount },
+        };
+
+        expect(tournamentWithPnLSchema.safeParse(response).success).toBe(false);
+      },
+    );
+
     it("rejects scenarios with the wrong container type", () => {
       const response = {
         ...tournament,
@@ -202,6 +214,18 @@ describe("API response schemas", () => {
         knownTournamentSchema.safeParse({
           name: "Open Championship",
           prize_tax_rate: prizeTaxRate,
+        }).success,
+      ).toBe(false);
+    },
+  );
+
+  it.each([-1, Number.POSITIVE_INFINITY])(
+    "rejects a known tournament prize round amount of %s",
+    (prizeAmount) => {
+      expect(
+        knownTournamentSchema.safeParse({
+          name: "Open Championship",
+          prize_rounds: { qf: prizeAmount },
         }).success,
       ).toBe(false);
     },

@@ -12,16 +12,17 @@ import type {
 
 const roundSchema = z.enum(["r1", "r2", "r3", "qf", "sf", "f", "w"]);
 const scenarioKinds = ["worst", "realistic", "best"] as const;
+const prizeAmountSchema = z.number().finite().nonnegative();
 const prizeTaxRateSchema = z.number().finite().min(0).max(100);
 
 const prizeRoundsSchema = z.looseObject({
-  r1: z.number().optional(),
-  r2: z.number().optional(),
-  r3: z.number().optional(),
-  qf: z.number().optional(),
-  sf: z.number().optional(),
-  f: z.number().optional(),
-  w: z.number().optional(),
+  r1: prizeAmountSchema.optional(),
+  r2: prizeAmountSchema.optional(),
+  r3: prizeAmountSchema.optional(),
+  qf: prizeAmountSchema.optional(),
+  sf: prizeAmountSchema.optional(),
+  f: prizeAmountSchema.optional(),
+  w: prizeAmountSchema.optional(),
 });
 
 export const athleteProfileSchema = z.looseObject({

@@ -151,14 +151,14 @@ export function ProjectionEditorFields({
     const selectedTemplate = workingDraft.prize_draw_template_id
       ? getDrawTemplate(workingDraft.prize_draw_template_id)
       : null;
-    const rounds = prizeRoundKeys.filter(
-      (round) =>
-        workingDraft.prize_rounds[round] > 0 &&
-        (!selectedTemplate || selectedTemplate.percentages[round] !== undefined),
-    );
     const generated =
       workingDraft.prize_distribution_mode === "generated" &&
       selectedTemplate !== null;
+    const rounds = prizeRoundKeys.filter(
+      (round) =>
+        workingDraft.prize_rounds[round] > 0 &&
+        (!generated || selectedTemplate?.percentages[round] !== undefined),
+    );
     const scheduleUnavailable = selectedTier?.manualOnly === true;
     const scheduleHeading = scheduleUnavailable
       ? "Schedule unavailable"
@@ -228,7 +228,7 @@ export function ProjectionEditorFields({
                   key={round}
                   label={roundLabels[round]}
                   currency={workingDraft.currency}
-                  players={selectedTemplate?.players[round]}
+                  players={generated ? selectedTemplate?.players[round] : undefined}
                   value={workingDraft.prize_rounds[round]}
                 />
               ))}

@@ -165,6 +165,39 @@ describe("PrizeDistributionSelector", () => {
     expect(screen.queryByText("$500 USD")).toBeNull();
   });
 
+  it("shows every positive round in a manual snapshot with selector metadata", () => {
+    const defaultDraft = createDefaultTournamentDraft();
+    const screen = renderPrizeEditor({
+      prize_distribution_mode: "manual",
+      prize_tier_id: "world_bronze",
+      prize_draw_template_id: "draw_32_entries_24",
+      prize_rounds: { ...defaultDraft.prize_rounds, r3: 700, qf: 500 },
+    });
+
+    expect(screen.getByText("Saved payout schedule")).toBeTruthy();
+    expect(screen.getByText("R3")).toBeTruthy();
+    expect(screen.getByText("$700 USD")).toBeTruthy();
+    expect(screen.getByText("$500 USD")).toBeTruthy();
+    expect(screen.queryByText("4 players paid")).toBeNull();
+  });
+
+  it("limits a generated schedule to rounds in its selected template", () => {
+    const defaultDraft = createDefaultTournamentDraft();
+    const screen = renderPrizeEditor({
+      prize_distribution_mode: "generated",
+      prize_tier_id: "world_bronze",
+      prize_draw_template_id: "draw_32_entries_24",
+      prize_player_total: 47_500,
+      prize_rounds: { ...defaultDraft.prize_rounds, r3: 700, qf: 500 },
+    });
+
+    expect(screen.getByText("PSA generated")).toBeTruthy();
+    expect(screen.queryByText("R3")).toBeNull();
+    expect(screen.queryByText("$700 USD")).toBeNull();
+    expect(screen.getByText("$500 USD")).toBeTruthy();
+    expect(screen.getByText("4 players paid")).toBeTruthy();
+  });
+
   it("blocks official generation when the tournament currency is not USD", () => {
     const screen = renderPrizeEditor({ currency: "EUR" });
 
