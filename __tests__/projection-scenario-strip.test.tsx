@@ -91,15 +91,82 @@ it("shows the explicit empty and unavailable states without blocking edits", asy
     scenarios: [],
     break_even_round: null,
   });
-  const empty = renderStrip();
+  const empty = renderStrip({
+    ...draft,
+    prize_rounds: createDefaultTournamentDraft().prize_rounds,
+  });
   await settlePreview();
   await waitFor(() => expect(empty.getByText("No outcomes yet")).toBeTruthy());
+  expect(
+    empty.getByText(
+      "Choose a supported PSA tier and draw to see worst, middle, and best outcomes.",
+    ),
+  ).toBeTruthy();
 
   mockPreview.mockRejectedValueOnce(new Error("Preview offline"));
   const unavailable = renderStrip({ ...draft, entry_fee: 1 });
   await settlePreview();
   await waitFor(() => expect(unavailable.getByText("Live preview unavailable")).toBeTruthy());
   expect(unavailable.getByText(/You can keep editing/)).toBeTruthy();
+});
+
+it.each([
+  [
+    "Tour Finals",
+    { prize_tier_id: "world_tour_finals" as const },
+    "PSA does not publish a round payout schedule for this tier.",
+  ],
+  [
+    "a non-USD tournament",
+    { currency: "EUR" },
+    "Official USD payout outcomes are unavailable for this tournament currency.",
+  ],
+])("explains unavailable outcomes for %s", async (_label, changes, body) => {
+  mockPreview.mockResolvedValue({
+    total_expenses: 0,
+    total_income_base: 0,
+    scenarios: [],
+    break_even_round: null,
+  });
+  const screen = renderStrip({
+    ...draft,
+    ...changes,
+    prize_rounds: createDefaultTournamentDraft().prize_rounds,
+  });
+  await settlePreview();
+
+  await waitFor(() =>
+    expect(screen.getByText("Outcomes unavailable")).toBeTruthy(),
+  );
+  expect(screen.getByText(body)).toBeTruthy();
+  expect(
+    screen.queryByText(
+      "Based on your earliest, middle, and latest entered prize rounds.",
+    ),
+  ).toBeNull();
+  expect(screen.queryByText(/Choose a supported PSA tier/)).toBeNull();
+  expect(screen.queryByText(/Add prize estimates/)).toBeNull();
+});
+
+it("explains a server-backed empty known-tournament schedule", async () => {
+  mockPreview.mockResolvedValue({
+    total_expenses: 0,
+    total_income_base: 0,
+    scenarios: [],
+    break_even_round: null,
+  });
+  const screen = renderStrip({
+    ...draft,
+    prize_distribution_mode: "manual",
+    prize_rounds: createDefaultTournamentDraft().prize_rounds,
+  });
+  await settlePreview();
+
+  await waitFor(() => expect(screen.getByText("No outcomes yet")).toBeTruthy());
+  expect(
+    screen.getByText("No payout schedule was supplied with this tournament."),
+  ).toBeTruthy();
+  expect(screen.queryByText(/Choose a supported PSA tier/)).toBeNull();
 });
 
 it("cancels the stale preview request when the debounced draft changes", async () => {

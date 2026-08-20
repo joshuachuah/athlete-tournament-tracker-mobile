@@ -1,5 +1,6 @@
 import { act, fireEvent, render } from "@testing-library/react-native";
 import { useState } from "react";
+import { ScrollView } from "react-native";
 
 import { PrizeDistributionSelector } from "@/components/tournament/prize-distribution-selector";
 import { ProjectionEditorFields } from "@/components/tournament/projection-editor-fields";
@@ -43,27 +44,21 @@ describe("PrizeDistributionSelector", () => {
     expect(screen.queryByText("R3")).toBeNull();
   });
 
-  it("turns a payout row into an editable input on tap", () => {
+  it("renders generated payout rows without editable inputs", () => {
     const screen = renderPrizeEditor();
 
     fireEvent.press(screen.getByText("Bronze"));
-    fireEvent.press(screen.getByLabelText("Edit QF payout"));
 
-    const input = screen.getByLabelText("QF (USD)");
-    expect(input.props.value).toBe("2137.5");
-
-    fireEvent.changeText(input, "2200");
-    fireEvent(input, "blur");
-
-    expect(screen.getByText("$2,200 USD")).toBeTruthy();
+    expect(screen.getByText("$2,137.5 USD")).toBeTruthy();
+    expect(screen.queryByLabelText("QF (USD)")).toBeNull();
+    expect(screen.queryByLabelText("Edit QF payout")).toBeNull();
+    expect(screen.queryByText("Enter payouts manually")).toBeNull();
   });
 
-  it("ends an active round edit when a tier regenerates payouts", () => {
+  it("regenerates read-only payouts when the selected tier changes", () => {
     const screen = renderPrizeEditor();
 
     fireEvent.press(screen.getByText("Bronze"));
-    fireEvent.press(screen.getByLabelText("Edit QF payout"));
-    fireEvent.changeText(screen.getByLabelText("QF (USD)"), "2200");
     fireEvent.press(screen.getByText("Gold"));
 
     expect(screen.queryByLabelText("QF (USD)")).toBeNull();
@@ -78,8 +73,12 @@ describe("PrizeDistributionSelector", () => {
     fireEvent.press(screen.getByText("Hotel"));
 
     // No draw chosen yet: payouts cannot be generated.
-    expect(screen.getByText("$5,000 USD")).toBeTruthy();
-    expect(screen.queryByLabelText("Edit R1 payout")).toBeNull();
+    expect(screen.getAllByText("$5,000 USD").length).toBeGreaterThan(0);
+    expect(
+      screen.getByText(
+        "Choose a supported PSA tier and draw to generate the payout schedule.",
+      ),
+    ).toBeTruthy();
 
     fireEvent.press(screen.getByText("16 draw · 16 entries"));
 
@@ -129,6 +128,7 @@ describe("PrizeDistributionSelector", () => {
     fireEvent.press(screen.getByText("16 draw · 16 entries"));
 
     expect(onUpdate).toHaveBeenCalledWith({
+      prize_distribution_mode: "generated",
       prize_tier_id: null,
       prize_player_total: 0,
       prize_draw_template_id: "draw_16_entries_16",
@@ -147,112 +147,85 @@ describe("PrizeDistributionSelector", () => {
     ).toBeDisabled();
   });
 
-  it("switches to all-round manual entry without clearing generated amounts", () => {
-    const screen = renderPrizeEditor();
+  it("preserves a saved payout snapshot until a PSA selection changes", () => {
+    const defaultDraft = createDefaultTournamentDraft();
+    const screen = renderPrizeEditor({
+      prize_distribution_mode: "manual",
+      prize_rounds: { ...defaultDraft.prize_rounds, qf: 500 },
+    });
+
+    expect(screen.getByText("Saved payout schedule")).toBeTruthy();
+    expect(screen.getByText("$500 USD")).toBeTruthy();
+    expect(screen.queryByLabelText("QF (USD)")).toBeNull();
 
     fireEvent.press(screen.getByText("Bronze"));
-    fireEvent.press(screen.getByLabelText("Edit QF payout"));
-    fireEvent.changeText(screen.getByLabelText("QF (USD)"), "2200");
-    fireEvent.press(screen.getByText("Enter payouts manually"));
 
-    expect(screen.getByLabelText("QF (USD)").props.value).toBe("2200");
-    expect(screen.getByLabelText("R3 (USD)")).toBeTruthy();
-    expect(screen.getByText("Use PSA selector")).toBeTruthy();
+    expect(screen.getByText("PSA generated")).toBeTruthy();
+    expect(screen.getByText("$2,137.5 USD")).toBeTruthy();
+    expect(screen.queryByText("$500 USD")).toBeNull();
   });
 
-  it("clears rounds outside the template when returning to generated mode", () => {
-    const onUpdate = jest.fn();
-    const draft: TournamentDraft = {
-      ...createDefaultTournamentDraft(),
+  it("shows every positive round in a manual snapshot with selector metadata", () => {
+    const defaultDraft = createDefaultTournamentDraft();
+    const screen = renderPrizeEditor({
       prize_distribution_mode: "manual",
       prize_tier_id: "world_bronze",
       prize_draw_template_id: "draw_32_entries_24",
-      prize_player_total: 47_500,
-      prize_rounds: {
-        r1: 800,
-        r2: 1_300,
-        r3: 500,
-        qf: 2_100,
-        sf: 3_500,
-        f: 5_700,
-        w: 9_000,
-      },
-    };
-    const screen = render(
-      <PrizeDistributionSelector draft={draft} onUpdate={onUpdate} />,
-    );
-
-    fireEvent.press(screen.getByText("Use PSA selector"));
-
-    expect(onUpdate).toHaveBeenCalledWith({
-      prize_distribution_mode: "generated",
-      prize_rounds: {
-        r1: 800,
-        r2: 1_300,
-        r3: 0,
-        qf: 2_100,
-        sf: 3_500,
-        f: 5_700,
-        w: 9_000,
-      },
+      prize_rounds: { ...defaultDraft.prize_rounds, r3: 700, qf: 500 },
     });
+
+    expect(screen.getByText("Saved payout schedule")).toBeTruthy();
+    expect(screen.getByText("R3")).toBeTruthy();
+    expect(screen.getByText("$700 USD")).toBeTruthy();
+    expect(screen.getByText("$500 USD")).toBeTruthy();
+    expect(screen.queryByText("4 players paid")).toBeNull();
+  });
+
+  it("limits a generated schedule to rounds in its selected template", () => {
+    const defaultDraft = createDefaultTournamentDraft();
+    const screen = renderPrizeEditor({
+      prize_distribution_mode: "generated",
+      prize_tier_id: "world_bronze",
+      prize_draw_template_id: "draw_32_entries_24",
+      prize_player_total: 47_500,
+      prize_rounds: { ...defaultDraft.prize_rounds, r3: 700, qf: 500 },
+    });
+
+    expect(screen.getByText("PSA generated")).toBeTruthy();
+    expect(screen.queryByText("R3")).toBeNull();
+    expect(screen.queryByText("$700 USD")).toBeNull();
+    expect(screen.getByText("$500 USD")).toBeTruthy();
+    expect(screen.getByText("4 players paid")).toBeTruthy();
   });
 
   it("blocks official generation when the tournament currency is not USD", () => {
     const screen = renderPrizeEditor({ currency: "EUR" });
 
+    expect(screen.getByRole("radio", { name: /Bronze/ })).toBeDisabled();
     fireEvent.press(screen.getByText("Bronze"));
 
     expect(screen.getByText("USD required for official tiers")).toBeTruthy();
-    expect(screen.getAllByText("€0 EUR").length).toBeGreaterThan(0);
+    expect(
+      screen.getByText(
+        "Official USD payout outcomes are unavailable for this tournament currency.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText("€47,500 EUR")).toBeNull();
     expect(screen.queryByText("$831.25 USD")).toBeNull();
   });
 
-  it("drops unused selector metadata when blocked payouts switch to manual", () => {
+  it("does not store selector provenance for a non-USD tournament", () => {
     const onUpdate = jest.fn();
-    const draft: TournamentDraft = {
-      ...createDefaultTournamentDraft(),
-      currency: "EUR",
-      prize_tier_id: "world_bronze",
-      prize_draw_template_id: "draw_32_entries_24",
-      prize_player_total: 47_500,
-    };
     const screen = render(
-      <PrizeDistributionSelector draft={draft} onUpdate={onUpdate} />,
+      <PrizeDistributionSelector
+        draft={{ ...createDefaultTournamentDraft(), currency: "EUR" }}
+        onUpdate={onUpdate}
+      />,
     );
 
-    fireEvent.press(screen.getByText("Enter payouts manually"));
+    fireEvent.press(screen.getByText("Bronze"));
 
-    expect(onUpdate).toHaveBeenCalledWith({
-      prize_distribution_mode: "manual",
-      prize_tier_id: null,
-      prize_draw_template_id: null,
-      prize_player_total: 0,
-    });
-  });
-
-  it("drops incomplete selector metadata before keeping typed manual payouts", () => {
-    const onUpdate = jest.fn();
-    const defaultDraft = createDefaultTournamentDraft();
-    const draft: TournamentDraft = {
-      ...defaultDraft,
-      prize_tier_id: "challenger_6_none",
-      prize_draw_template_id: null,
-      prize_player_total: 6_000,
-      prize_rounds: { ...defaultDraft.prize_rounds, qf: 500 },
-    };
-    const screen = render(
-      <PrizeDistributionSelector draft={draft} onUpdate={onUpdate} />,
-    );
-
-    fireEvent.press(screen.getByText("Enter payouts manually"));
-
-    expect(onUpdate).toHaveBeenCalledWith({
-      prize_distribution_mode: "manual",
-      prize_tier_id: null,
-      prize_draw_template_id: null,
-      prize_player_total: 0,
-    });
+    expect(onUpdate).not.toHaveBeenCalled();
   });
 
   it.each(["generated", "manual"] as const)(
@@ -297,6 +270,7 @@ describe("PrizeDistributionSelector", () => {
       expect(onApply).toHaveBeenCalledWith(
         expect.objectContaining({
           currency: "EUR",
+          prize_distribution_mode: "generated",
           prize_tier_id: null,
           prize_draw_template_id: null,
           prize_player_total: 0,
@@ -356,7 +330,7 @@ describe("PrizeDistributionSelector", () => {
     );
   });
 
-  it("preserves typed payouts without selector provenance when currency changes", async () => {
+  it("clears saved payouts without selector provenance when currency changes", async () => {
     const onApply = jest.fn();
     const defaultDraft = createDefaultTournamentDraft();
     const draft: TournamentDraft = {
@@ -388,30 +362,69 @@ describe("PrizeDistributionSelector", () => {
     expect(onApply).toHaveBeenCalledWith(
       expect.objectContaining({
         currency: "EUR",
-        prize_rounds: draft.prize_rounds,
+        prize_distribution_mode: "generated",
+        prize_rounds: defaultDraft.prize_rounds,
       }),
     );
   });
 
-  it("shows Tour Finals as manual-only", () => {
+  it("allows Tour Finals to record that its payout schedule is unavailable", () => {
     const screen = renderPrizeEditor();
 
-    expect(screen.getByText("Tour Finals")).toBeTruthy();
-    expect(screen.getByText("Manual only · group format")).toBeTruthy();
+    fireEvent.press(screen.getByText("Tour Finals"));
+
+    expect(
+      screen.getByRole("radio", { name: /Tour Finals/, checked: true }),
+    ).toBeTruthy();
+    expect(screen.getByText("Payout schedule unavailable")).toBeTruthy();
+    expect(screen.getByText("Schedule unavailable")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "PSA does not publish a round payout schedule for this tier.",
+      ),
+    ).toBeTruthy();
   });
 
-  it("records the withholding rate through presets and custom entry", () => {
+  it("shows gross prize messaging without manual withholding controls", () => {
     const screen = renderPrizeEditor();
 
-    fireEvent.press(screen.getByText("15%"));
-    fireEvent.press(screen.getByText("Custom"));
+    expect(screen.getByText("Gross prize projection")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Withholding is not included because no verified rate is available.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText("15%")).toBeNull();
+    expect(screen.queryByText("Custom")).toBeNull();
+    expect(screen.queryByLabelText("Prize tax withholding %")).toBeNull();
+  });
 
-    const customInput = screen.getByLabelText("Prize tax withholding %");
-    expect(customInput.props.value).toBe("15");
+  it("renders a supplied withholding rate as read-only tournament data", () => {
+    const screen = renderPrizeEditor({ prize_tax_rate: 30 });
 
-    fireEvent.changeText(customInput, "12.5");
-    expect(screen.getByLabelText("Prize tax withholding %").props.value).toBe(
-      "12.5",
+    expect(screen.getByText("Withholding included")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "The server will apply the 30% rate supplied with this tournament.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByLabelText("Prize tax withholding %")).toBeNull();
+  });
+});
+
+describe("ProjectionEditorSheet", () => {
+  it("dismisses the keyboard on drag without interactive frame tracking", () => {
+    const screen = render(
+      <ProjectionEditorSheet
+        editor="prize"
+        draft={createDefaultTournamentDraft()}
+        onApply={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+
+    expect(screen.UNSAFE_getByType(ScrollView).props.keyboardDismissMode).toBe(
+      "on-drag",
     );
   });
 });

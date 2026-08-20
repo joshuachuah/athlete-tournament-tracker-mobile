@@ -5,13 +5,17 @@ import { Alert } from "react-native";
 import { useNavigation, usePreventRemove } from "@react-navigation/native";
 
 import { TournamentProjectionBuilder } from "@/components/tournament/tournament-projection-builder";
+import { TournamentIdentitySearch } from "@/components/tournament/tournament-identity-search";
 import { TournamentDraftProvider } from "@/context/tournament-draft";
 import { api } from "@/lib/api";
 import {
   completeTournamentSaveData,
   createDefaultTournamentDraft,
   saveTournamentDraft,
+  tournamentDraftFromKnown,
+  tournamentDraftFromPrefill,
   tournamentToDraft,
+  type TournamentDraft,
 } from "@/lib/tournament-draft";
 import type { TournamentWithPnL } from "@/types";
 
@@ -227,10 +231,9 @@ describe("TournamentProjectionBuilder", () => {
     fireEvent.changeText(screen.getByLabelText("Location"), "Kuala Lumpur");
     fireEvent.changeText(screen.getByLabelText("Country"), "Malaysia");
     fireEvent.press(screen.getByText("Apply tournament details"));
-    fireEvent.press(screen.getByText("Add prize estimate"));
-    fireEvent.press(screen.getByText("Enter payouts manually"));
-    fireEvent.changeText(screen.getByLabelText("QF (USD)"), "250");
-    fireEvent.press(screen.getByText("Apply prize and tax"));
+    fireEvent.press(screen.getByText("Add prize money"));
+    fireEvent.press(screen.getByText("Bronze"));
+    fireEvent.press(screen.getByText("Apply prize money"));
     fireEvent.press(screen.getByText("Create projection"));
 
     expect(onSubmit).toHaveBeenCalledWith(
@@ -268,9 +271,9 @@ describe("TournamentProjectionBuilder", () => {
   it("uses the adaptive CTA to open and validate the first invalid editor", () => {
     const { screen } = renderBuilder({ ...validDraft, prize_tax_rate: 101 });
 
-    expect(screen.getByText("Review prize and tax")).toBeTruthy();
-    fireEvent.press(screen.getByText("Review prize and tax"));
-    fireEvent.press(screen.getByText("Apply prize and tax"));
+    expect(screen.getByText("Review prize money")).toBeTruthy();
+    fireEvent.press(screen.getByText("Review prize money"));
+    fireEvent.press(screen.getByText("Apply prize money"));
 
     expect(screen.getByText("Must be between 0 and 100.")).toBeTruthy();
   });
@@ -285,6 +288,121 @@ describe("TournamentProjectionBuilder", () => {
 
     expect(onSubmit).not.toHaveBeenCalled();
     expect(screen.getByText("Choose a known tournament or enter a new tournament name.")).toBeTruthy();
+  });
+
+  it("clears the previous tournament when choosing a new free-text identity", async () => {
+    const previousDraft: TournamentDraft = {
+      ...validDraft,
+      location: "Paris",
+      country: "France",
+      currency: "EUR",
+      entry_fee: 300,
+      prize_distribution_mode: "generated",
+      prize_tier_id: "world_bronze",
+      prize_draw_template_id: "draw_32_entries_24",
+      prize_player_total: 47_500,
+      prize_rounds: { ...defaultDraft.prize_rounds, qf: 2_137.5 },
+      prize_tax_rate: 30,
+      flight_cost: 500,
+      accommodation_total: 600,
+      coaching_cost: 200,
+      subsidy_enabled: true,
+      subsidy_by: "Federation",
+      subsidy_amount: 400,
+      sponsorship_allocated: 250,
+    };
+    const onChangeDraft = jest.fn();
+    const screen = renderWithClient(
+      <TournamentIdentitySearch
+        draft={previousDraft}
+        inputRef={{ current: null }}
+        onChangeDraft={onChangeDraft}
+        onResolutionChange={jest.fn()}
+        sport="tennis"
+      />,
+    );
+
+    fireEvent.press(
+      screen.getByLabelText(
+        "Selected tournament Open Championship. Change selection",
+      ),
+    );
+    fireEvent.changeText(screen.getByLabelText("Tournament name"), "Community Open");
+    await advance(300);
+    await waitFor(() =>
+      expect(
+        screen.getByLabelText("Create a new tournament named Community Open"),
+      ).toBeTruthy(),
+    );
+    fireEvent.press(
+      screen.getByLabelText("Create a new tournament named Community Open"),
+    );
+
+    expect(onChangeDraft).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "Community Open",
+        location: "",
+        country: "",
+        currency: "USD",
+        entry_fee: 0,
+        prize_rounds: defaultDraft.prize_rounds,
+        prize_tax_rate: 0,
+        flight_cost: 0,
+        accommodation_total: 0,
+        coaching_cost: 0,
+        subsidy_by: "",
+        subsidy_amount: 0,
+        sponsorship_allocated: 0,
+        prize_distribution_mode: "generated",
+        prize_tier_id: null,
+        prize_draw_template_id: null,
+        prize_player_total: 0,
+      }),
+    );
+  });
+
+  it("preserves safe route prefills when committing the first identity", async () => {
+    const prefilledDraft = tournamentDraftFromPrefill({
+      location: "Paris",
+      country: "France",
+      currency: "EUR",
+      start_date: "2026-06-01",
+      end_date: "2026-06-03",
+    });
+    const onChangeDraft = jest.fn();
+    const screen = renderWithClient(
+      <TournamentIdentitySearch
+        draft={prefilledDraft}
+        inputRef={{ current: null }}
+        onChangeDraft={onChangeDraft}
+        onResolutionChange={jest.fn()}
+        sport="tennis"
+      />,
+    );
+
+    fireEvent.changeText(screen.getByLabelText("Tournament name"), "Paris Open");
+    await advance(300);
+    await waitFor(() =>
+      expect(
+        screen.getByLabelText("Create a new tournament named Paris Open"),
+      ).toBeTruthy(),
+    );
+    fireEvent.press(
+      screen.getByLabelText("Create a new tournament named Paris Open"),
+    );
+
+    expect(onChangeDraft).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "Paris Open",
+        location: "Paris",
+        country: "France",
+        currency: "EUR",
+        start_date: "2026-06-01",
+        end_date: "2026-06-03",
+        prize_rounds: defaultDraft.prize_rounds,
+        prize_tax_rate: 0,
+      }),
+    );
   });
 
   it("does not carry tournament A values into a replacement tournament B", async () => {
@@ -338,15 +456,168 @@ describe("TournamentProjectionBuilder", () => {
     expect(screen.getByText("Renamed Open")).toBeTruthy();
   });
 
+  it("clears a known tournament's prize snapshot when its identity is renamed", async () => {
+    const initialDraft = tournamentDraftFromKnown({
+      name: "Known Open",
+      location: "Detroit",
+      country: "United States",
+      currency: "USD",
+      prize_rounds: { qf: 500 },
+      prize_tax_rate: 30,
+    });
+    const { onSubmit, screen } = renderBuilder(initialDraft);
+
+    fireEvent.press(screen.getByText("Tournament details"));
+    const nameInputs = screen.getAllByLabelText("Tournament name");
+    fireEvent.changeText(nameInputs[nameInputs.length - 1], "Unrelated Open");
+    fireEvent.press(screen.getByText("Apply tournament details"));
+    await advance(350);
+
+    expect(mockPreview.mock.calls.at(-1)?.[0]).toEqual(
+      expect.objectContaining({
+        name: "Unrelated Open",
+        prize_rounds: {},
+        prize_tax_rate: 0,
+      }),
+    );
+    expect(screen.getByText("Add prize money")).toBeTruthy();
+    fireEvent.press(screen.getByText("Add prize money"));
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("clears generated prize data when a known create draft is renamed", async () => {
+    const initialDraft = tournamentDraftFromKnown({
+      name: "Known Open",
+      location: "Detroit",
+      country: "United States",
+      currency: "USD",
+      prize_tax_rate: 30,
+    });
+    const { screen } = renderBuilder(initialDraft);
+
+    fireEvent.press(screen.getByText("Prize money"));
+    fireEvent.press(screen.getByText("Bronze"));
+    fireEvent.press(screen.getByText("Apply prize money"));
+    fireEvent.press(screen.getByText("Tournament details"));
+    const nameInputs = screen.getAllByLabelText("Tournament name");
+    fireEvent.changeText(nameInputs[nameInputs.length - 1], "Unrelated Open");
+    fireEvent.press(screen.getByText("Apply tournament details"));
+    await advance(350);
+
+    expect(mockPreview.mock.calls.at(-1)?.[0]).toEqual(
+      expect.objectContaining({
+        name: "Unrelated Open",
+        prize_rounds: {},
+        prize_tax_rate: 0,
+      }),
+    );
+    expect(screen.getByText("Add prize money")).toBeTruthy();
+  });
+
+  it("preserves server-owned prize data when a saved tournament is renamed", () => {
+    const onSubmit = jest.fn();
+    const initialDraft = tournamentToDraft(savedTournament);
+    const { screen } = renderBuilder(initialDraft, onSubmit);
+
+    fireEvent.press(screen.getByText("Tournament details"));
+    const nameInputs = screen.getAllByLabelText("Tournament name");
+    fireEvent.changeText(nameInputs[nameInputs.length - 1], "Renamed Saved Open");
+    fireEvent.press(screen.getByText("Apply tournament details"));
+    fireEvent.press(screen.getByText("Save changes"));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        editId: savedTournament.id,
+        name: "Renamed Saved Open",
+        prize_rounds: initialDraft.prize_rounds,
+        prize_tax_rate: 30,
+      }),
+    );
+  });
+
   it("gates a valid expense-only draft on adding a prize estimate", () => {
     const { onSubmit, screen } = renderBuilder({
       ...validDraft,
       prize_rounds: { ...defaultDraft.prize_rounds },
     });
 
-    fireEvent.press(screen.getByText("Add prize estimate"));
-    expect(screen.getAllByText("Prize and tax").length).toBeGreaterThan(1);
+    fireEvent.press(screen.getByText("Add prize money"));
+    expect(screen.getAllByText("Prize money").length).toBeGreaterThan(1);
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("allows a non-USD projection without fabricated prize outcomes", () => {
+    const onSubmit = jest.fn();
+    const prizeRounds = { ...defaultDraft.prize_rounds };
+    const { screen } = renderBuilder(
+      {
+        ...validDraft,
+        currency: "EUR",
+        prize_rounds: prizeRounds,
+      },
+      onSubmit,
+    );
+
+    fireEvent.press(screen.getByText("Create projection"));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ currency: "EUR", prize_rounds: prizeRounds }),
+    );
+  });
+
+  it("allows a USD event whose official payout schedule is unavailable", () => {
+    const onSubmit = jest.fn();
+    const { screen } = renderBuilder(validDraft, onSubmit);
+
+    fireEvent.press(screen.getByText("Prize money"));
+    fireEvent.press(screen.getByText("Tour Finals"));
+    fireEvent.press(screen.getByText("Apply prize money"));
+
+    expect(screen.getByText("Official payout schedule unavailable")).toBeTruthy();
+    fireEvent.press(screen.getByText("Create projection"));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prize_tier_id: "world_tour_finals",
+        prize_player_total: 0,
+        prize_rounds: defaultDraft.prize_rounds,
+      }),
+    );
+  });
+
+  it("allows a known tournament with no supplied payout schedule", () => {
+    const initialDraft = tournamentDraftFromKnown({
+      name: "Known Open",
+      location: "Detroit",
+      country: "United States",
+      currency: "USD",
+    });
+    const { onSubmit, screen } = renderBuilder(initialDraft);
+
+    expect(screen.getByText("No prize outcomes supplied")).toBeTruthy();
+    fireEvent.press(screen.getByText("Create projection"));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "Known Open",
+        prize_distribution_mode: "manual",
+        prize_rounds: defaultDraft.prize_rounds,
+      }),
+    );
+  });
+
+  it("keeps a saved USD event editable when it has no prize outcomes", () => {
+    const onSubmit = jest.fn();
+    const initialDraft = tournamentToDraft({
+      ...savedTournament,
+      prize_rounds: {},
+    });
+    const { screen } = renderBuilder(initialDraft, onSubmit);
+
+    expect(screen.getByText("No prize outcomes saved")).toBeTruthy();
+    fireEvent.press(screen.getByText("Save changes"));
+
+    expect(onSubmit).toHaveBeenCalledWith(initialDraft);
   });
 
   it("edits one assumption and preserves untouched hydrated fields", () => {

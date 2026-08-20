@@ -8,6 +8,7 @@ import { colors, radii, spacing } from "@/constants/theme";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { api } from "@/lib/api";
 import {
+  createDefaultTournamentDraft,
   tournamentDraftFromKnown,
   type TournamentDraft,
 } from "@/lib/tournament-draft";
@@ -81,7 +82,8 @@ export function TournamentIdentitySearch({
   function chooseNew() {
     const name = query.trim();
     if (!name) return;
-    onChangeDraft({ ...draft, name });
+    const baseDraft = draft.name.trim() ? createDefaultTournamentDraft() : draft;
+    onChangeDraft({ ...baseDraft, name });
     setQuery(name);
     setCommitted(true);
     onResolutionChange(true);

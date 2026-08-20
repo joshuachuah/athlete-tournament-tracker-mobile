@@ -10,17 +10,24 @@ import type {
   TournamentWithPnL,
 } from "@/types";
 
-const roundSchema = z.enum(["r1", "r2", "r3", "qf", "sf", "f", "w"]);
+const prizeRoundKeys = ["r1", "r2", "r3", "qf", "sf", "f", "w"] as const;
+const roundSchema = z.enum(prizeRoundKeys);
 const scenarioKinds = ["worst", "realistic", "best"] as const;
+const prizeAmountSchema = z.number().finite().nonnegative();
+const prizeTaxRateSchema = z.number().finite().min(0).max(100);
+
+function hasPositivePrizeRounds(prizeRounds: PrizeRounds | undefined) {
+  return prizeRoundKeys.some((round) => (prizeRounds?.[round] ?? 0) > 0);
+}
 
 const prizeRoundsSchema = z.looseObject({
-  r1: z.number().optional(),
-  r2: z.number().optional(),
-  r3: z.number().optional(),
-  qf: z.number().optional(),
-  sf: z.number().optional(),
-  f: z.number().optional(),
-  w: z.number().optional(),
+  r1: prizeAmountSchema.optional(),
+  r2: prizeAmountSchema.optional(),
+  r3: prizeAmountSchema.optional(),
+  qf: prizeAmountSchema.optional(),
+  sf: prizeAmountSchema.optional(),
+  f: prizeAmountSchema.optional(),
+  w: prizeAmountSchema.optional(),
 });
 
 export const athleteProfileSchema = z.looseObject({
@@ -59,7 +66,7 @@ const tournamentSchema = z.looseObject({
     .nullable(),
   sponsorship_allocated: z.number(),
   prize_rounds: prizeRoundsSchema,
-  prize_tax_rate: z.number(),
+  prize_tax_rate: prizeTaxRateSchema,
   created_at: z.string(),
 });
 
@@ -104,10 +111,37 @@ export const pnlResultSchema = z.looseObject({
   break_even_round: roundSchema.nullable(),
 });
 
-export const tournamentWithPnLSchema = tournamentSchema.extend({
-  pnl: pnlResultSchema,
-  home_currency: z.string(),
-});
+export function pnlResultSchemaForPrizeRounds(
+  prizeRounds: PrizeRounds | undefined,
+) {
+  return pnlResultSchema.superRefine((pnl, context) => {
+    if (hasPositivePrizeRounds(prizeRounds) && pnl.scenarios.length === 0) {
+      context.addIssue({
+        code: "custom",
+        path: ["scenarios"],
+        message: "Expected scenarios for the submitted prize rounds.",
+      });
+    }
+  });
+}
+
+export const tournamentWithPnLSchema = tournamentSchema
+  .extend({
+    pnl: pnlResultSchema,
+    home_currency: z.string(),
+  })
+  .superRefine((tournament, context) => {
+    if (
+      hasPositivePrizeRounds(tournament.prize_rounds) &&
+      tournament.pnl.scenarios.length === 0
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["pnl", "scenarios"],
+        message: "Expected scenarios when the tournament has prize rounds.",
+      });
+    }
+  });
 
 export const knownTournamentSchema = z.looseObject({
   id: z.string().optional(),
@@ -122,7 +156,7 @@ export const knownTournamentSchema = z.looseObject({
   tour_level: z.string().optional(),
   estimated_prize_total: z.number().optional(),
   prize_rounds: prizeRoundsSchema.optional(),
-  prize_tax_rate: z.number().optional(),
+  prize_tax_rate: prizeTaxRateSchema.optional(),
 });
 
 export const fxConversionSchema = z.looseObject({

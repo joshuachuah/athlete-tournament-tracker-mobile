@@ -24,6 +24,10 @@ import { Button } from "@/components/ui/button";
 import { colors, spacing } from "@/constants/theme";
 import { useTournamentDraft } from "@/context/tournament-draft";
 import {
+  getPrizeTier,
+  prizeDistributionCurrency,
+} from "@/lib/prize-distributions";
+import {
   detailsSchema,
   prizesSchema,
   spendingSchema,
@@ -67,7 +71,25 @@ function firstInvalidEditor(draft: TournamentDraft): ProjectionEditor | null {
   if (!detailsSchema.safeParse(draft).success) return "details";
   if (!prizesSchema.safeParse(draft).success) return "prize";
   if (!travelSchema.safeParse(draft).success) return "travel";
-  if (!Object.values(draft.prize_rounds).some((amount) => amount > 0)) return "prize";
+  const hasPrizeRounds = Object.values(draft.prize_rounds).some(
+    (amount) => amount > 0,
+  );
+  const selectedTier = draft.prize_tier_id
+    ? getPrizeTier(draft.prize_tier_id)
+    : null;
+  const scheduleUnavailable = selectedTier?.manualOnly === true;
+  const hasServerPrizeSnapshot = draft.prize_distribution_mode === "manual";
+  // Some PSA events and existing server records have no published schedule.
+  // Non-USD tournaments also remain valid without making the client invent FX.
+  if (
+    !hasPrizeRounds &&
+    draft.currency.toUpperCase() === prizeDistributionCurrency &&
+    !scheduleUnavailable &&
+    !hasServerPrizeSnapshot &&
+    !draft.editId
+  ) {
+    return "prize";
+  }
   if (!subsidySchema.safeParse(draft).success) return "subsidy";
 
   const spending = spendingSchema.safeParse(draft);
@@ -89,8 +111,8 @@ function actionLabel(draft: TournamentDraft, identityResolved: boolean) {
   if (invalid === "details") return "Complete tournament details";
   if (invalid === "prize") {
     return Object.values(draft.prize_rounds).some((amount) => amount > 0)
-      ? "Review prize and tax"
-      : "Add prize estimate";
+      ? "Review prize money"
+      : "Add prize money";
   }
   if (invalid === "travel") return "Review travel and stay";
   if (invalid) return "Review optional assumptions";

@@ -77,6 +77,15 @@ describe("API response schemas", () => {
       expect(tournamentWithPnLSchema.parse(response)).toEqual(response);
     });
 
+    it("rejects no scenarios when the tournament has prize rounds", () => {
+      const response = {
+        ...tournament,
+        pnl: { ...tournament.pnl, scenarios: [] },
+      };
+
+      expect(tournamentWithPnLSchema.safeParse(response).success).toBe(false);
+    });
+
     it("preserves unknown fields for additive backend changes", () => {
       const response = { ...tournament, some_new_field: 1 };
 
@@ -94,6 +103,33 @@ describe("API response schemas", () => {
 
       expect(tournamentWithPnLSchema.safeParse(response).success).toBe(false);
     });
+
+    it.each([-1, 101, Number.POSITIVE_INFINITY])(
+      "rejects an invalid prize tax rate of %s",
+      (prizeTaxRate) => {
+        const response = { ...tournament, prize_tax_rate: prizeTaxRate };
+
+        expect(tournamentWithPnLSchema.safeParse(response).success).toBe(false);
+      },
+    );
+
+    it.each([0, 100])("accepts a boundary prize tax rate of %s", (prizeTaxRate) => {
+      const response = { ...tournament, prize_tax_rate: prizeTaxRate };
+
+      expect(tournamentWithPnLSchema.safeParse(response).success).toBe(true);
+    });
+
+    it.each([-1, Number.POSITIVE_INFINITY])(
+      "rejects an invalid prize round amount of %s",
+      (prizeAmount) => {
+        const response = {
+          ...tournament,
+          prize_rounds: { ...tournament.prize_rounds, qf: prizeAmount },
+        };
+
+        expect(tournamentWithPnLSchema.safeParse(response).success).toBe(false);
+      },
+    );
 
     it("rejects scenarios with the wrong container type", () => {
       const response = {
@@ -179,4 +215,28 @@ describe("API response schemas", () => {
 
     expect(knownTournamentSchema.parse(response)).toEqual(response);
   });
+
+  it.each([-1, 101, Number.POSITIVE_INFINITY])(
+    "rejects a known tournament prize tax rate of %s",
+    (prizeTaxRate) => {
+      expect(
+        knownTournamentSchema.safeParse({
+          name: "Open Championship",
+          prize_tax_rate: prizeTaxRate,
+        }).success,
+      ).toBe(false);
+    },
+  );
+
+  it.each([-1, Number.POSITIVE_INFINITY])(
+    "rejects a known tournament prize round amount of %s",
+    (prizeAmount) => {
+      expect(
+        knownTournamentSchema.safeParse({
+          name: "Open Championship",
+          prize_rounds: { qf: prizeAmount },
+        }).success,
+      ).toBe(false);
+    },
+  );
 });

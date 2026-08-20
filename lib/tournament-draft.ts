@@ -13,8 +13,11 @@ import {
 } from "@/lib/utils";
 import type { ApiRequestOptions } from "@/lib/api";
 import {
+  generatePrizeRounds,
+  getPrizeTier,
   isDrawTemplateId,
   isPrizeTierId,
+  prizeDistributionCurrency,
   type DrawTemplateId,
   type PrizeDistributionMode,
   type PrizeTierId,
@@ -50,6 +53,10 @@ export type TournamentDraft = {
   sponsorship_allocated: number;
 };
 
+function emptyPrizeRounds(): Required<PrizeRounds> {
+  return { r1: 0, r2: 0, r3: 0, qf: 0, sf: 0, f: 0, w: 0 };
+}
+
 type TournamentDraftPrefillParam = string | string[];
 
 export type TournamentDraftPrefill = {
@@ -60,8 +67,6 @@ export type TournamentDraftPrefill = {
   start_date?: TournamentDraftPrefillParam;
   end_date?: TournamentDraftPrefillParam;
   duration_days?: TournamentDraftPrefillParam;
-  prize_rounds?: TournamentDraftPrefillParam;
-  prize_tax_rate?: TournamentDraftPrefillParam;
 };
 
 const prizeRoundKeys = ["r1", "r2", "r3", "qf", "sf", "f", "w"] as const;
@@ -114,15 +119,7 @@ export function createDefaultTournamentDraft(
     end_date: addDateOnlyDays(startDate, 2) ?? startDate,
     duration_days: 3,
     entry_fee: 0,
-    prize_rounds: {
-      r1: 0,
-      r2: 0,
-      r3: 0,
-      qf: 0,
-      sf: 0,
-      f: 0,
-      w: 0,
-    },
+    prize_rounds: emptyPrizeRounds(),
     prize_tax_rate: 0,
     prize_distribution_mode: "generated",
     prize_tier_id: null,
@@ -296,6 +293,10 @@ const persistedTournamentDraftSchema = persistedTournamentDraftV1Schema.extend({
   prize_player_total: finiteNonNegativeNumber,
 });
 const storedTournamentDraftSchema = z.strictObject({
+  version: z.literal(3),
+  draft: persistedTournamentDraftSchema,
+});
+const storedTournamentDraftV2Schema = z.strictObject({
   version: z.literal(2),
   draft: persistedTournamentDraftSchema,
 });
@@ -308,7 +309,7 @@ const legacyTournamentDraftSchema = persistedTournamentDraftV1Schema.extend({
 }).partial();
 
 export function persistedTournamentDraft(draft: TournamentDraft) {
-  return { version: 2 as const, draft };
+  return { version: 3 as const, draft };
 }
 
 function prizeSelectorMigration(
@@ -330,6 +331,102 @@ function prizeSelectorMigration(
   };
 }
 
+function migrateV2GeneratedPrizeSchedule(
+  draft: TournamentDraft,
+): TournamentDraft {
+  const hasPrizeRounds = Object.values(draft.prize_rounds).some(
+    (amount) => amount > 0,
+  );
+
+  if (draft.prize_distribution_mode !== "generated") {
+    return hasPrizeRounds
+      ? draft
+      : {
+          ...draft,
+          prize_distribution_mode: "generated",
+          prize_tier_id: null,
+          prize_draw_template_id: null,
+          prize_player_total: 0,
+        };
+  }
+
+  const currencyMatches =
+    draft.currency.toUpperCase() === prizeDistributionCurrency;
+
+  function preserveAsManualSnapshot() {
+    return {
+      ...draft,
+      prize_distribution_mode: "manual" as const,
+      prize_tier_id: null,
+      prize_draw_template_id: null,
+      prize_player_total: 0,
+    };
+  }
+
+  if (!currencyMatches) {
+    if (hasPrizeRounds) {
+      return preserveAsManualSnapshot();
+    }
+
+    return {
+      ...draft,
+      prize_tier_id: null,
+      prize_draw_template_id: null,
+      prize_player_total: 0,
+      prize_rounds: emptyPrizeRounds(),
+    };
+  }
+
+  if (!draft.prize_tier_id) {
+    return hasPrizeRounds
+      ? preserveAsManualSnapshot()
+      : { ...draft, prize_player_total: 0 };
+  }
+
+  const tier = getPrizeTier(draft.prize_tier_id);
+  const templateId =
+    tier.category === "world"
+      ? tier.drawTemplateId
+      : draft.prize_draw_template_id;
+
+  if (tier.manualOnly) {
+    return hasPrizeRounds
+      ? preserveAsManualSnapshot()
+      : {
+          ...draft,
+          prize_draw_template_id: null,
+          prize_player_total: 0,
+          prize_rounds: emptyPrizeRounds(),
+        };
+  }
+
+  if (!templateId) {
+    if (hasPrizeRounds) {
+      return preserveAsManualSnapshot();
+    }
+
+    return {
+      ...draft,
+      prize_player_total: tier.playerPrizeMoney,
+      prize_rounds: emptyPrizeRounds(),
+    };
+  }
+
+  return {
+    ...draft,
+    prize_draw_template_id: templateId,
+    prize_player_total: tier.playerPrizeMoney,
+    prize_rounds: {
+      ...emptyPrizeRounds(),
+      ...generatePrizeRounds(
+        tier.playerPrizeMoney,
+        templateId,
+        prizeDistributionCurrency,
+      ),
+    },
+  };
+}
+
 export function normalizeTournamentDraft(stored: unknown): TournamentDraft {
   const defaults = createDefaultTournamentDraft();
   const current = storedTournamentDraftSchema.safeParse(stored);
@@ -338,12 +435,24 @@ export function normalizeTournamentDraft(stored: unknown): TournamentDraft {
     return current.data.draft;
   }
 
+  const version2 = storedTournamentDraftV2Schema.safeParse(stored);
+
+  if (version2.success) {
+    return {
+      ...migrateV2GeneratedPrizeSchedule(version2.data.draft),
+      // Older drafts allowed athletes to edit withholding, so the stored rate
+      // cannot be treated as server-supplied once the field becomes read-only.
+      prize_tax_rate: defaults.prize_tax_rate,
+    };
+  }
+
   const previous = storedTournamentDraftV1Schema.safeParse(stored);
 
   if (previous.success) {
     return {
       ...previous.data.draft,
       ...prizeSelectorMigration(previous.data.draft.prize_rounds),
+      prize_tax_rate: defaults.prize_tax_rate,
     };
   }
 
@@ -363,17 +472,10 @@ export function normalizeTournamentDraft(stored: unknown): TournamentDraft {
     ...legacy.data,
     ...prizeSelectorMigration(prizeRounds),
     prize_rounds: prizeRounds,
-    prize_tax_rate: legacy.data.prize_tax_rate ?? defaults.prize_tax_rate,
+    prize_tax_rate: defaults.prize_tax_rate,
   };
 }
 
-const prefillNumber = z.preprocess(
-  (value) =>
-    typeof value === "string" && value.trim() !== ""
-      ? Number(value)
-      : value,
-  finiteNonNegativeNumber,
-);
 const prefillInteger = z.preprocess(
   (value) =>
     typeof value === "string" && value.trim() !== ""
@@ -381,23 +483,6 @@ const prefillInteger = z.preprocess(
       : value,
   nonNegativeInteger,
 );
-const prefillTaxRate = z.preprocess(
-  (value) =>
-    typeof value === "string" && value.trim() !== ""
-      ? Number(value)
-      : value,
-  finiteNonNegativeNumber.max(100),
-);
-const optionalPrefillMoney = prefillNumber.optional().catch(undefined);
-const prefillPrizeRoundsSchema = z.strictObject({
-  r1: optionalPrefillMoney,
-  r2: optionalPrefillMoney,
-  r3: optionalPrefillMoney,
-  qf: optionalPrefillMoney,
-  sf: optionalPrefillMoney,
-  f: optionalPrefillMoney,
-  w: optionalPrefillMoney,
-});
 const prefillParamsSchema = z.object({
   name: z.string().min(1).optional().catch(undefined),
   location: z.string().min(1).optional().catch(undefined),
@@ -411,8 +496,6 @@ const prefillParamsSchema = z.object({
   start_date: persistedDateOnly.optional().catch(undefined),
   end_date: persistedDateOnly.optional().catch(undefined),
   duration_days: prefillInteger.optional().catch(undefined),
-  prize_rounds: z.string().optional().catch(undefined),
-  prize_tax_rate: prefillTaxRate.optional().catch(undefined),
 });
 
 export function tournamentDraftFromPrefill(
@@ -433,32 +516,6 @@ export function tournamentDraftFromPrefill(
   if (parsedParams.end_date) next.end_date = parsedParams.end_date;
   if (parsedParams.duration_days !== undefined) {
     next.duration_days = parsedParams.duration_days;
-  }
-  if (parsedParams.prize_tax_rate !== undefined) {
-    next.prize_tax_rate = parsedParams.prize_tax_rate;
-  }
-  if (parsedParams.prize_rounds) {
-    try {
-      const parsedPrizeRounds = prefillPrizeRoundsSchema.safeParse(
-        JSON.parse(parsedParams.prize_rounds) as unknown,
-      );
-
-      if (parsedPrizeRounds.success) {
-        for (const round of prizeRoundKeys) {
-          const amount = parsedPrizeRounds.data[round];
-
-          if (amount !== undefined) {
-            next.prize_rounds[round] = amount;
-          }
-        }
-
-        if (Object.values(next.prize_rounds).some((amount) => amount > 0)) {
-          next.prize_distribution_mode = "manual";
-        }
-      }
-    } catch {
-      // Ignore malformed prefill data from navigation params.
-    }
   }
 
   return deriveDraftDates(next);
@@ -498,9 +555,9 @@ export function tournamentDraftFromKnown(
     start_date: validStartDate ?? defaults.start_date,
     end_date: endDate,
     prize_rounds: prizeRounds,
-    prize_distribution_mode: Object.values(prizeRounds).some((amount) => amount > 0)
-      ? "manual"
-      : defaults.prize_distribution_mode,
+    // Known-tournament prize data is a server-owned snapshot, including an
+    // explicitly empty schedule. Manual mode preserves that provenance.
+    prize_distribution_mode: "manual",
     prize_tax_rate: tournament.prize_tax_rate ?? defaults.prize_tax_rate,
   });
 }

@@ -42,8 +42,8 @@ const editorTitles: Record<ProjectionEditor, { title: string; description: strin
     description: "Set the identity, dates, currency, and entry fee.",
   },
   prize: {
-    title: "Prize and tax",
-    description: "Enter server-projected prize outcomes and withholding.",
+    title: "Prize money",
+    description: "Choose the PSA event details.",
   },
   travel: {
     title: "Travel and stay",
@@ -132,18 +132,27 @@ export function ProjectionEditorSheet({
     const currencyChanged =
       editor === "details" &&
       workingDraft.currency.toUpperCase() !== draft.currency.toUpperCase();
-    const hasSelectorPayouts =
+    const createTournamentRenamed =
+      editor === "details" &&
+      !draft.editId &&
+      workingDraft.name.trim() !== draft.name.trim();
+    const hasPrizeData =
       workingDraft.prize_tier_id !== null ||
       workingDraft.prize_draw_template_id !== null ||
-      workingDraft.prize_player_total > 0;
+      workingDraft.prize_player_total > 0 ||
+      Object.values(workingDraft.prize_rounds).some((amount) => amount > 0);
     const appliedDraft =
-      currencyChanged && hasSelectorPayouts
+      (currencyChanged && hasPrizeData) || createTournamentRenamed
         ? {
             ...workingDraft,
+            prize_distribution_mode: "generated" as const,
             prize_tier_id: null,
             prize_draw_template_id: null,
             prize_player_total: 0,
             prize_rounds: emptyPrizeRounds(),
+            prize_tax_rate: createTournamentRenamed
+              ? 0
+              : workingDraft.prize_tax_rate,
           }
         : workingDraft;
 
@@ -207,7 +216,7 @@ export function ProjectionEditorSheet({
           </View>
 
           <ScrollView
-            keyboardDismissMode="interactive"
+            keyboardDismissMode="on-drag"
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.editorContent}
           >
