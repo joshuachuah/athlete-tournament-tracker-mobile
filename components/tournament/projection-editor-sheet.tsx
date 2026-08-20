@@ -132,13 +132,17 @@ export function ProjectionEditorSheet({
     const currencyChanged =
       editor === "details" &&
       workingDraft.currency.toUpperCase() !== draft.currency.toUpperCase();
+    const createTournamentRenamed =
+      editor === "details" &&
+      !draft.editId &&
+      workingDraft.name.trim() !== draft.name.trim();
     const hasPrizeData =
       workingDraft.prize_tier_id !== null ||
       workingDraft.prize_draw_template_id !== null ||
       workingDraft.prize_player_total > 0 ||
       Object.values(workingDraft.prize_rounds).some((amount) => amount > 0);
     const appliedDraft =
-      currencyChanged && hasPrizeData
+      (currencyChanged && hasPrizeData) || createTournamentRenamed
         ? {
             ...workingDraft,
             prize_distribution_mode: "generated" as const,
@@ -146,6 +150,9 @@ export function ProjectionEditorSheet({
             prize_draw_template_id: null,
             prize_player_total: 0,
             prize_rounds: emptyPrizeRounds(),
+            prize_tax_rate: createTournamentRenamed
+              ? 0
+              : workingDraft.prize_tax_rate,
           }
         : workingDraft;
 

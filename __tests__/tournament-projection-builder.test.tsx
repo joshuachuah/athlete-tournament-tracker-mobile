@@ -411,6 +411,85 @@ describe("TournamentProjectionBuilder", () => {
     expect(screen.getByText("Renamed Open")).toBeTruthy();
   });
 
+  it("clears a known tournament's prize snapshot when its identity is renamed", async () => {
+    const initialDraft = tournamentDraftFromKnown({
+      name: "Known Open",
+      location: "Detroit",
+      country: "United States",
+      currency: "USD",
+      prize_rounds: { qf: 500 },
+      prize_tax_rate: 30,
+    });
+    const { onSubmit, screen } = renderBuilder(initialDraft);
+
+    fireEvent.press(screen.getByText("Tournament details"));
+    const nameInputs = screen.getAllByLabelText("Tournament name");
+    fireEvent.changeText(nameInputs[nameInputs.length - 1], "Unrelated Open");
+    fireEvent.press(screen.getByText("Apply tournament details"));
+    await advance(350);
+
+    expect(mockPreview.mock.calls.at(-1)?.[0]).toEqual(
+      expect.objectContaining({
+        name: "Unrelated Open",
+        prize_rounds: {},
+        prize_tax_rate: 0,
+      }),
+    );
+    expect(screen.getByText("Add prize money")).toBeTruthy();
+    fireEvent.press(screen.getByText("Add prize money"));
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("clears generated prize data when a known create draft is renamed", async () => {
+    const initialDraft = tournamentDraftFromKnown({
+      name: "Known Open",
+      location: "Detroit",
+      country: "United States",
+      currency: "USD",
+      prize_tax_rate: 30,
+    });
+    const { screen } = renderBuilder(initialDraft);
+
+    fireEvent.press(screen.getByText("Prize money"));
+    fireEvent.press(screen.getByText("Bronze"));
+    fireEvent.press(screen.getByText("Apply prize money"));
+    fireEvent.press(screen.getByText("Tournament details"));
+    const nameInputs = screen.getAllByLabelText("Tournament name");
+    fireEvent.changeText(nameInputs[nameInputs.length - 1], "Unrelated Open");
+    fireEvent.press(screen.getByText("Apply tournament details"));
+    await advance(350);
+
+    expect(mockPreview.mock.calls.at(-1)?.[0]).toEqual(
+      expect.objectContaining({
+        name: "Unrelated Open",
+        prize_rounds: {},
+        prize_tax_rate: 0,
+      }),
+    );
+    expect(screen.getByText("Add prize money")).toBeTruthy();
+  });
+
+  it("preserves server-owned prize data when a saved tournament is renamed", () => {
+    const onSubmit = jest.fn();
+    const initialDraft = tournamentToDraft(savedTournament);
+    const { screen } = renderBuilder(initialDraft, onSubmit);
+
+    fireEvent.press(screen.getByText("Tournament details"));
+    const nameInputs = screen.getAllByLabelText("Tournament name");
+    fireEvent.changeText(nameInputs[nameInputs.length - 1], "Renamed Saved Open");
+    fireEvent.press(screen.getByText("Apply tournament details"));
+    fireEvent.press(screen.getByText("Save changes"));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        editId: savedTournament.id,
+        name: "Renamed Saved Open",
+        prize_rounds: initialDraft.prize_rounds,
+        prize_tax_rate: 30,
+      }),
+    );
+  });
+
   it("gates a valid expense-only draft on adding a prize estimate", () => {
     const { onSubmit, screen } = renderBuilder({
       ...validDraft,
