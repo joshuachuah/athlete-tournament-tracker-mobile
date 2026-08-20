@@ -506,6 +506,7 @@ describe("tournamentDraftFromKnown", () => {
         currency: "USD",
         entry_fee: 0,
         prize_tax_rate: 0,
+        prize_distribution_mode: "manual",
       }),
     );
     expect(draft.prize_rounds).toEqual(defaultTournamentDraft.prize_rounds);
@@ -547,6 +548,18 @@ describe("normalizeTournamentDraft", () => {
 
     expect(persisted.version).toBe(3);
     expect(normalizeTournamentDraft(persisted)).toEqual(storedDraft);
+  });
+
+  it("preserves a current server-backed empty prize snapshot", () => {
+    const storedDraft = {
+      ...defaultTournamentDraft,
+      name: "Known stored draft",
+      prize_distribution_mode: "manual" as const,
+    };
+
+    expect(normalizeTournamentDraft(persistedTournamentDraft(storedDraft))).toEqual(
+      storedDraft,
+    );
   });
 
   it("repairs an edited generated World schedule from a v2 draft", () => {
@@ -620,6 +633,24 @@ describe("normalizeTournamentDraft", () => {
       ...storedDraft,
       prize_tax_rate: 0,
     });
+  });
+
+  it("does not treat an empty manual v2 draft as server-backed", () => {
+    const storedDraft = {
+      ...defaultTournamentDraft,
+      prize_distribution_mode: "manual" as const,
+    };
+
+    expect(
+      normalizeTournamentDraft({ version: 2, draft: storedDraft }),
+    ).toEqual(
+      expect.objectContaining({
+        prize_distribution_mode: "generated",
+        prize_tier_id: null,
+        prize_draw_template_id: null,
+        prize_player_total: 0,
+      }),
+    );
   });
 
   it("preserves entered non-USD v2 payouts as a manual snapshot", () => {

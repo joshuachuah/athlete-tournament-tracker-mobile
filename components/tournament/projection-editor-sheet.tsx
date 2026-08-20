@@ -141,6 +141,7 @@ export function ProjectionEditorSheet({
       currencyChanged && hasPrizeData
         ? {
             ...workingDraft,
+            prize_distribution_mode: "generated" as const,
             prize_tier_id: null,
             prize_draw_template_id: null,
             prize_player_total: 0,

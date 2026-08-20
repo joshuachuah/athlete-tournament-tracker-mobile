@@ -12,6 +12,7 @@ import {
   completeTournamentSaveData,
   createDefaultTournamentDraft,
   saveTournamentDraft,
+  tournamentDraftFromKnown,
   tournamentToDraft,
   type TournamentDraft,
 } from "@/lib/tournament-draft";
@@ -455,6 +456,27 @@ describe("TournamentProjectionBuilder", () => {
       expect.objectContaining({
         prize_tier_id: "world_tour_finals",
         prize_player_total: 0,
+        prize_rounds: defaultDraft.prize_rounds,
+      }),
+    );
+  });
+
+  it("allows a known tournament with no supplied payout schedule", () => {
+    const initialDraft = tournamentDraftFromKnown({
+      name: "Known Open",
+      location: "Detroit",
+      country: "United States",
+      currency: "USD",
+    });
+    const { onSubmit, screen } = renderBuilder(initialDraft);
+
+    expect(screen.getByText("No prize outcomes supplied")).toBeTruthy();
+    fireEvent.press(screen.getByText("Create projection"));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "Known Open",
+        prize_distribution_mode: "manual",
         prize_rounds: defaultDraft.prize_rounds,
       }),
     );

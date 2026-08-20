@@ -93,6 +93,11 @@ export function ScenarioStrip({
             title: "Outcomes unavailable",
             body: "Official USD payout outcomes are unavailable for this tournament currency.",
           }
+        : draft.prize_distribution_mode === "manual"
+          ? {
+              title: "No outcomes yet",
+              body: "No payout schedule was supplied with this tournament.",
+            }
         : {
             title: "No outcomes yet",
             body: "Choose a supported PSA tier and draw to see worst, middle, and best outcomes.",

@@ -270,6 +270,7 @@ describe("PrizeDistributionSelector", () => {
       expect(onApply).toHaveBeenCalledWith(
         expect.objectContaining({
           currency: "EUR",
+          prize_distribution_mode: "generated",
           prize_tier_id: null,
           prize_draw_template_id: null,
           prize_player_total: 0,
@@ -361,6 +362,7 @@ describe("PrizeDistributionSelector", () => {
     expect(onApply).toHaveBeenCalledWith(
       expect.objectContaining({
         currency: "EUR",
+        prize_distribution_mode: "generated",
         prize_rounds: defaultDraft.prize_rounds,
       }),
     );

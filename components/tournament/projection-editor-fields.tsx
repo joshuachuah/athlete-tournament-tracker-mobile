@@ -171,6 +171,8 @@ export function ProjectionEditorFields({
       ? "PSA does not publish a round payout schedule for this tier."
       : workingDraft.currency.toUpperCase() !== prizeDistributionCurrency
         ? "Official USD payout outcomes are unavailable for this tournament currency."
+        : workingDraft.prize_distribution_mode === "manual"
+          ? "No payout schedule was supplied with this tournament."
         : "Choose a supported PSA tier and draw to generate the payout schedule.";
 
     return (

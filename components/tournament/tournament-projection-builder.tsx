@@ -78,12 +78,14 @@ function firstInvalidEditor(draft: TournamentDraft): ProjectionEditor | null {
     ? getPrizeTier(draft.prize_tier_id)
     : null;
   const scheduleUnavailable = selectedTier?.manualOnly === true;
+  const hasServerPrizeSnapshot = draft.prize_distribution_mode === "manual";
   // Some PSA events and existing server records have no published schedule.
   // Non-USD tournaments also remain valid without making the client invent FX.
   if (
     !hasPrizeRounds &&
     draft.currency.toUpperCase() === prizeDistributionCurrency &&
     !scheduleUnavailable &&
+    !hasServerPrizeSnapshot &&
     !draft.editId
   ) {
     return "prize";

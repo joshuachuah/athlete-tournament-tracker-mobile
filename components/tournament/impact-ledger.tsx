@@ -218,7 +218,9 @@ export function ImpactLedger({
           ? "Official USD outcomes unavailable"
           : draft.editId
             ? "No prize outcomes saved"
-            : "Choose a PSA tier and draw";
+            : draft.prize_distribution_mode === "manual"
+              ? "No prize outcomes supplied"
+              : "Choose a PSA tier and draw";
   const prizeImpact =
     prizes.length === 0
       ? formatMoney(0, draft.currency)

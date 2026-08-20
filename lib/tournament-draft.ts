@@ -334,13 +334,22 @@ function prizeSelectorMigration(
 function migrateV2GeneratedPrizeSchedule(
   draft: TournamentDraft,
 ): TournamentDraft {
-  if (draft.prize_distribution_mode !== "generated") {
-    return draft;
-  }
-
   const hasPrizeRounds = Object.values(draft.prize_rounds).some(
     (amount) => amount > 0,
   );
+
+  if (draft.prize_distribution_mode !== "generated") {
+    return hasPrizeRounds
+      ? draft
+      : {
+          ...draft,
+          prize_distribution_mode: "generated",
+          prize_tier_id: null,
+          prize_draw_template_id: null,
+          prize_player_total: 0,
+        };
+  }
+
   const currencyMatches =
     draft.currency.toUpperCase() === prizeDistributionCurrency;
 
@@ -546,9 +555,9 @@ export function tournamentDraftFromKnown(
     start_date: validStartDate ?? defaults.start_date,
     end_date: endDate,
     prize_rounds: prizeRounds,
-    prize_distribution_mode: Object.values(prizeRounds).some((amount) => amount > 0)
-      ? "manual"
-      : defaults.prize_distribution_mode,
+    // Known-tournament prize data is a server-owned snapshot, including an
+    // explicitly empty schedule. Manual mode preserves that provenance.
+    prize_distribution_mode: "manual",
     prize_tax_rate: tournament.prize_tax_rate ?? defaults.prize_tax_rate,
   });
 }

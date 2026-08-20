@@ -148,6 +148,27 @@ it.each([
   expect(screen.queryByText(/Add prize estimates/)).toBeNull();
 });
 
+it("explains a server-backed empty known-tournament schedule", async () => {
+  mockPreview.mockResolvedValue({
+    total_expenses: 0,
+    total_income_base: 0,
+    scenarios: [],
+    break_even_round: null,
+  });
+  const screen = renderStrip({
+    ...draft,
+    prize_distribution_mode: "manual",
+    prize_rounds: createDefaultTournamentDraft().prize_rounds,
+  });
+  await settlePreview();
+
+  await waitFor(() => expect(screen.getByText("No outcomes yet")).toBeTruthy());
+  expect(
+    screen.getByText("No payout schedule was supplied with this tournament."),
+  ).toBeTruthy();
+  expect(screen.queryByText(/Choose a supported PSA tier/)).toBeNull();
+});
+
 it("cancels the stale preview request when the debounced draft changes", async () => {
   mockPreview.mockImplementation(
     (_payload: unknown, options: { signal: AbortSignal }) =>
