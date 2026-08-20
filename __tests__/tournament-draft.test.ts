@@ -579,9 +579,143 @@ describe("normalizeTournamentDraft", () => {
       prize_rounds: { ...defaultTournamentDraft.prize_rounds, qf: 2_137.5 },
     };
 
+    const persisted = persistedTournamentDraft(storedDraft);
+
+    expect(persisted.version).toBe(3);
+    expect(normalizeTournamentDraft(persisted)).toEqual(storedDraft);
+  });
+
+  it("repairs an edited generated World schedule from a v2 draft", () => {
+    const storedDraft = {
+      ...defaultTournamentDraft,
+      name: "Interrupted generated draft",
+      prize_tier_id: "world_bronze" as const,
+      prize_draw_template_id: "draw_32_entries_24" as const,
+      prize_player_total: 47_500,
+      prize_rounds: {
+        ...defaultTournamentDraft.prize_rounds,
+        r1: 0,
+        qf: 2_137.5,
+      },
+    };
+
+    const repaired = normalizeTournamentDraft({ version: 2, draft: storedDraft });
+
+    expect(repaired.prize_player_total).toBe(47_500);
+    expect(repaired.prize_rounds).toEqual({
+      r1: 831.25,
+      r2: 1_306.25,
+      r3: 0,
+      qf: 2_137.5,
+      sf: 3_562.5,
+      f: 5_700,
+      w: 9_025,
+    });
+  });
+
+  it("repairs an edited generated Challenger schedule from a v2 draft", () => {
+    const storedDraft = {
+      ...defaultTournamentDraft,
+      prize_tier_id: "challenger_6_none" as const,
+      prize_draw_template_id: "draw_16_entries_16" as const,
+      prize_player_total: 6_000,
+      prize_rounds: {
+        ...defaultTournamentDraft.prize_rounds,
+        r1: 0,
+        qf: 330,
+      },
+    };
+
+    const repaired = normalizeTournamentDraft({ version: 2, draft: storedDraft });
+
+    expect(repaired.prize_rounds).toEqual({
+      r1: 195,
+      r2: 0,
+      r3: 0,
+      qf: 330,
+      sf: 540,
+      f: 840,
+      w: 1_200,
+    });
+  });
+
+  it("preserves a manual v2 payout snapshot without changing its values", () => {
+    const storedDraft = {
+      ...defaultTournamentDraft,
+      prize_distribution_mode: "manual" as const,
+      prize_tier_id: "world_bronze" as const,
+      prize_draw_template_id: "draw_32_entries_24" as const,
+      prize_player_total: 47_500,
+      prize_rounds: { ...defaultTournamentDraft.prize_rounds, r3: 700 },
+    };
+
+    expect(normalizeTournamentDraft({ version: 2, draft: storedDraft })).toEqual(
+      storedDraft,
+    );
+  });
+
+  it("preserves entered non-USD v2 payouts as a manual snapshot", () => {
+    const storedDraft = {
+      ...defaultTournamentDraft,
+      currency: "EUR",
+      prize_tier_id: "world_bronze" as const,
+      prize_draw_template_id: "draw_32_entries_24" as const,
+      prize_player_total: 47_500,
+      prize_rounds: { ...defaultTournamentDraft.prize_rounds, qf: 500 },
+    };
+
     expect(
-      normalizeTournamentDraft(persistedTournamentDraft(storedDraft)),
-    ).toEqual(storedDraft);
+      normalizeTournamentDraft({ version: 2, draft: storedDraft }),
+    ).toEqual(
+      expect.objectContaining({
+        prize_distribution_mode: "manual",
+        prize_tier_id: null,
+        prize_draw_template_id: null,
+        prize_player_total: 0,
+        prize_rounds: storedDraft.prize_rounds,
+      }),
+    );
+  });
+
+  it("keeps an empty v2 unavailable tier as an explicit selection", () => {
+    const storedDraft = {
+      ...defaultTournamentDraft,
+      prize_tier_id: "world_tour_finals" as const,
+      prize_draw_template_id: null,
+      prize_player_total: 285_000,
+    };
+
+    expect(
+      normalizeTournamentDraft({ version: 2, draft: storedDraft }),
+    ).toEqual(
+      expect.objectContaining({
+        prize_tier_id: "world_tour_finals",
+        prize_draw_template_id: null,
+        prize_player_total: 0,
+        prize_rounds: defaultTournamentDraft.prize_rounds,
+      }),
+    );
+  });
+
+  it("keeps an incomplete v2 Challenger selection ready for a draw", () => {
+    const storedDraft = {
+      ...defaultTournamentDraft,
+      prize_tier_id: "challenger_6_none" as const,
+      prize_draw_template_id: null,
+      prize_player_total: 0,
+    };
+
+    expect(
+      normalizeTournamentDraft({ version: 2, draft: storedDraft }),
+    ).toEqual(
+      expect.objectContaining({
+        prize_distribution_mode: "generated",
+        prize_tier_id: "challenger_6_none",
+        prize_draw_template_id: null,
+        prize_player_total: 6_000,
+        prize_rounds: defaultTournamentDraft.prize_rounds,
+      }),
+    );
   });
 
   it("migrates a v1 draft with entered rounds to manual mode without data loss", () => {

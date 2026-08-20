@@ -13,8 +13,11 @@ import {
 } from "@/lib/utils";
 import type { ApiRequestOptions } from "@/lib/api";
 import {
+  generatePrizeRounds,
+  getPrizeTier,
   isDrawTemplateId,
   isPrizeTierId,
+  prizeDistributionCurrency,
   type DrawTemplateId,
   type PrizeDistributionMode,
   type PrizeTierId,
@@ -49,6 +52,10 @@ export type TournamentDraft = {
   subsidy_covers: NonNullable<Tournament["subsidy_covers"]>;
   sponsorship_allocated: number;
 };
+
+function emptyPrizeRounds(): Required<PrizeRounds> {
+  return { r1: 0, r2: 0, r3: 0, qf: 0, sf: 0, f: 0, w: 0 };
+}
 
 type TournamentDraftPrefillParam = string | string[];
 
@@ -114,15 +121,7 @@ export function createDefaultTournamentDraft(
     end_date: addDateOnlyDays(startDate, 2) ?? startDate,
     duration_days: 3,
     entry_fee: 0,
-    prize_rounds: {
-      r1: 0,
-      r2: 0,
-      r3: 0,
-      qf: 0,
-      sf: 0,
-      f: 0,
-      w: 0,
-    },
+    prize_rounds: emptyPrizeRounds(),
     prize_tax_rate: 0,
     prize_distribution_mode: "generated",
     prize_tier_id: null,
@@ -296,6 +295,10 @@ const persistedTournamentDraftSchema = persistedTournamentDraftV1Schema.extend({
   prize_player_total: finiteNonNegativeNumber,
 });
 const storedTournamentDraftSchema = z.strictObject({
+  version: z.literal(3),
+  draft: persistedTournamentDraftSchema,
+});
+const storedTournamentDraftV2Schema = z.strictObject({
   version: z.literal(2),
   draft: persistedTournamentDraftSchema,
 });
@@ -308,7 +311,7 @@ const legacyTournamentDraftSchema = persistedTournamentDraftV1Schema.extend({
 }).partial();
 
 export function persistedTournamentDraft(draft: TournamentDraft) {
-  return { version: 2 as const, draft };
+  return { version: 3 as const, draft };
 }
 
 function prizeSelectorMigration(
@@ -330,12 +333,105 @@ function prizeSelectorMigration(
   };
 }
 
+function migrateV2GeneratedPrizeSchedule(
+  draft: TournamentDraft,
+): TournamentDraft {
+  if (draft.prize_distribution_mode !== "generated") {
+    return draft;
+  }
+
+  const hasPrizeRounds = Object.values(draft.prize_rounds).some(
+    (amount) => amount > 0,
+  );
+  const currencyMatches =
+    draft.currency.toUpperCase() === prizeDistributionCurrency;
+
+  function preserveAsManualSnapshot() {
+    return {
+      ...draft,
+      prize_distribution_mode: "manual" as const,
+      prize_tier_id: null,
+      prize_draw_template_id: null,
+      prize_player_total: 0,
+    };
+  }
+
+  if (!currencyMatches) {
+    if (hasPrizeRounds) {
+      return preserveAsManualSnapshot();
+    }
+
+    return {
+      ...draft,
+      prize_tier_id: null,
+      prize_draw_template_id: null,
+      prize_player_total: 0,
+      prize_rounds: emptyPrizeRounds(),
+    };
+  }
+
+  if (!draft.prize_tier_id) {
+    return hasPrizeRounds
+      ? preserveAsManualSnapshot()
+      : { ...draft, prize_player_total: 0 };
+  }
+
+  const tier = getPrizeTier(draft.prize_tier_id);
+  const templateId =
+    tier.category === "world"
+      ? tier.drawTemplateId
+      : draft.prize_draw_template_id;
+
+  if (tier.manualOnly) {
+    return hasPrizeRounds
+      ? preserveAsManualSnapshot()
+      : {
+          ...draft,
+          prize_draw_template_id: null,
+          prize_player_total: 0,
+          prize_rounds: emptyPrizeRounds(),
+        };
+  }
+
+  if (!templateId) {
+    if (hasPrizeRounds) {
+      return preserveAsManualSnapshot();
+    }
+
+    return {
+      ...draft,
+      prize_player_total: tier.playerPrizeMoney,
+      prize_rounds: emptyPrizeRounds(),
+    };
+  }
+
+  return {
+    ...draft,
+    prize_draw_template_id: templateId,
+    prize_player_total: tier.playerPrizeMoney,
+    prize_rounds: {
+      ...emptyPrizeRounds(),
+      ...generatePrizeRounds(
+        tier.playerPrizeMoney,
+        templateId,
+        prizeDistributionCurrency,
+      ),
+    },
+  };
+}
+
 export function normalizeTournamentDraft(stored: unknown): TournamentDraft {
   const defaults = createDefaultTournamentDraft();
   const current = storedTournamentDraftSchema.safeParse(stored);
 
   if (current.success) {
     return current.data.draft;
+  }
+
+  const version2 = storedTournamentDraftV2Schema.safeParse(stored);
+
+  if (version2.success) {
+    return migrateV2GeneratedPrizeSchedule(version2.data.draft);
   }
 
   const previous = storedTournamentDraftV1Schema.safeParse(stored);
