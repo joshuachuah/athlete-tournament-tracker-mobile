@@ -23,6 +23,7 @@ import { TournamentIdentitySearch } from "@/components/tournament/tournament-ide
 import { Button } from "@/components/ui/button";
 import { colors, spacing } from "@/constants/theme";
 import { useTournamentDraft } from "@/context/tournament-draft";
+import { prizeDistributionCurrency } from "@/lib/prize-distributions";
 import {
   detailsSchema,
   prizesSchema,
@@ -67,7 +68,17 @@ function firstInvalidEditor(draft: TournamentDraft): ProjectionEditor | null {
   if (!detailsSchema.safeParse(draft).success) return "details";
   if (!prizesSchema.safeParse(draft).success) return "prize";
   if (!travelSchema.safeParse(draft).success) return "travel";
-  if (!Object.values(draft.prize_rounds).some((amount) => amount > 0)) return "prize";
+  const hasPrizeRounds = Object.values(draft.prize_rounds).some(
+    (amount) => amount > 0,
+  );
+  // PSA only supplies USD schedules. Other currencies remain valid with no
+  // prize outcomes instead of making the client invent an FX conversion.
+  if (
+    !hasPrizeRounds &&
+    draft.currency.toUpperCase() === prizeDistributionCurrency
+  ) {
+    return "prize";
+  }
   if (!subsidySchema.safeParse(draft).success) return "subsidy";
 
   const spending = spendingSchema.safeParse(draft);

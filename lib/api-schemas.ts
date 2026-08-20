@@ -12,6 +12,7 @@ import type {
 
 const roundSchema = z.enum(["r1", "r2", "r3", "qf", "sf", "f", "w"]);
 const scenarioKinds = ["worst", "realistic", "best"] as const;
+const prizeTaxRateSchema = z.number().finite().min(0).max(100);
 
 const prizeRoundsSchema = z.looseObject({
   r1: z.number().optional(),
@@ -59,7 +60,7 @@ const tournamentSchema = z.looseObject({
     .nullable(),
   sponsorship_allocated: z.number(),
   prize_rounds: prizeRoundsSchema,
-  prize_tax_rate: z.number(),
+  prize_tax_rate: prizeTaxRateSchema,
   created_at: z.string(),
 });
 
@@ -122,7 +123,7 @@ export const knownTournamentSchema = z.looseObject({
   tour_level: z.string().optional(),
   estimated_prize_total: z.number().optional(),
   prize_rounds: prizeRoundsSchema.optional(),
-  prize_tax_rate: z.number().optional(),
+  prize_tax_rate: prizeTaxRateSchema.optional(),
 });
 
 export const fxConversionSchema = z.looseObject({

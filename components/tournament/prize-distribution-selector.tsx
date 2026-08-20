@@ -279,7 +279,7 @@ export function PrizeDistributionSelector({
     onUpdate({
       prize_distribution_mode: "generated",
       prize_tier_id: tierId,
-      prize_player_total: tier.playerPrizeMoney,
+      prize_player_total: currencyMatches ? tier.playerPrizeMoney : 0,
       prize_draw_template_id: templateId,
       prize_rounds: roundsFor(tier, templateId),
     });
@@ -340,7 +340,7 @@ export function PrizeDistributionSelector({
                       ? "Payout schedule unavailable"
                       : formatMoney(tier.playerPrizeMoney, prizeDistributionCurrency)
                   }
-                  disabled={manualOnly}
+                  disabled={manualOnly || !currencyMatches}
                   selected={draft.prize_tier_id === tier.id}
                   onPress={() => selectTier(tier.id)}
                 />
@@ -357,6 +357,7 @@ export function PrizeDistributionSelector({
               <HeroPill
                 key={level}
                 label={`${level}K`}
+                disabled={!currencyMatches}
                 selected={activeLevel === String(level)}
                 onPress={() => {
                   // Keep the current stay when the new level offers it;
@@ -383,7 +384,7 @@ export function PrizeDistributionSelector({
                 <HeroPill
                   key={stay.suffix}
                   label={stay.label}
-                  disabled={tierId === null}
+                  disabled={!currencyMatches || tierId === null}
                   selected={activeStay === stay.suffix}
                   onPress={() => {
                     if (tierId) {
@@ -430,7 +431,11 @@ export function PrizeDistributionSelector({
                 <Pressable
                   key={template.id}
                   accessibilityRole="radio"
-                  accessibilityState={{ checked: selected }}
+                  accessibilityState={{
+                    checked: selected,
+                    disabled: !currencyMatches,
+                  }}
+                  disabled={!currencyMatches}
                   onPress={() => selectTemplate(template.id)}
                   style={({ pressed }) => [
                     styles.drawChip,
@@ -439,7 +444,7 @@ export function PrizeDistributionSelector({
                       backgroundColor: selected
                         ? colors.accentSoft
                         : colors.surface,
-                      opacity: pressed ? 0.7 : 1,
+                      opacity: !currencyMatches ? 0.5 : pressed ? 0.7 : 1,
                     },
                   ]}
                 >
@@ -482,8 +487,8 @@ export function PrizeDistributionSelector({
         <View style={[styles.notice, { backgroundColor: colors.lossSoft }]}>
           <Text style={styles.noticeTitle}>USD required for official tiers</Text>
           <Text style={styles.noticeText}>
-            PSA publishes these tier amounts in USD. Change the tournament currency to USD
-            to generate the official payout schedule.
+            PSA publishes these tier amounts in USD. Official payout outcomes are unavailable
+            for tournaments tracked in another currency.
           </Text>
         </View>
       ) : null}

@@ -168,6 +168,7 @@ describe("PrizeDistributionSelector", () => {
   it("blocks official generation when the tournament currency is not USD", () => {
     const screen = renderPrizeEditor({ currency: "EUR" });
 
+    expect(screen.getByRole("radio", { name: /Bronze/ })).toBeDisabled();
     fireEvent.press(screen.getByText("Bronze"));
 
     expect(screen.getByText("USD required for official tiers")).toBeTruthy();
@@ -176,7 +177,22 @@ describe("PrizeDistributionSelector", () => {
         "Choose a supported PSA tier and draw to generate the payout schedule.",
       ),
     ).toBeTruthy();
+    expect(screen.queryByText("€47,500 EUR")).toBeNull();
     expect(screen.queryByText("$831.25 USD")).toBeNull();
+  });
+
+  it("does not store selector provenance for a non-USD tournament", () => {
+    const onUpdate = jest.fn();
+    const screen = render(
+      <PrizeDistributionSelector
+        draft={{ ...createDefaultTournamentDraft(), currency: "EUR" }}
+        onUpdate={onUpdate}
+      />,
+    );
+
+    fireEvent.press(screen.getByText("Bronze"));
+
+    expect(onUpdate).not.toHaveBeenCalled();
   });
 
   it.each(["generated", "manual"] as const)(

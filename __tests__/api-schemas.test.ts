@@ -95,6 +95,21 @@ describe("API response schemas", () => {
       expect(tournamentWithPnLSchema.safeParse(response).success).toBe(false);
     });
 
+    it.each([-1, 101, Number.POSITIVE_INFINITY])(
+      "rejects an invalid prize tax rate of %s",
+      (prizeTaxRate) => {
+        const response = { ...tournament, prize_tax_rate: prizeTaxRate };
+
+        expect(tournamentWithPnLSchema.safeParse(response).success).toBe(false);
+      },
+    );
+
+    it.each([0, 100])("accepts a boundary prize tax rate of %s", (prizeTaxRate) => {
+      const response = { ...tournament, prize_tax_rate: prizeTaxRate };
+
+      expect(tournamentWithPnLSchema.safeParse(response).success).toBe(true);
+    });
+
     it("rejects scenarios with the wrong container type", () => {
       const response = {
         ...tournament,
@@ -179,4 +194,16 @@ describe("API response schemas", () => {
 
     expect(knownTournamentSchema.parse(response)).toEqual(response);
   });
+
+  it.each([-1, 101, Number.POSITIVE_INFINITY])(
+    "rejects a known tournament prize tax rate of %s",
+    (prizeTaxRate) => {
+      expect(
+        knownTournamentSchema.safeParse({
+          name: "Open Championship",
+          prize_tax_rate: prizeTaxRate,
+        }).success,
+      ).toBe(false);
+    },
+  );
 });

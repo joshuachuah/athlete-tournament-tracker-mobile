@@ -178,7 +178,7 @@ export function ProjectionEditorFields({
               {workingDraft.currency}
             </Text>
           </View>
-          {workingDraft.prize_player_total > 0 ? (
+          {rounds.length > 0 && workingDraft.prize_player_total > 0 ? (
             <View
               style={{
                 flexDirection: "row",

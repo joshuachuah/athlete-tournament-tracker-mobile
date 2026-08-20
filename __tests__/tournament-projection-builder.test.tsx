@@ -348,6 +348,25 @@ describe("TournamentProjectionBuilder", () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
+  it("allows a non-USD projection without fabricated prize outcomes", () => {
+    const onSubmit = jest.fn();
+    const prizeRounds = { ...defaultDraft.prize_rounds };
+    const { screen } = renderBuilder(
+      {
+        ...validDraft,
+        currency: "EUR",
+        prize_rounds: prizeRounds,
+      },
+      onSubmit,
+    );
+
+    fireEvent.press(screen.getByText("Create projection"));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ currency: "EUR", prize_rounds: prizeRounds }),
+    );
+  });
+
   it("edits one assumption and preserves untouched hydrated fields", () => {
     const onSubmit = jest.fn();
     const initialDraft = tournamentToDraft(savedTournament);
