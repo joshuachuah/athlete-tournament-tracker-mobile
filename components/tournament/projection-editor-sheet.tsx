@@ -132,12 +132,13 @@ export function ProjectionEditorSheet({
     const currencyChanged =
       editor === "details" &&
       workingDraft.currency.toUpperCase() !== draft.currency.toUpperCase();
-    const hasSelectorPayouts =
+    const hasPrizeData =
       workingDraft.prize_tier_id !== null ||
       workingDraft.prize_draw_template_id !== null ||
-      workingDraft.prize_player_total > 0;
+      workingDraft.prize_player_total > 0 ||
+      Object.values(workingDraft.prize_rounds).some((amount) => amount > 0);
     const appliedDraft =
-      currencyChanged && hasSelectorPayouts
+      currencyChanged && hasPrizeData
         ? {
             ...workingDraft,
             prize_tier_id: null,

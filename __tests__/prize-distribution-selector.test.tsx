@@ -296,7 +296,7 @@ describe("PrizeDistributionSelector", () => {
     );
   });
 
-  it("preserves typed payouts without selector provenance when currency changes", async () => {
+  it("clears saved payouts without selector provenance when currency changes", async () => {
     const onApply = jest.fn();
     const defaultDraft = createDefaultTournamentDraft();
     const draft: TournamentDraft = {
@@ -328,7 +328,7 @@ describe("PrizeDistributionSelector", () => {
     expect(onApply).toHaveBeenCalledWith(
       expect.objectContaining({
         currency: "EUR",
-        prize_rounds: draft.prize_rounds,
+        prize_rounds: defaultDraft.prize_rounds,
       }),
     );
   });
