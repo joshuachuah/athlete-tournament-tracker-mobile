@@ -5,6 +5,10 @@ import { colors, radii, spacing } from "@/constants/theme";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { api } from "@/lib/api";
 import {
+  getPrizeTier,
+  prizeDistributionCurrency,
+} from "@/lib/prize-distributions";
+import {
   detailsSchema,
   prizesSchema,
   spendingSchema,
@@ -72,6 +76,27 @@ export function ScenarioStrip({
 }) {
   const draftReady = canPreview(draft);
   const previewReady = identityResolved && draftReady;
+  const selectedTier = draft.prize_tier_id
+    ? getPrizeTier(draft.prize_tier_id)
+    : null;
+  const hasPrizeRounds = Object.values(draft.prize_rounds).some(
+    (amount) => amount > 0,
+  );
+  const emptyProjectionCopy =
+    selectedTier?.manualOnly === true
+      ? {
+          title: "Outcomes unavailable",
+          body: "PSA does not publish a round payout schedule for this tier.",
+        }
+      : draft.currency.toUpperCase() !== prizeDistributionCurrency
+        ? {
+            title: "Outcomes unavailable",
+            body: "Official USD payout outcomes are unavailable for this tournament currency.",
+          }
+        : {
+            title: "No outcomes yet",
+            body: "Choose a supported PSA tier and draw to see worst, middle, and best outcomes.",
+          };
   const serializedPayload = previewReady
     ? JSON.stringify(toTournamentPreviewPayload(draft, profileId))
     : "";
@@ -112,9 +137,11 @@ export function ScenarioStrip({
           <Text style={{ color: colors.brandForeground, fontSize: 24, fontWeight: "900" }}>
             Outcome scenarios
           </Text>
-          <Text style={{ color: colors.brandMutedForeground, lineHeight: 20 }}>
-            Based on your earliest, middle, and latest entered prize rounds.
-          </Text>
+          {hasPrizeRounds ? (
+            <Text style={{ color: colors.brandMutedForeground, lineHeight: 20 }}>
+              Based on your earliest, middle, and latest entered prize rounds.
+            </Text>
+          ) : null}
         </View>
         {loading ? (
           <ActivityIndicator color={colors.brandForeground} size="small" />
@@ -187,7 +214,7 @@ export function ScenarioStrip({
           }}
         >
           <Text style={{ color: colors.brandForeground, fontWeight: "800" }}>
-            No outcomes yet
+            {emptyProjectionCopy.title}
           </Text>
           <Text
             style={{
@@ -196,7 +223,7 @@ export function ScenarioStrip({
               marginTop: spacing.xs,
             }}
           >
-            Add prize estimates to see worst, middle, and best outcomes.
+            {emptyProjectionCopy.body}
           </Text>
         </View>
       ) : data ? (
