@@ -82,7 +82,8 @@ export function TournamentIdentitySearch({
   function chooseNew() {
     const name = query.trim();
     if (!name) return;
-    onChangeDraft({ ...createDefaultTournamentDraft(), name });
+    const baseDraft = draft.name.trim() ? createDefaultTournamentDraft() : draft;
+    onChangeDraft({ ...baseDraft, name });
     setQuery(name);
     setCommitted(true);
     onResolutionChange(true);

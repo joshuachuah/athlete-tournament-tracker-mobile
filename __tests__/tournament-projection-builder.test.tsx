@@ -13,6 +13,7 @@ import {
   createDefaultTournamentDraft,
   saveTournamentDraft,
   tournamentDraftFromKnown,
+  tournamentDraftFromPrefill,
   tournamentToDraft,
   type TournamentDraft,
 } from "@/lib/tournament-draft";
@@ -356,6 +357,50 @@ describe("TournamentProjectionBuilder", () => {
         prize_tier_id: null,
         prize_draw_template_id: null,
         prize_player_total: 0,
+      }),
+    );
+  });
+
+  it("preserves safe route prefills when committing the first identity", async () => {
+    const prefilledDraft = tournamentDraftFromPrefill({
+      location: "Paris",
+      country: "France",
+      currency: "EUR",
+      start_date: "2026-06-01",
+      end_date: "2026-06-03",
+    });
+    const onChangeDraft = jest.fn();
+    const screen = renderWithClient(
+      <TournamentIdentitySearch
+        draft={prefilledDraft}
+        inputRef={{ current: null }}
+        onChangeDraft={onChangeDraft}
+        onResolutionChange={jest.fn()}
+        sport="tennis"
+      />,
+    );
+
+    fireEvent.changeText(screen.getByLabelText("Tournament name"), "Paris Open");
+    await advance(300);
+    await waitFor(() =>
+      expect(
+        screen.getByLabelText("Create a new tournament named Paris Open"),
+      ).toBeTruthy(),
+    );
+    fireEvent.press(
+      screen.getByLabelText("Create a new tournament named Paris Open"),
+    );
+
+    expect(onChangeDraft).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "Paris Open",
+        location: "Paris",
+        country: "France",
+        currency: "EUR",
+        start_date: "2026-06-01",
+        end_date: "2026-06-03",
+        prize_rounds: defaultDraft.prize_rounds,
+        prize_tax_rate: 0,
       }),
     );
   });
