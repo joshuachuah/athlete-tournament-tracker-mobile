@@ -67,8 +67,6 @@ export type TournamentDraftPrefill = {
   start_date?: TournamentDraftPrefillParam;
   end_date?: TournamentDraftPrefillParam;
   duration_days?: TournamentDraftPrefillParam;
-  prize_rounds?: TournamentDraftPrefillParam;
-  prize_tax_rate?: TournamentDraftPrefillParam;
 };
 
 const prizeRoundKeys = ["r1", "r2", "r3", "qf", "sf", "f", "w"] as const;
@@ -431,7 +429,12 @@ export function normalizeTournamentDraft(stored: unknown): TournamentDraft {
   const version2 = storedTournamentDraftV2Schema.safeParse(stored);
 
   if (version2.success) {
-    return migrateV2GeneratedPrizeSchedule(version2.data.draft);
+    return {
+      ...migrateV2GeneratedPrizeSchedule(version2.data.draft),
+      // Older drafts allowed athletes to edit withholding, so the stored rate
+      // cannot be treated as server-supplied once the field becomes read-only.
+      prize_tax_rate: defaults.prize_tax_rate,
+    };
   }
 
   const previous = storedTournamentDraftV1Schema.safeParse(stored);
@@ -440,6 +443,7 @@ export function normalizeTournamentDraft(stored: unknown): TournamentDraft {
     return {
       ...previous.data.draft,
       ...prizeSelectorMigration(previous.data.draft.prize_rounds),
+      prize_tax_rate: defaults.prize_tax_rate,
     };
   }
 
@@ -459,17 +463,10 @@ export function normalizeTournamentDraft(stored: unknown): TournamentDraft {
     ...legacy.data,
     ...prizeSelectorMigration(prizeRounds),
     prize_rounds: prizeRounds,
-    prize_tax_rate: legacy.data.prize_tax_rate ?? defaults.prize_tax_rate,
+    prize_tax_rate: defaults.prize_tax_rate,
   };
 }
 
-const prefillNumber = z.preprocess(
-  (value) =>
-    typeof value === "string" && value.trim() !== ""
-      ? Number(value)
-      : value,
-  finiteNonNegativeNumber,
-);
 const prefillInteger = z.preprocess(
   (value) =>
     typeof value === "string" && value.trim() !== ""
@@ -477,23 +474,6 @@ const prefillInteger = z.preprocess(
       : value,
   nonNegativeInteger,
 );
-const prefillTaxRate = z.preprocess(
-  (value) =>
-    typeof value === "string" && value.trim() !== ""
-      ? Number(value)
-      : value,
-  finiteNonNegativeNumber.max(100),
-);
-const optionalPrefillMoney = prefillNumber.optional().catch(undefined);
-const prefillPrizeRoundsSchema = z.strictObject({
-  r1: optionalPrefillMoney,
-  r2: optionalPrefillMoney,
-  r3: optionalPrefillMoney,
-  qf: optionalPrefillMoney,
-  sf: optionalPrefillMoney,
-  f: optionalPrefillMoney,
-  w: optionalPrefillMoney,
-});
 const prefillParamsSchema = z.object({
   name: z.string().min(1).optional().catch(undefined),
   location: z.string().min(1).optional().catch(undefined),
@@ -507,8 +487,6 @@ const prefillParamsSchema = z.object({
   start_date: persistedDateOnly.optional().catch(undefined),
   end_date: persistedDateOnly.optional().catch(undefined),
   duration_days: prefillInteger.optional().catch(undefined),
-  prize_rounds: z.string().optional().catch(undefined),
-  prize_tax_rate: prefillTaxRate.optional().catch(undefined),
 });
 
 export function tournamentDraftFromPrefill(
@@ -529,32 +507,6 @@ export function tournamentDraftFromPrefill(
   if (parsedParams.end_date) next.end_date = parsedParams.end_date;
   if (parsedParams.duration_days !== undefined) {
     next.duration_days = parsedParams.duration_days;
-  }
-  if (parsedParams.prize_tax_rate !== undefined) {
-    next.prize_tax_rate = parsedParams.prize_tax_rate;
-  }
-  if (parsedParams.prize_rounds) {
-    try {
-      const parsedPrizeRounds = prefillPrizeRoundsSchema.safeParse(
-        JSON.parse(parsedParams.prize_rounds) as unknown,
-      );
-
-      if (parsedPrizeRounds.success) {
-        for (const round of prizeRoundKeys) {
-          const amount = parsedPrizeRounds.data[round];
-
-          if (amount !== undefined) {
-            next.prize_rounds[round] = amount;
-          }
-        }
-
-        if (Object.values(next.prize_rounds).some((amount) => amount > 0)) {
-          next.prize_distribution_mode = "manual";
-        }
-      }
-    } catch {
-      // Ignore malformed prefill data from navigation params.
-    }
   }
 
   return deriveDraftDates(next);

@@ -391,7 +391,7 @@ describe("resumableDraft", () => {
 });
 
 describe("tournamentDraftFromPrefill", () => {
-  it("hydrates all supplied known-tournament fields and derives duration", () => {
+  it("hydrates supplied identity fields and derives duration", () => {
     const draft = tournamentDraftFromPrefill({
       name: "Known Open",
       location: "Paris",
@@ -400,8 +400,6 @@ describe("tournamentDraftFromPrefill", () => {
       start_date: "2026-05-01",
       end_date: "2026-05-04",
       duration_days: "99",
-      prize_rounds: JSON.stringify({ qf: 500, w: 2_000 }),
-      prize_tax_rate: "30",
     });
 
     expect(draft).toEqual(
@@ -413,44 +411,23 @@ describe("tournamentDraftFromPrefill", () => {
         start_date: "2026-05-01",
         end_date: "2026-05-04",
         duration_days: 4,
-        prize_tax_rate: 30,
+        prize_tax_rate: 0,
       }),
     );
-    expect(draft.prize_rounds).toEqual(
-      expect.objectContaining({ qf: 500, w: 2_000 }),
-    );
-  });
-
-  it("keeps defaults when optional JSON prefill is malformed", () => {
-    const draft = tournamentDraftFromPrefill({ prize_rounds: "not-json" });
-
     expect(draft.prize_rounds).toEqual(defaultTournamentDraft.prize_rounds);
   });
 
-  it("stores parsed finite numbers from navigation JSON", () => {
-    const draft = tournamentDraftFromPrefill({
-      prize_rounds: JSON.stringify({ r1: "125.5", qf: 500 }),
-      prize_tax_rate: "30.5",
-    });
+  it("ignores financial values supplied through untrusted route params", () => {
+    const routeParams = {
+      name: "Known Open",
+      prize_rounds: JSON.stringify({ w: 999_999 }),
+      prize_tax_rate: "30",
+    };
+    const draft = tournamentDraftFromPrefill(routeParams);
 
-    expect(draft.prize_rounds).toEqual(
-      expect.objectContaining({ r1: 125.5, qf: 500 }),
-    );
-    expect(typeof draft.prize_rounds.r1).toBe("number");
-    expect(draft.prize_tax_rate).toBe(30.5);
-  });
-
-  it.each([
-    JSON.stringify([]),
-    JSON.stringify(100),
-    JSON.stringify({ r1: { amount: 100 } }),
-    JSON.stringify({ r1: [100] }),
-    JSON.stringify({ r1: -1 }),
-    JSON.stringify({ r1: "not-a-number" }),
-  ])("ignores invalid prize round prefill %s", (prize_rounds) => {
-    const draft = tournamentDraftFromPrefill({ prize_rounds });
-
+    expect(draft.prize_distribution_mode).toBe("generated");
     expect(draft.prize_rounds).toEqual(defaultTournamentDraft.prize_rounds);
+    expect(draft.prize_tax_rate).toBe(0);
   });
 
   it("ignores invalid scalar params independently", () => {
@@ -458,7 +435,6 @@ describe("tournamentDraftFromPrefill", () => {
       name: "Known Open",
       currency: "US",
       start_date: "not-a-date",
-      prize_tax_rate: "Infinity",
     });
 
     expect(draft.name).toBe("Known Open");
@@ -473,8 +449,6 @@ describe("tournamentDraftFromPrefill", () => {
       currency: ["EUR"],
       start_date: ["2026-05-01"],
       duration_days: ["4"],
-      prize_rounds: [JSON.stringify({ qf: 500 })],
-      prize_tax_rate: ["30"],
     });
 
     expect(draft.name).toBe("Known Open");
@@ -482,17 +456,6 @@ describe("tournamentDraftFromPrefill", () => {
     expect(draft.start_date).toBe(createDefaultTournamentDraft().start_date);
     expect(draft.prize_rounds).toEqual(defaultTournamentDraft.prize_rounds);
     expect(draft.prize_tax_rate).toBe(defaultTournamentDraft.prize_tax_rate);
-  });
-
-  it("keeps valid prize fields when another prefill field is malformed", () => {
-    const draft = tournamentDraftFromPrefill({
-      prize_rounds: JSON.stringify({ r1: { amount: 100 }, qf: "500" }),
-    });
-
-    expect(draft.prize_rounds).toEqual({
-      ...defaultTournamentDraft.prize_rounds,
-      qf: 500,
-    });
   });
 });
 
@@ -577,6 +540,7 @@ describe("normalizeTournamentDraft", () => {
       prize_draw_template_id: "draw_32_entries_24" as const,
       prize_player_total: 47_500,
       prize_rounds: { ...defaultTournamentDraft.prize_rounds, qf: 2_137.5 },
+      prize_tax_rate: 30,
     };
 
     const persisted = persistedTournamentDraft(storedDraft);
@@ -597,11 +561,13 @@ describe("normalizeTournamentDraft", () => {
         r1: 0,
         qf: 2_137.5,
       },
+      prize_tax_rate: 30,
     };
 
     const repaired = normalizeTournamentDraft({ version: 2, draft: storedDraft });
 
     expect(repaired.prize_player_total).toBe(47_500);
+    expect(repaired.prize_tax_rate).toBe(0);
     expect(repaired.prize_rounds).toEqual({
       r1: 831.25,
       r2: 1_306.25,
@@ -639,7 +605,7 @@ describe("normalizeTournamentDraft", () => {
     });
   });
 
-  it("preserves a manual v2 payout snapshot without changing its values", () => {
+  it("preserves manual v2 payout values while clearing editable withholding", () => {
     const storedDraft = {
       ...defaultTournamentDraft,
       prize_distribution_mode: "manual" as const,
@@ -647,11 +613,13 @@ describe("normalizeTournamentDraft", () => {
       prize_draw_template_id: "draw_32_entries_24" as const,
       prize_player_total: 47_500,
       prize_rounds: { ...defaultTournamentDraft.prize_rounds, r3: 700 },
+      prize_tax_rate: 30,
     };
 
-    expect(normalizeTournamentDraft({ version: 2, draft: storedDraft })).toEqual(
-      storedDraft,
-    );
+    expect(normalizeTournamentDraft({ version: 2, draft: storedDraft })).toEqual({
+      ...storedDraft,
+      prize_tax_rate: 0,
+    });
   });
 
   it("preserves entered non-USD v2 payouts as a manual snapshot", () => {
@@ -743,6 +711,27 @@ describe("normalizeTournamentDraft", () => {
       }),
     );
     expect(migrated.prize_rounds.qf).toBe(500);
+  });
+
+  it("clears editable withholding from v1 drafts", () => {
+    const {
+      prize_distribution_mode: _mode,
+      prize_tier_id: _tier,
+      prize_draw_template_id: _template,
+      prize_player_total: _total,
+      ...v1Draft
+    } = { ...defaultTournamentDraft, prize_tax_rate: 30 };
+
+    expect(
+      normalizeTournamentDraft({ version: 1, draft: v1Draft }).prize_tax_rate,
+    ).toBe(0);
+  });
+
+  it("clears editable withholding from unversioned drafts", () => {
+    expect(
+      normalizeTournamentDraft({ name: "Stored draft", prize_tax_rate: 30 })
+        .prize_tax_rate,
+    ).toBe(0);
   });
 
   it("migrates an empty v1 draft into the primary generated flow", () => {

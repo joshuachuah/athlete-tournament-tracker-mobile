@@ -46,8 +46,6 @@ function hasPrefill(prefill: TournamentDraftPrefill | undefined) {
     prefill.start_date,
     prefill.end_date,
     prefill.duration_days,
-    prefill.prize_rounds,
-    prefill.prize_tax_rate,
   ].some(Boolean);
 }
 
