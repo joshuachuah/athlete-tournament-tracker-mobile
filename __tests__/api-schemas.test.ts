@@ -77,6 +77,15 @@ describe("API response schemas", () => {
       expect(tournamentWithPnLSchema.parse(response)).toEqual(response);
     });
 
+    it("rejects no scenarios when the tournament has prize rounds", () => {
+      const response = {
+        ...tournament,
+        pnl: { ...tournament.pnl, scenarios: [] },
+      };
+
+      expect(tournamentWithPnLSchema.safeParse(response).success).toBe(false);
+    });
+
     it("preserves unknown fields for additive backend changes", () => {
       const response = { ...tournament, some_new_field: 1 };
 

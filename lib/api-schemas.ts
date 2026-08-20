@@ -10,7 +10,8 @@ import type {
   TournamentWithPnL,
 } from "@/types";
 
-const roundSchema = z.enum(["r1", "r2", "r3", "qf", "sf", "f", "w"]);
+const prizeRoundKeys = ["r1", "r2", "r3", "qf", "sf", "f", "w"] as const;
+const roundSchema = z.enum(prizeRoundKeys);
 const scenarioKinds = ["worst", "realistic", "best"] as const;
 const prizeAmountSchema = z.number().finite().nonnegative();
 const prizeTaxRateSchema = z.number().finite().min(0).max(100);
@@ -106,10 +107,24 @@ export const pnlResultSchema = z.looseObject({
   break_even_round: roundSchema.nullable(),
 });
 
-export const tournamentWithPnLSchema = tournamentSchema.extend({
-  pnl: pnlResultSchema,
-  home_currency: z.string(),
-});
+export const tournamentWithPnLSchema = tournamentSchema
+  .extend({
+    pnl: pnlResultSchema,
+    home_currency: z.string(),
+  })
+  .superRefine((tournament, context) => {
+    const hasPrizeRounds = prizeRoundKeys.some(
+      (round) => (tournament.prize_rounds[round] ?? 0) > 0,
+    );
+
+    if (hasPrizeRounds && tournament.pnl.scenarios.length === 0) {
+      context.addIssue({
+        code: "custom",
+        path: ["pnl", "scenarios"],
+        message: "Expected scenarios when the tournament has prize rounds.",
+      });
+    }
+  });
 
 export const knownTournamentSchema = z.looseObject({
   id: z.string().optional(),
