@@ -23,7 +23,10 @@ import { TournamentIdentitySearch } from "@/components/tournament/tournament-ide
 import { Button } from "@/components/ui/button";
 import { colors, spacing } from "@/constants/theme";
 import { useTournamentDraft } from "@/context/tournament-draft";
-import { prizeDistributionCurrency } from "@/lib/prize-distributions";
+import {
+  getPrizeTier,
+  prizeDistributionCurrency,
+} from "@/lib/prize-distributions";
 import {
   detailsSchema,
   prizesSchema,
@@ -71,11 +74,17 @@ function firstInvalidEditor(draft: TournamentDraft): ProjectionEditor | null {
   const hasPrizeRounds = Object.values(draft.prize_rounds).some(
     (amount) => amount > 0,
   );
-  // PSA only supplies USD schedules. Other currencies remain valid with no
-  // prize outcomes instead of making the client invent an FX conversion.
+  const selectedTier = draft.prize_tier_id
+    ? getPrizeTier(draft.prize_tier_id)
+    : null;
+  const scheduleUnavailable = selectedTier?.manualOnly === true;
+  // Some PSA events and existing server records have no published schedule.
+  // Non-USD tournaments also remain valid without making the client invent FX.
   if (
     !hasPrizeRounds &&
-    draft.currency.toUpperCase() === prizeDistributionCurrency
+    draft.currency.toUpperCase() === prizeDistributionCurrency &&
+    !scheduleUnavailable &&
+    !draft.editId
   ) {
     return "prize";
   }

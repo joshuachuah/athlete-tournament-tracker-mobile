@@ -367,6 +367,40 @@ describe("TournamentProjectionBuilder", () => {
     );
   });
 
+  it("allows a USD event whose official payout schedule is unavailable", () => {
+    const onSubmit = jest.fn();
+    const { screen } = renderBuilder(validDraft, onSubmit);
+
+    fireEvent.press(screen.getByText("Prize money"));
+    fireEvent.press(screen.getByText("Tour Finals"));
+    fireEvent.press(screen.getByText("Apply prize money"));
+
+    expect(screen.getByText("Official payout schedule unavailable")).toBeTruthy();
+    fireEvent.press(screen.getByText("Create projection"));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prize_tier_id: "world_tour_finals",
+        prize_player_total: 0,
+        prize_rounds: defaultDraft.prize_rounds,
+      }),
+    );
+  });
+
+  it("keeps a saved USD event editable when it has no prize outcomes", () => {
+    const onSubmit = jest.fn();
+    const initialDraft = tournamentToDraft({
+      ...savedTournament,
+      prize_rounds: {},
+    });
+    const { screen } = renderBuilder(initialDraft, onSubmit);
+
+    expect(screen.getByText("No prize outcomes saved")).toBeTruthy();
+    fireEvent.press(screen.getByText("Save changes"));
+
+    expect(onSubmit).toHaveBeenCalledWith(initialDraft);
+  });
+
   it("edits one assumption and preserves untouched hydrated fields", () => {
     const onSubmit = jest.fn();
     const initialDraft = tournamentToDraft(savedTournament);

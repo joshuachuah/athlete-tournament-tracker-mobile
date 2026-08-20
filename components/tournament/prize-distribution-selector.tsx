@@ -279,7 +279,8 @@ export function PrizeDistributionSelector({
     onUpdate({
       prize_distribution_mode: "generated",
       prize_tier_id: tierId,
-      prize_player_total: currencyMatches ? tier.playerPrizeMoney : 0,
+      prize_player_total:
+        currencyMatches && !tier.manualOnly ? tier.playerPrizeMoney : 0,
       prize_draw_template_id: templateId,
       prize_rounds: roundsFor(tier, templateId),
     });
@@ -340,7 +341,7 @@ export function PrizeDistributionSelector({
                       ? "Payout schedule unavailable"
                       : formatMoney(tier.playerPrizeMoney, prizeDistributionCurrency)
                   }
-                  disabled={manualOnly || !currencyMatches}
+                  disabled={!currencyMatches}
                   selected={draft.prize_tier_id === tier.id}
                   onPress={() => selectTier(tier.id)}
                 />

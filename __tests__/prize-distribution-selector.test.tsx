@@ -174,7 +174,7 @@ describe("PrizeDistributionSelector", () => {
     expect(screen.getByText("USD required for official tiers")).toBeTruthy();
     expect(
       screen.getByText(
-        "Choose a supported PSA tier and draw to generate the payout schedule.",
+        "Official USD payout outcomes are unavailable for this tournament currency.",
       ),
     ).toBeTruthy();
     expect(screen.queryByText("€47,500 EUR")).toBeNull();
@@ -333,11 +333,21 @@ describe("PrizeDistributionSelector", () => {
     );
   });
 
-  it("keeps unsupported Tour Finals unavailable", () => {
+  it("allows Tour Finals to record that its payout schedule is unavailable", () => {
     const screen = renderPrizeEditor();
 
-    expect(screen.getByText("Tour Finals")).toBeTruthy();
+    fireEvent.press(screen.getByText("Tour Finals"));
+
+    expect(
+      screen.getByRole("radio", { name: /Tour Finals/, checked: true }),
+    ).toBeTruthy();
     expect(screen.getByText("Payout schedule unavailable")).toBeTruthy();
+    expect(screen.getByText("Schedule unavailable")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "PSA does not publish a round payout schedule for this tier.",
+      ),
+    ).toBeTruthy();
   });
 
   it("shows gross prize messaging without manual withholding controls", () => {

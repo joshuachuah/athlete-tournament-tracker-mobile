@@ -14,6 +14,10 @@ import {
 import { Pressable, Text, View } from "react-native";
 
 import { colors, radii, spacing } from "@/constants/theme";
+import {
+  getPrizeTier,
+  prizeDistributionCurrency,
+} from "@/lib/prize-distributions";
 import { formatDate, formatMoney, parseDateOnly } from "@/lib/utils";
 import type { TournamentDraft } from "@/lib/tournament-draft";
 
@@ -201,10 +205,20 @@ export function ImpactLedger({
   const detailSummary = draft.location.trim()
     ? `${draft.location.trim()}${parseDateOnly(draft.start_date) ? ` · ${formatDate(draft.start_date)}` : ""}`
     : "Location, dates, currency, and entry fee";
+  const selectedPrizeTier = draft.prize_tier_id
+    ? getPrizeTier(draft.prize_tier_id)
+    : null;
+  const scheduleUnavailable = selectedPrizeTier?.manualOnly === true;
   const prizeSummary =
     prizes.length > 0
       ? `${prizes.length} round estimate${prizes.length === 1 ? "" : "s"}${draft.prize_tax_rate > 0 ? ` · ${draft.prize_tax_rate}% tax` : ""}`
-      : "Choose a PSA tier and draw";
+      : scheduleUnavailable
+        ? "Official payout schedule unavailable"
+        : draft.currency.toUpperCase() !== prizeDistributionCurrency
+          ? "Official USD outcomes unavailable"
+          : draft.editId
+            ? "No prize outcomes saved"
+            : "Choose a PSA tier and draw";
   const prizeImpact =
     prizes.length === 0
       ? formatMoney(0, draft.currency)

@@ -8,7 +8,12 @@ import { Input } from "@/components/ui/input";
 import { MoneyInput } from "@/components/ui/money-input";
 import { colors, spacing } from "@/constants/theme";
 import type { TournamentDraft } from "@/lib/tournament-draft";
-import { getDrawTemplate, prizeRoundKeys } from "@/lib/prize-distributions";
+import {
+  getDrawTemplate,
+  getPrizeTier,
+  prizeDistributionCurrency,
+  prizeRoundKeys,
+} from "@/lib/prize-distributions";
 import { formatMoney, roundLabels } from "@/lib/utils";
 import type { SubsidyCovers } from "@/types";
 
@@ -140,6 +145,9 @@ export function ProjectionEditorFields({
   }
 
   if (editor === "prize") {
+    const selectedTier = workingDraft.prize_tier_id
+      ? getPrizeTier(workingDraft.prize_tier_id)
+      : null;
     const selectedTemplate = workingDraft.prize_draw_template_id
       ? getDrawTemplate(workingDraft.prize_draw_template_id)
       : null;
@@ -151,6 +159,19 @@ export function ProjectionEditorFields({
     const generated =
       workingDraft.prize_distribution_mode === "generated" &&
       selectedTemplate !== null;
+    const scheduleUnavailable = selectedTier?.manualOnly === true;
+    const scheduleHeading = scheduleUnavailable
+      ? "Schedule unavailable"
+      : rounds.length > 0
+        ? generated
+          ? "PSA generated"
+          : "Saved payout schedule"
+        : "No payout schedule";
+    const emptyScheduleMessage = scheduleUnavailable
+      ? "PSA does not publish a round payout schedule for this tier."
+      : workingDraft.currency.toUpperCase() !== prizeDistributionCurrency
+        ? "Official USD payout outcomes are unavailable for this tournament currency."
+        : "Choose a supported PSA tier and draw to generate the payout schedule.";
 
     return (
       <>
@@ -172,7 +193,7 @@ export function ProjectionEditorFields({
                 textTransform: "uppercase",
               }}
             >
-              {generated ? "PSA generated" : "Saved payout schedule"}
+              {scheduleHeading}
             </Text>
             <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>
               {workingDraft.currency}
@@ -214,7 +235,7 @@ export function ProjectionEditorFields({
             </View>
           ) : (
             <Text style={{ color: colors.mutedForeground, lineHeight: 20 }}>
-              Choose a supported PSA tier and draw to generate the payout schedule.
+              {emptyScheduleMessage}
             </Text>
           )}
         </View>
