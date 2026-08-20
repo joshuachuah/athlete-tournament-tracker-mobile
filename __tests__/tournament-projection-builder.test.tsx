@@ -5,6 +5,7 @@ import { Alert } from "react-native";
 import { useNavigation, usePreventRemove } from "@react-navigation/native";
 
 import { TournamentProjectionBuilder } from "@/components/tournament/tournament-projection-builder";
+import { TournamentIdentitySearch } from "@/components/tournament/tournament-identity-search";
 import { TournamentDraftProvider } from "@/context/tournament-draft";
 import { api } from "@/lib/api";
 import {
@@ -12,6 +13,7 @@ import {
   createDefaultTournamentDraft,
   saveTournamentDraft,
   tournamentToDraft,
+  type TournamentDraft,
 } from "@/lib/tournament-draft";
 import type { TournamentWithPnL } from "@/types";
 
@@ -284,6 +286,77 @@ describe("TournamentProjectionBuilder", () => {
 
     expect(onSubmit).not.toHaveBeenCalled();
     expect(screen.getByText("Choose a known tournament or enter a new tournament name.")).toBeTruthy();
+  });
+
+  it("clears the previous tournament when choosing a new free-text identity", async () => {
+    const previousDraft: TournamentDraft = {
+      ...validDraft,
+      location: "Paris",
+      country: "France",
+      currency: "EUR",
+      entry_fee: 300,
+      prize_distribution_mode: "generated",
+      prize_tier_id: "world_bronze",
+      prize_draw_template_id: "draw_32_entries_24",
+      prize_player_total: 47_500,
+      prize_rounds: { ...defaultDraft.prize_rounds, qf: 2_137.5 },
+      prize_tax_rate: 30,
+      flight_cost: 500,
+      accommodation_total: 600,
+      coaching_cost: 200,
+      subsidy_enabled: true,
+      subsidy_by: "Federation",
+      subsidy_amount: 400,
+      sponsorship_allocated: 250,
+    };
+    const onChangeDraft = jest.fn();
+    const screen = renderWithClient(
+      <TournamentIdentitySearch
+        draft={previousDraft}
+        inputRef={{ current: null }}
+        onChangeDraft={onChangeDraft}
+        onResolutionChange={jest.fn()}
+        sport="tennis"
+      />,
+    );
+
+    fireEvent.press(
+      screen.getByLabelText(
+        "Selected tournament Open Championship. Change selection",
+      ),
+    );
+    fireEvent.changeText(screen.getByLabelText("Tournament name"), "Community Open");
+    await advance(300);
+    await waitFor(() =>
+      expect(
+        screen.getByLabelText("Create a new tournament named Community Open"),
+      ).toBeTruthy(),
+    );
+    fireEvent.press(
+      screen.getByLabelText("Create a new tournament named Community Open"),
+    );
+
+    expect(onChangeDraft).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "Community Open",
+        location: "",
+        country: "",
+        currency: "USD",
+        entry_fee: 0,
+        prize_rounds: defaultDraft.prize_rounds,
+        prize_tax_rate: 0,
+        flight_cost: 0,
+        accommodation_total: 0,
+        coaching_cost: 0,
+        subsidy_by: "",
+        subsidy_amount: 0,
+        sponsorship_allocated: 0,
+        prize_distribution_mode: "generated",
+        prize_tier_id: null,
+        prize_draw_template_id: null,
+        prize_player_total: 0,
+      }),
+    );
   });
 
   it("does not carry tournament A values into a replacement tournament B", async () => {

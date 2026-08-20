@@ -16,6 +16,10 @@ const scenarioKinds = ["worst", "realistic", "best"] as const;
 const prizeAmountSchema = z.number().finite().nonnegative();
 const prizeTaxRateSchema = z.number().finite().min(0).max(100);
 
+function hasPositivePrizeRounds(prizeRounds: PrizeRounds | undefined) {
+  return prizeRoundKeys.some((round) => (prizeRounds?.[round] ?? 0) > 0);
+}
+
 const prizeRoundsSchema = z.looseObject({
   r1: prizeAmountSchema.optional(),
   r2: prizeAmountSchema.optional(),
@@ -107,17 +111,30 @@ export const pnlResultSchema = z.looseObject({
   break_even_round: roundSchema.nullable(),
 });
 
+export function pnlResultSchemaForPrizeRounds(
+  prizeRounds: PrizeRounds | undefined,
+) {
+  return pnlResultSchema.superRefine((pnl, context) => {
+    if (hasPositivePrizeRounds(prizeRounds) && pnl.scenarios.length === 0) {
+      context.addIssue({
+        code: "custom",
+        path: ["scenarios"],
+        message: "Expected scenarios for the submitted prize rounds.",
+      });
+    }
+  });
+}
+
 export const tournamentWithPnLSchema = tournamentSchema
   .extend({
     pnl: pnlResultSchema,
     home_currency: z.string(),
   })
   .superRefine((tournament, context) => {
-    const hasPrizeRounds = prizeRoundKeys.some(
-      (round) => (tournament.prize_rounds[round] ?? 0) > 0,
-    );
-
-    if (hasPrizeRounds && tournament.pnl.scenarios.length === 0) {
+    if (
+      hasPositivePrizeRounds(tournament.prize_rounds) &&
+      tournament.pnl.scenarios.length === 0
+    ) {
       context.addIssue({
         code: "custom",
         path: ["pnl", "scenarios"],

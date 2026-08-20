@@ -92,7 +92,12 @@ describe("api client", () => {
 
     await expect(
       api.tournaments.preview(
-        { user_id: "athlete-1", name: "Open", prize_tax_rate: 30 },
+        {
+          user_id: "athlete-1",
+          name: "Open",
+          prize_rounds: { qf: 500 },
+          prize_tax_rate: 30,
+        },
         { signal: controller.signal, authToken: "preview-token" },
       ),
     ).resolves.toEqual(preview);
@@ -104,6 +109,7 @@ describe("api client", () => {
         body: JSON.stringify({
           user_id: "athlete-1",
           name: "Open",
+          prize_rounds: { qf: 500 },
           prize_tax_rate: 30,
         }),
         headers: {
@@ -113,6 +119,36 @@ describe("api client", () => {
         signal: expect.any(AbortSignal),
       }),
     );
+  });
+
+  it("rejects an empty preview when the request has prize rounds", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        total_expenses: 100,
+        total_income_base: 0,
+        scenarios: [],
+        break_even_round: null,
+      }),
+    } as Response);
+
+    await expect(
+      api.tournaments.preview({ prize_rounds: { qf: 500 } }),
+    ).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+  });
+
+  it("accepts an empty preview when the request has no prize rounds", async () => {
+    const preview = {
+      total_expenses: 100,
+      total_income_base: 0,
+      scenarios: [],
+      break_even_round: null,
+    };
+    fetchMock.mockResolvedValue({ ok: true, json: async () => preview } as Response);
+
+    await expect(
+      api.tournaments.preview({ prize_rounds: { qf: 0 } }),
+    ).resolves.toEqual(preview);
   });
 
   it("returns successful responses without an authorization header", async () => {

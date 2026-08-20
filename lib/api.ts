@@ -6,7 +6,7 @@ import {
   fxConversionSchema,
   healthSchema,
   knownTournamentSchema,
-  pnlResultSchema,
+  pnlResultSchemaForPrizeRounds,
   tournamentWithPnLSchema,
 } from "@/lib/api-schemas";
 import { supabase } from "@/lib/supabase";
@@ -244,13 +244,17 @@ export const api = {
       data: Partial<Tournament>,
       options?: ApiRequestOptions,
     ) =>
-      requestParsed(pnlResultSchema, `${TOURNAMENT_API_BASE}/pnl-preview`, {
-        method: "POST",
-        body: JSON.stringify(data),
-        signal: options?.signal,
-        authToken: options?.authToken,
-        authenticatedUserId: options?.authenticatedUserId,
-      }),
+      requestParsed(
+        pnlResultSchemaForPrizeRounds(data.prize_rounds),
+        `${TOURNAMENT_API_BASE}/pnl-preview`,
+        {
+          method: "POST",
+          body: JSON.stringify(data),
+          signal: options?.signal,
+          authToken: options?.authToken,
+          authenticatedUserId: options?.authenticatedUserId,
+        },
+      ),
     update: (
       id: string,
       data: Partial<Tournament>,
