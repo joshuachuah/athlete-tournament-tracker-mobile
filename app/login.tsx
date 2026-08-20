@@ -395,6 +395,7 @@ const styles = StyleSheet.create({
     fontSize: 21,
     fontWeight: "600",
     letterSpacing: -0.2,
+    transform: [{ translateX: spacing.xxs }],
   },
   legal: {
     marginTop: spacing.xs,
