@@ -50,7 +50,9 @@ it("renders the actual returned projection and delegates view or dismiss", () =>
     <ProjectionSuccessSheet mode="create" tournament={saved} onView={onView} onDismiss={onDismiss} />,
   );
 
-  expect(screen.getByText("Server Open now uses the server’s latest tax-aware P&L.")).toBeTruthy();
+  expect(
+    screen.getByText("This projection now reflects the tournament's current tax settings."),
+  ).toBeTruthy();
   expect(screen.getByText("Middle case")).toBeTruthy();
   expect(screen.getByText("R2")).toBeTruthy();
   expect(screen.queryByText("QF")).toBeNull();
@@ -73,7 +75,9 @@ it("uses distinct update confirmation copy in edit mode", () => {
   );
 
   expect(screen.getByText("Projection updated")).toBeTruthy();
-  expect(screen.getByText("Server Open changes now use the server’s latest tax-aware P&L.")).toBeTruthy();
+  expect(
+    screen.getByText("This projection now reflects the tournament's current tax settings."),
+  ).toBeTruthy();
   expect(screen.getByLabelText("Server Open projection updated")).toBeTruthy();
   expect(screen.getByLabelText("Dismiss updated projection")).toBeTruthy();
 });

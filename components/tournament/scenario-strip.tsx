@@ -181,7 +181,7 @@ export function ScenarioStrip({
           }}
         >
           <Text style={{ color: colors.brandMutedForeground }}>
-            Updating from the server…
+            Updating projection…
           </Text>
         </View>
       ) : isError ? (

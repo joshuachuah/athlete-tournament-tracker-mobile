@@ -97,7 +97,7 @@ function TournamentDetailContent() {
 
     Alert.alert(
       "Delete tournament",
-      "This removes the tournament from the server.",
+      "This permanently deletes the tournament and its projection.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -190,7 +190,7 @@ function TournamentDetailContent() {
                   : "Projection unavailable"}
             </Text>
             <Text style={{ color: colors.mutedForeground, lineHeight: 20 }} selectable>
-              The server returns the minimum round needed to avoid losing money.
+              This is the minimum round needed to avoid losing money.
             </Text>
           </Card>
 

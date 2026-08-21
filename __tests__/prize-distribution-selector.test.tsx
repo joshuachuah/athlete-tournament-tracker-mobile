@@ -405,7 +405,7 @@ describe("PrizeDistributionSelector", () => {
     expect(screen.getByText("Withholding included")).toBeTruthy();
     expect(
       screen.getByText(
-        "The server will apply the 30% rate supplied with this tournament.",
+        "This projection includes the tournament's 30% withholding rate.",
       ),
     ).toBeTruthy();
     expect(screen.queryByLabelText("Prize tax withholding %")).toBeNull();

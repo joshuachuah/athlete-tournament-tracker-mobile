@@ -67,7 +67,7 @@ export function ExpenseBreakdown({ tournament }: { tournament: TournamentWithPnL
         }}
       >
         <Text style={{ color: colors.mutedForeground }} selectable>
-          Server-adjusted total
+          Total expenses in {tournament.home_currency.toUpperCase()}
         </Text>
         <Text
           style={{

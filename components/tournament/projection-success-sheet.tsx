@@ -73,9 +73,7 @@ export function ProjectionSuccessSheet({
                 {title}
               </Text>
               <Text style={{ color: colors.mutedForeground, lineHeight: 20 }}>
-                {mode === "edit"
-                  ? `${tournament.name} changes now use the server’s latest tax-aware P&L.`
-                  : `${tournament.name} now uses the server’s latest tax-aware P&L.`}
+                This projection now reflects the tournament's current tax settings.
               </Text>
             </View>
             <Pressable

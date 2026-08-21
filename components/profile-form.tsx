@@ -193,7 +193,7 @@ export function ProfileForm({
           ? "Changing your home currency refreshes tournament projections and converted values."
           : fields === "finances"
             ? `These values are stored in ${profile?.home_currency.toUpperCase() ?? "your home currency"} and remain hidden outside this authenticated view.`
-            : "Monetary values are stored in your home currency and converted by the server when tournaments use another currency."}
+            : "Monetary values are stored in your home currency. Amounts in other currencies are converted automatically."}
       </Text>
       <Button label={submitLabel} loading={loading} onPress={handleSubmit(onSubmit)} />
     </View>

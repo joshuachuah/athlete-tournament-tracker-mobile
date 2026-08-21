@@ -264,7 +264,7 @@ export function ProjectionEditorFields({
             style={{ color: colors.mutedForeground, fontSize: 12, lineHeight: 18 }}
           >
             {workingDraft.prize_tax_rate > 0
-              ? `The server will apply the ${workingDraft.prize_tax_rate}% rate supplied with this tournament.`
+              ? `This projection includes the tournament's ${workingDraft.prize_tax_rate}% withholding rate.`
               : "Withholding is not included because no verified rate is available."}
           </Text>
           {errors.prize_tax_rate ? (
