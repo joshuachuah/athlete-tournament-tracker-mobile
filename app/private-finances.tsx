@@ -26,6 +26,7 @@ import { colors, radii, spacing } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
 import { authenticatePrivateFinances } from "@/lib/private-finance-auth";
 import { formatMoney } from "@/lib/utils";
+import type { AthleteProfile } from "@/types";
 
 type GateState = "authenticating" | "locked" | "unlocked";
 type PrivateFinanceViewState = {
@@ -53,6 +54,161 @@ async function authenticateSafely() {
       message: "Authentication is unavailable. Your private finances stayed locked.",
     };
   }
+}
+
+function PrivateFinancesUnlocked({
+  authenticationName,
+  editing,
+  onCancelEditing,
+  onEdit,
+  onLock,
+  onSave,
+  profile,
+  saveError,
+  saveMessage,
+  saving,
+}: {
+  authenticationName: string;
+  editing: boolean;
+  onCancelEditing: () => void;
+  onEdit: () => void;
+  onLock: () => void;
+  onSave: (values: ProfileFormValues) => Promise<void>;
+  profile: AthleteProfile;
+  saveError: string | null;
+  saveMessage: string | null;
+  saving: boolean;
+}) {
+  return (
+    <ScrollView
+      contentInsetAdjustmentBehavior="automatic"
+      keyboardDismissMode="interactive"
+      keyboardShouldPersistTaps="handled"
+      contentContainerStyle={styles.content}
+      style={styles.screen}
+    >
+      <View style={styles.verifiedBadge}>
+        <CircleCheck color={colors.accent} size={16} strokeWidth={2.4} />
+        <Text style={styles.verifiedText}>{authenticationName} verified</Text>
+      </View>
+
+      <View style={styles.heading}>
+        <Text accessibilityRole="header" style={styles.title}>
+          {editing ? "Edit private finances" : "Private finances"}
+        </Text>
+        <Text style={styles.subtitle}>
+          {editing
+            ? "Update the financial assumptions used to calculate runway and tournament affordability."
+            : "Visible only for this authenticated view. Leaving the app locks these values again."}
+        </Text>
+      </View>
+
+      {saveError ? (
+        <Text accessibilityRole="alert" selectable style={styles.error}>
+          {saveError}
+        </Text>
+      ) : null}
+      {saveMessage ? (
+        <Text accessibilityLiveRegion="polite" selectable style={styles.success}>
+          {saveMessage}
+        </Text>
+      ) : null}
+
+      {editing ? (
+        <>
+          <ProfileForm
+            fields="finances"
+            loading={saving}
+            profile={profile}
+            submitLabel="Save private finances"
+            onSubmit={onSave}
+          />
+          <Button
+            disabled={saving}
+            label="Cancel"
+            variant="ghost"
+            onPress={onCancelEditing}
+          />
+        </>
+      ) : (
+        <View accessibilityLabel="Private financial details" style={styles.values}>
+          <FinanceValue
+            label="Monthly income"
+            value={formatMoney(profile.monthly_income, profile.home_currency)}
+          />
+          <View style={styles.separator} />
+          <FinanceValue
+            label="Savings balance"
+            value={formatMoney(profile.savings_balance, profile.home_currency)}
+          />
+          <View style={styles.separator} />
+          <FinanceValue
+            label="Monthly sponsorship"
+            value={formatMoney(profile.monthly_sponsorship, profile.home_currency)}
+          />
+        </View>
+      )}
+
+      {!editing ? (
+        <Button
+          label="Edit private finances"
+          loading={saving}
+          variant="secondary"
+          onPress={onEdit}
+        />
+      ) : null}
+
+      <View style={styles.sessionNote}>
+        <ShieldCheck color={colors.mutedForeground} size={17} strokeWidth={2.2} />
+        <Text style={styles.sessionNoteText}>
+          Authentication is required again after this screen closes or the app moves
+          to the background.
+        </Text>
+      </View>
+
+      <Button
+        label="Lock private finances"
+        variant="secondary"
+        onPress={onLock}
+      />
+    </ScrollView>
+  );
+}
+
+function PrivateFinancesGate({
+  authenticationName,
+  gateState,
+  message,
+  onUnlock,
+}: {
+  authenticationName: string;
+  gateState: Exclude<GateState, "unlocked">;
+  message: string | null;
+  onUnlock: () => void;
+}) {
+  return (
+    <View style={styles.gate}>
+      <View style={styles.gateIcon}>
+        {gateState === "authenticating" ? (
+          <ScanFace color={colors.accent} size={34} strokeWidth={1.8} />
+        ) : (
+          <LockKeyhole color={colors.accent} size={31} strokeWidth={2} />
+        )}
+      </View>
+      <Text style={styles.gateTitle}>
+        {gateState === "authenticating"
+          ? "Authenticating…"
+          : "Private finances locked"}
+      </Text>
+      <Text style={styles.gateBody}>
+        {message ??
+          `Use ${authenticationName} to view your income, savings, and sponsorship details.`}
+      </Text>
+      {gateState === "locked" ? (
+        <Button label={`Unlock with ${authenticationName}`} onPress={onUnlock} />
+      ) : null}
+    </View>
+  );
 }
 
 export default function PrivateFinancesScreen() {
@@ -257,143 +413,42 @@ function PrivateFinancesContent() {
         }}
       />
       {gateState === "unlocked" ? (
-        <ScrollView
-          contentInsetAdjustmentBehavior="automatic"
-          keyboardDismissMode="interactive"
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={styles.content}
-          style={styles.screen}
-        >
-          <View style={styles.verifiedBadge}>
-            <CircleCheck color={colors.accent} size={16} strokeWidth={2.4} />
-            <Text style={styles.verifiedText}>{authenticationName} verified</Text>
-          </View>
-
-          <View style={styles.heading}>
-            <Text accessibilityRole="header" style={styles.title}>
-              {editing ? "Edit private finances" : "Private finances"}
-            </Text>
-            <Text style={styles.subtitle}>
-              {editing
-                ? "Update the financial assumptions used to calculate runway and tournament affordability."
-                : "Visible only for this authenticated view. Leaving the app locks these values again."}
-            </Text>
-          </View>
-
-          {saveError ? (
-            <Text accessibilityRole="alert" selectable style={styles.error}>
-              {saveError}
-            </Text>
-          ) : null}
-          {saveMessage ? (
-            <Text accessibilityLiveRegion="polite" selectable style={styles.success}>
-              {saveMessage}
-            </Text>
-          ) : null}
-
-          {editing ? (
-            <>
-              <ProfileForm
-                fields="finances"
-                loading={saving}
-                profile={profile}
-                submitLabel="Save private finances"
-                onSubmit={handleFinancialSave}
-              />
-              <Button
-                disabled={saving}
-                label="Cancel"
-                variant="ghost"
-                onPress={() => {
-                  updateViewState({ editing: false, saveError: null });
-                }}
-              />
-            </>
-          ) : (
-            <View
-              accessibilityLabel="Private financial details"
-              style={styles.values}
-            >
-              <FinanceValue
-                label="Monthly income"
-                value={formatMoney(profile.monthly_income, profile.home_currency)}
-              />
-              <View style={styles.separator} />
-              <FinanceValue
-                label="Savings balance"
-                value={formatMoney(profile.savings_balance, profile.home_currency)}
-              />
-              <View style={styles.separator} />
-              <FinanceValue
-                label="Monthly sponsorship"
-                value={formatMoney(
-                  profile.monthly_sponsorship,
-                  profile.home_currency,
-                )}
-              />
-            </View>
-          )}
-
-          {!editing ? (
-            <Button
-              label="Edit private finances"
-              loading={saving}
-              variant="secondary"
-              onPress={() => {
-                updateViewState({
-                  editing: true,
-                  saveError: null,
-                  saveMessage: null,
-                });
-              }}
-            />
-          ) : null}
-
-          <View style={styles.sessionNote}>
-            <ShieldCheck color={colors.mutedForeground} size={17} strokeWidth={2.2} />
-            <Text style={styles.sessionNoteText}>
-              Authentication is required again after this screen closes or the app
-              moves to the background.
-            </Text>
-          </View>
-
-          <Button
-            label="Lock private finances"
-            variant="secondary"
-            onPress={() => {
-              financialSaveAttempt.current += 1;
-              updateViewState({
-                editing: false,
-                gateState: "locked",
-                message: "Private finances locked.",
-                saveError: null,
-                saveMessage: null,
-              });
-            }}
-          />
-        </ScrollView>
+        <PrivateFinancesUnlocked
+          authenticationName={authenticationName}
+          editing={editing}
+          profile={profile}
+          saveError={saveError}
+          saveMessage={saveMessage}
+          saving={saving}
+          onCancelEditing={() => {
+            updateViewState({ editing: false, saveError: null });
+          }}
+          onEdit={() => {
+            updateViewState({
+              editing: true,
+              saveError: null,
+              saveMessage: null,
+            });
+          }}
+          onLock={() => {
+            financialSaveAttempt.current += 1;
+            updateViewState({
+              editing: false,
+              gateState: "locked",
+              message: "Private finances locked.",
+              saveError: null,
+              saveMessage: null,
+            });
+          }}
+          onSave={handleFinancialSave}
+        />
       ) : (
-        <View style={styles.gate}>
-          <View style={styles.gateIcon}>
-            {gateState === "authenticating" ? (
-              <ScanFace color={colors.accent} size={34} strokeWidth={1.8} />
-            ) : (
-              <LockKeyhole color={colors.accent} size={31} strokeWidth={2} />
-            )}
-          </View>
-          <Text style={styles.gateTitle}>
-            {gateState === "authenticating"
-              ? "Authenticating…"
-              : "Private finances locked"}
-          </Text>
-          <Text style={styles.gateBody}>
-            {message ??
-              `Use ${authenticationName} to view your income, savings, and sponsorship details.`}
-          </Text>
-          {gateState === "locked" ? (
-            <Button label={`Unlock with ${authenticationName}`} onPress={handleUnlock} />
-          ) : null}
-        </View>
+        <PrivateFinancesGate
+          authenticationName={authenticationName}
+          gateState={gateState}
+          message={message}
+          onUnlock={handleUnlock}
+        />
       )}
     </>
   );
