@@ -908,7 +908,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 22,
+    borderRadius: radii.md,
     borderCurve: "continuous",
     backgroundColor: colors.surface,
     boxShadow:
@@ -981,7 +981,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 22,
+    borderRadius: radii.sm,
     borderCurve: "continuous",
     backgroundColor: colors.surface,
     boxShadow:

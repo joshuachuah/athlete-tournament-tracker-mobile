@@ -518,7 +518,7 @@ const styles = StyleSheet.create({
   },
   values: {
     overflow: "hidden",
-    borderRadius: radii.lg,
+    borderRadius: radii.md,
     borderCurve: "continuous",
     backgroundColor: colors.surface,
     boxShadow:
