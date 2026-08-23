@@ -690,17 +690,48 @@ describe("TournamentProjectionBuilder", () => {
     expect(screen.getByText("Renamed Open")).toBeTruthy();
   });
 
-  it("returns to discovery when tournament details clear the identity", () => {
-    const { screen } = renderBuilder(validDraft);
+  it("resets stale edit data when a cleared identity is replaced manually", () => {
+    const onSubmit = jest.fn();
+    const { screen } = renderBuilder(tournamentToDraft(savedTournament), onSubmit);
 
     fireEvent.press(screen.getByText("Tournament details"));
     const nameInputs = screen.getAllByLabelText("Tournament name");
     fireEvent.changeText(nameInputs[nameInputs.length - 1], " ");
     fireEvent.press(screen.getByText("Apply tournament details"));
-    fireEvent.press(screen.getByText("Choose tournament"));
 
+    expect(screen.getByText("Choose tournament")).toBeTruthy();
+    fireEvent.press(screen.getByText("Choose tournament"));
     expect(screen.getByRole("header", { name: "Which tournament?" })).toBeTruthy();
     expect(screen.getByPlaceholderText("Search by tournament name")).toBeTruthy();
+    expect(AccessibilityInfo.announceForAccessibility).toHaveBeenCalledWith(
+      "Choose a known tournament or enter a new tournament name.",
+    );
+
+    fireEvent.press(screen.getByText("I can't find my tournament"));
+    fireEvent.changeText(screen.getByLabelText("Tournament name"), "Replacement Open");
+    fireEvent.press(screen.getByText("Continue manually"));
+    fireEvent.press(screen.getByText("Complete tournament details"));
+    fireEvent.changeText(screen.getByLabelText("Location"), "Paris");
+    fireEvent.changeText(screen.getByLabelText("Country"), "France");
+    fireEvent.changeText(screen.getByLabelText("Currency"), "EUR");
+    fireEvent.press(screen.getByText("Apply tournament details"));
+    fireEvent.press(screen.getByText("Create projection"));
+
+    const submittedDraft = onSubmit.mock.calls[0]?.[0] as TournamentDraft;
+    expect(submittedDraft).not.toHaveProperty("editId");
+    expect(submittedDraft).toEqual(
+      expect.objectContaining({
+        name: "Replacement Open",
+        location: "Paris",
+        country: "France",
+        currency: "EUR",
+        entry_fee: 0,
+        flight_cost: 0,
+        accommodation_total: 0,
+        coaching_cost: 0,
+        sponsorship_allocated: 0,
+      }),
+    );
   });
 
   it("clears a known tournament's prize snapshot when its identity is renamed", async () => {

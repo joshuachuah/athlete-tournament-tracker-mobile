@@ -1,6 +1,7 @@
 import { useNavigation, usePreventRemove } from "@react-navigation/native";
 import { useEffect, useReducer, useRef, useState } from "react";
 import {
+  AccessibilityInfo,
   Alert,
   Keyboard,
   Platform,
@@ -43,6 +44,7 @@ type BuilderState = {
   assumptionPickerOpen: boolean;
   formDraft: TournamentDraft;
   identityResetVersion: number;
+  isReplacingIdentity: boolean;
   identityResolved: boolean;
   stage: "identity" | "projection" | "resume";
   submissionSummary: string | null;
@@ -57,6 +59,7 @@ function createBuilderState(
     assumptionPickerOpen: false,
     formDraft: initialDraft,
     identityResetVersion: 0,
+    isReplacingIdentity: false,
     identityResolved: Boolean(initialDraft.name.trim()),
     stage:
       offerResume && initialDraft.name.trim()
@@ -112,8 +115,8 @@ function firstInvalidEditor(draft: TournamentDraft): ProjectionEditor | null {
 }
 
 function actionLabel(draft: TournamentDraft, identityResolved: boolean) {
-  if (draft.editId) return "Save changes";
   if (!identityResolved || !draft.name.trim()) return "Choose tournament";
+  if (draft.editId) return "Save changes";
 
   const invalid = firstInvalidEditor(draft);
   if (invalid === "details") return "Complete tournament details";
@@ -162,6 +165,7 @@ export function TournamentProjectionBuilder({
     assumptionPickerOpen,
     formDraft,
     identityResetVersion,
+    isReplacingIdentity,
     identityResolved,
     stage,
     submissionSummary,
@@ -220,6 +224,7 @@ export function TournamentProjectionBuilder({
     updateBuilderState({
       formDraft: next,
       identityResolved: true,
+      isReplacingIdentity: false,
       stage: "projection",
       submissionSummary: null,
     });
@@ -232,6 +237,9 @@ export function TournamentProjectionBuilder({
         submissionSummary:
           "Choose a known tournament or enter a new tournament name.",
       });
+      AccessibilityInfo.announceForAccessibility(
+        "Choose a known tournament or enter a new tournament name.",
+      );
       return;
     }
 
@@ -313,6 +321,7 @@ export function TournamentProjectionBuilder({
             key={`identity:${formDraft.name}:${identityResetVersion}`}
             draft={formDraft}
             inputRef={identityInputRef}
+            isReplacingIdentity={isReplacingIdentity}
             onSelectDraft={selectDraft}
             sport={sport}
           />
@@ -344,6 +353,8 @@ export function TournamentProjectionBuilder({
                   onPress={() => {
                     updateBuilderState({
                       identityResolved: false,
+                      isReplacingIdentity: true,
+                      identityResetVersion: identityResetVersion + 1,
                       stage: "identity",
                       submissionSummary: null,
                     });
@@ -426,6 +437,7 @@ export function TournamentProjectionBuilder({
               updateBuilderState({
                 activeEditor: null,
                 identityResolved: Boolean(nextDraft.name.trim()),
+                isReplacingIdentity: !nextDraft.name.trim(),
                 identityResetVersion: identityResetVersion + 1,
               });
               return;

@@ -91,11 +91,13 @@ function knownTournamentDetails(tournament: KnownTournament) {
 export function TournamentIdentitySearch({
   draft,
   inputRef,
+  isReplacingIdentity = false,
   onSelectDraft,
   sport,
 }: {
   draft: TournamentDraft;
   inputRef: React.RefObject<TextInput | null>;
+  isReplacingIdentity?: boolean;
   onSelectDraft: (draft: TournamentDraft) => void;
   sport?: string;
 }) {
@@ -155,7 +157,10 @@ export function TournamentIdentitySearch({
     }
     if (confirmationStartedRef.current) return;
     confirmationStartedRef.current = true;
-    const baseDraft = draft.name.trim() ? createDefaultTournamentDraft() : draft;
+    const baseDraft =
+      isReplacingIdentity || draft.name.trim()
+        ? createDefaultTournamentDraft()
+        : draft;
     onSelectDraft({ ...baseDraft, name: trimmedName });
   }
 
