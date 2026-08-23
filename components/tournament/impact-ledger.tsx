@@ -76,7 +76,7 @@ function ImpactLedgerRow({
           flexShrink: 0,
           alignItems: "center",
           justifyContent: "center",
-          borderRadius: radii.sm,
+          borderRadius: radii.md,
           backgroundColor: colors.surfaceMuted,
         }}
       >
