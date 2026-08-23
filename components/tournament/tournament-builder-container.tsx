@@ -58,6 +58,7 @@ export function TournamentBuilderContainer({
 }) {
   const { isCurrentUser, profile, session } = useAuth();
   const { draft, resetDraft } = useTournamentDraft();
+  const [createSession, setCreateSession] = useState(0);
   const [submitError, setSubmitError] = useState<SubmitError | null>(null);
   const [savedProjection, setSavedProjection] = useState<SavedProjection | null>(null);
   const completedSaveDataId = useRef<string | null>(null);
@@ -120,11 +121,13 @@ export function TournamentBuilderContainer({
     : shouldPrefill && prefill
       ? tournamentDraftFromPrefill(prefill)
       : resumableDraft(draft);
+  const offerResume =
+    !editTournament && !shouldPrefill && Boolean(initialDraft.name.trim());
   const builderKey = editTournament
     ? `edit:${editTournament.id}`
     : shouldPrefill
       ? `prefill:${JSON.stringify(prefill)}`
-      : "resume";
+      : `create:${createSession}`;
 
   function finishSavedProjection() {
     if (!savedProjection || navigatedSaveId.current === savedProjection.tournament.id) return;
@@ -143,11 +146,18 @@ export function TournamentBuilderContainer({
           mutation.isPending && mutation.variables?.userId === session.user.id
         }
         profileId={profile.id}
+        offerResume={offerResume}
         saveCompleted={Boolean(savedProjection)}
         sport={profile.sport}
         submitError={
           submitError?.userId === session.user.id ? submitError.message : null
         }
+        onClearSubmitError={() => setSubmitError(null)}
+        onStartAnotherTournament={() => {
+          resetDraft();
+          setSubmitError(null);
+          setCreateSession((current) => current + 1);
+        }}
         onSubmit={(nextDraft) => {
           setSubmitError(null);
           if (!session.user.id || !profile.id) {

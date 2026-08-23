@@ -196,13 +196,164 @@ describe("TournamentProjectionBuilder", () => {
     await waitFor(() => expect(screen.getByText("Detroit Open")).toBeTruthy());
     fireEvent.press(screen.getByText("Detroit Open"));
 
-    expect(screen.getByText("Detroit")).toBeTruthy();
+    expect(screen.getByText("Confirm tournament")).toBeTruthy();
     expect(screen.queryByText("Outcome scenarios")).toBeNull();
-    fireEvent.press(screen.getByText("Continue"));
+    fireEvent.press(screen.getByText("Build projection"));
 
     expect(screen.getByText("Outcome scenarios")).toBeTruthy();
     expect(screen.getByText("Up to +$600 USD")).toBeTruthy();
     expect(screen.getByText("Create projection")).toBeTruthy();
+  });
+
+  it("waits for two characters and never creates data from keyboard search", async () => {
+    const onSelectDraft = jest.fn();
+    const screen = renderWithClient(
+      <TournamentIdentitySearch
+        draft={defaultDraft}
+        inputRef={{ current: null }}
+        onSelectDraft={onSelectDraft}
+        sport="tennis"
+      />,
+    );
+    const input = screen.getByPlaceholderText("Search by tournament name");
+
+    fireEvent(input, "submitEditing");
+    fireEvent.changeText(input, "a");
+    await advance(300);
+    expect(mockSearch).not.toHaveBeenCalled();
+    expect(screen.getByText("Enter one more character to search.")).toBeTruthy();
+
+    fireEvent.changeText(input, "ab");
+    fireEvent(input, "submitEditing");
+    await advance(300);
+    await waitFor(() => expect(mockSearch).toHaveBeenCalledTimes(1));
+    expect(onSelectDraft).not.toHaveBeenCalled();
+  });
+
+  it("keeps known selection local until confirmation and commits it once", async () => {
+    mockSearch.mockResolvedValue([
+      {
+        id: "known-1",
+        name: "Detroit Open",
+        location: "Detroit",
+        country: "United States",
+        currency: "USD",
+        start_date: "2026-02-01",
+        end_date: "2026-02-03",
+        tour_level: "World Tour",
+        prize_rounds: { qf: 600 },
+      },
+    ]);
+    const onSelectDraft = jest.fn();
+    const screen = renderWithClient(
+      <TournamentIdentitySearch
+        draft={defaultDraft}
+        inputRef={{ current: null }}
+        onSelectDraft={onSelectDraft}
+        sport="tennis"
+      />,
+    );
+
+    fireEvent.changeText(screen.getByLabelText("Tournament name"), "Detroit");
+    await advance(300);
+    await waitFor(() => expect(screen.getByText("Detroit Open")).toBeTruthy());
+    fireEvent.press(screen.getByText("Detroit Open"));
+
+    expect(onSelectDraft).not.toHaveBeenCalled();
+    expect(screen.getByText("World Tour")).toBeTruthy();
+    expect(screen.getByText("Available")).toBeTruthy();
+    fireEvent.press(screen.getByText("Back to results"));
+    expect(screen.getByLabelText("Tournament name").props.value).toBe("Detroit");
+    await waitFor(() => expect(screen.getByText("Detroit Open")).toBeTruthy());
+    fireEvent.press(screen.getByText("Detroit Open"));
+
+    const buildButton = screen.getByText("Build projection");
+    fireEvent.press(buildButton);
+    fireEvent.press(buildButton);
+    expect(onSelectDraft).toHaveBeenCalledTimes(1);
+    expect(onSelectDraft).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Detroit Open", location: "Detroit" }),
+    );
+  });
+
+  it("validates manual entry and preserves search when going back", async () => {
+    const onSelectDraft = jest.fn();
+    const screen = renderWithClient(
+      <TournamentIdentitySearch
+        draft={defaultDraft}
+        inputRef={{ current: null }}
+        onSelectDraft={onSelectDraft}
+        sport="tennis"
+      />,
+    );
+
+    fireEvent.press(screen.getByText("I can't find my tournament"));
+    fireEvent.press(screen.getByText("Continue manually"));
+    expect(screen.getByText("Enter a tournament name.")).toBeTruthy();
+    expect(onSelectDraft).not.toHaveBeenCalled();
+    fireEvent.changeText(screen.getByLabelText("Tournament name"), "Local Open");
+    fireEvent.press(screen.getByText("Back to search"));
+    expect(screen.getByLabelText("Tournament name").props.value).toBe("");
+
+    fireEvent.changeText(screen.getByLabelText("Tournament name"), "Community Open");
+    await advance(300);
+    await waitFor(() => expect(screen.getByText("No known tournaments found.")).toBeTruthy());
+    fireEvent.press(screen.getByText("Enter tournament manually"));
+    expect(screen.getByLabelText("Tournament name").props.value).toBe("Community Open");
+    fireEvent.press(screen.getByText("Back to search"));
+    expect(screen.getByLabelText("Tournament name").props.value).toBe("Community Open");
+  });
+
+  it("offers a saved create draft before search and confirms starting another", () => {
+    const onStartAnotherTournament = jest.fn();
+    const screen = renderWithClient(
+      <TournamentDraftProvider userId="account-1">
+        <TournamentProjectionBuilder
+          authenticatedUserId="account-1"
+          homeCurrency="USD"
+          initialDraft={validDraft}
+          offerResume
+          onStartAnotherTournament={onStartAnotherTournament}
+          onSubmit={jest.fn()}
+          profileId="athlete-1"
+          sport="tennis"
+        />
+      </TournamentDraftProvider>,
+    );
+
+    expect(screen.getByText("Continue your draft?")).toBeTruthy();
+    expect(screen.queryByText("Outcome scenarios")).toBeNull();
+    fireEvent.press(screen.getByText("Start another tournament"));
+    expect(Alert.alert).toHaveBeenCalledWith(
+      "Start another tournament?",
+      "This clears the local create draft for this tournament.",
+      expect.any(Array),
+    );
+    expect(onStartAnotherTournament).not.toHaveBeenCalled();
+
+    const buttons = jest.mocked(Alert.alert).mock.calls.at(-1)?.[2];
+    act(() => buttons?.[1]?.onPress?.());
+    expect(onStartAnotherTournament).toHaveBeenCalledTimes(1);
+  });
+
+  it("continues a saved create draft without rewriting its identity", () => {
+    const screen = renderWithClient(
+      <TournamentDraftProvider userId="account-1">
+        <TournamentProjectionBuilder
+          authenticatedUserId="account-1"
+          homeCurrency="USD"
+          initialDraft={validDraft}
+          offerResume
+          onSubmit={jest.fn()}
+          profileId="athlete-1"
+          sport="tennis"
+        />
+      </TournamentDraftProvider>,
+    );
+
+    fireEvent.press(screen.getByText("Continue draft"));
+    expect(screen.getByText("Outcome scenarios")).toBeTruthy();
+    expect(screen.getByText("Open Championship")).toBeTruthy();
   });
 
   it("shows search loading and retryable error states inline", async () => {
@@ -221,12 +372,11 @@ describe("TournamentProjectionBuilder", () => {
 
     fireEvent.changeText(screen.getByLabelText("Tournament name"), "Community Open");
     await advance(300);
-    await waitFor(() =>
-      expect(screen.getByText("Use “Community Open” as a new tournament")).toBeTruthy(),
-    );
-    fireEvent.press(screen.getByText("Use “Community Open” as a new tournament"));
+    await waitFor(() => expect(screen.getByText("No known tournaments found.")).toBeTruthy());
+    fireEvent.press(screen.getByText("Enter tournament manually"));
+    expect(screen.getByLabelText("Tournament name").props.value).toBe("Community Open");
+    fireEvent.press(screen.getByText("Continue manually"));
     expect(screen.queryByLabelText("Location")).toBeNull();
-    fireEvent.press(screen.getByText("Continue"));
     fireEvent.press(screen.getByText("Complete tournament details"));
     fireEvent.changeText(screen.getByLabelText("Location"), "Kuala Lumpur");
     fireEvent.changeText(screen.getByLabelText("Country"), "Malaysia");
@@ -278,16 +428,14 @@ describe("TournamentProjectionBuilder", () => {
     expect(screen.getByText("Must be between 0 and 100.")).toBeTruthy();
   });
 
-  it("does not submit a stale identity while a replacement search is unresolved", () => {
+  it("does not change a persisted identity while a replacement search is unresolved", () => {
     const { onSubmit, screen } = renderBuilder(validDraft);
 
     fireEvent.press(screen.getByText("Change tournament"));
     fireEvent.changeText(screen.getByLabelText("Tournament name"), "Replacement Open");
-    expect(screen.getByText("Choose tournament")).toBeTruthy();
-    fireEvent.press(screen.getByText("Choose tournament"));
 
     expect(onSubmit).not.toHaveBeenCalled();
-    expect(screen.getByText("Choose a known tournament or enter a new tournament name.")).toBeTruthy();
+    expect(screen.queryByText("Outcome scenarios")).toBeNull();
   });
 
   it("clears the previous tournament when choosing a new free-text identity", async () => {
@@ -311,34 +459,23 @@ describe("TournamentProjectionBuilder", () => {
       subsidy_amount: 400,
       sponsorship_allocated: 250,
     };
-    const onChangeDraft = jest.fn();
+    const onSelectDraft = jest.fn();
     const screen = renderWithClient(
       <TournamentIdentitySearch
         draft={previousDraft}
         inputRef={{ current: null }}
-        onChangeDraft={onChangeDraft}
-        onResolutionChange={jest.fn()}
+        onSelectDraft={onSelectDraft}
         sport="tennis"
       />,
     );
 
-    fireEvent.press(
-      screen.getByLabelText(
-        "Selected tournament Open Championship. Change selection",
-      ),
-    );
     fireEvent.changeText(screen.getByLabelText("Tournament name"), "Community Open");
     await advance(300);
-    await waitFor(() =>
-      expect(
-        screen.getByLabelText("Create a new tournament named Community Open"),
-      ).toBeTruthy(),
-    );
-    fireEvent.press(
-      screen.getByLabelText("Create a new tournament named Community Open"),
-    );
+    await waitFor(() => expect(screen.getByText("No known tournaments found.")).toBeTruthy());
+    fireEvent.press(screen.getByText("Enter tournament manually"));
+    fireEvent.press(screen.getByText("Continue manually"));
 
-    expect(onChangeDraft).toHaveBeenCalledWith(
+    expect(onSelectDraft).toHaveBeenCalledWith(
       expect.objectContaining({
         name: "Community Open",
         location: "",
@@ -369,29 +506,23 @@ describe("TournamentProjectionBuilder", () => {
       start_date: "2026-06-01",
       end_date: "2026-06-03",
     });
-    const onChangeDraft = jest.fn();
+    const onSelectDraft = jest.fn();
     const screen = renderWithClient(
       <TournamentIdentitySearch
         draft={prefilledDraft}
         inputRef={{ current: null }}
-        onChangeDraft={onChangeDraft}
-        onResolutionChange={jest.fn()}
+        onSelectDraft={onSelectDraft}
         sport="tennis"
       />,
     );
 
     fireEvent.changeText(screen.getByLabelText("Tournament name"), "Paris Open");
     await advance(300);
-    await waitFor(() =>
-      expect(
-        screen.getByLabelText("Create a new tournament named Paris Open"),
-      ).toBeTruthy(),
-    );
-    fireEvent.press(
-      screen.getByLabelText("Create a new tournament named Paris Open"),
-    );
+    await waitFor(() => expect(screen.getByText("No known tournaments found.")).toBeTruthy());
+    fireEvent.press(screen.getByText("Enter tournament manually"));
+    fireEvent.press(screen.getByText("Continue manually"));
 
-    expect(onChangeDraft).toHaveBeenCalledWith(
+    expect(onSelectDraft).toHaveBeenCalledWith(
       expect.objectContaining({
         name: "Paris Open",
         location: "Paris",
@@ -429,7 +560,7 @@ describe("TournamentProjectionBuilder", () => {
     await advance(300);
     await waitFor(() => expect(screen.getByText("Replacement Open")).toBeTruthy());
     fireEvent.press(screen.getByText("Replacement Open"));
-    fireEvent.press(screen.getByText("Continue"));
+    fireEvent.press(screen.getByText("Build projection"));
     await advance(350);
     await waitFor(() => expect(mockPreview).toHaveBeenCalled());
 
