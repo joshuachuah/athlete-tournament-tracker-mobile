@@ -132,11 +132,10 @@ export function TournamentProjectionBuilder({
   homeCurrency,
   initialDraft,
   loading = false,
-  offerResume = false,
   onClearSubmitError,
-  onStartAnotherTournament,
   onSubmit,
   profileId,
+  resume,
   saveCompleted = false,
   sport,
   submitError,
@@ -145,11 +144,10 @@ export function TournamentProjectionBuilder({
   homeCurrency: string;
   initialDraft: TournamentDraft;
   loading?: boolean;
-  offerResume?: boolean;
   onClearSubmitError?: () => void;
-  onStartAnotherTournament?: () => void;
   onSubmit: (draft: TournamentDraft) => void;
   profileId: string;
+  resume?: { onStartAnotherTournament: () => void };
   saveCompleted?: boolean;
   sport?: string;
   submitError?: string | null;
@@ -157,7 +155,7 @@ export function TournamentProjectionBuilder({
   const { setDraft } = useTournamentDraft();
   const [builderState, updateBuilderState] = useReducer(
     builderReducer,
-    createBuilderState(initialDraft, offerResume),
+    createBuilderState(initialDraft, Boolean(resume)),
   );
   const {
     activeEditor,
@@ -269,7 +267,7 @@ export function TournamentProjectionBuilder({
           paddingBottom: 0,
         }}
       >
-        {stage === "resume" ? (
+        {stage === "resume" && resume ? (
           <View style={{ gap: spacing.xl }}>
             <View style={{ gap: spacing.xs }}>
               <Text style={{ color: colors.foreground, fontSize: 26, fontWeight: "900" }}>
@@ -301,7 +299,7 @@ export function TournamentProjectionBuilder({
                         onPress: () => {
                           onClearSubmitError?.();
                           updateBuilderState({ submissionSummary: null });
-                          onStartAnotherTournament?.();
+                          resume.onStartAnotherTournament();
                         },
                       },
                     ],

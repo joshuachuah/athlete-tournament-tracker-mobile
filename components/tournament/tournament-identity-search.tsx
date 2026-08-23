@@ -3,6 +3,7 @@ import { Search } from "lucide-react-native";
 import { useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AccessibilityInfo,
   Keyboard,
   Pressable,
   Text,
@@ -128,6 +129,14 @@ export function TournamentIdentitySearch({
   function openManualEntry() {
     setManualError(null);
     setDiscovery({ mode: "manual", name: query.trim() });
+    AccessibilityInfo.announceForAccessibility("Add manually");
+  }
+
+  function openKnownConfirmation(tournament: KnownTournament) {
+    setDiscovery({ mode: "confirm-known", tournament });
+    AccessibilityInfo.announceForAccessibility(
+      `Confirm tournament. ${tournament.name}`,
+    );
   }
 
   function confirmKnown(tournament: KnownTournament) {
@@ -140,6 +149,7 @@ export function TournamentIdentitySearch({
     const trimmedName = name.trim();
     if (!trimmedName) {
       setManualError("Enter a tournament name.");
+      AccessibilityInfo.announceForAccessibility("Enter a tournament name.");
       manualInputRef.current?.focus();
       return;
     }
@@ -154,7 +164,10 @@ export function TournamentIdentitySearch({
     return (
       <View style={{ gap: spacing.xl }}>
         <View style={{ gap: spacing.xs }}>
-          <Text style={{ color: colors.foreground, fontSize: 26, fontWeight: "900" }}>
+          <Text
+            accessibilityRole="header"
+            style={{ color: colors.foreground, fontSize: 26, fontWeight: "900" }}
+          >
             Confirm tournament
           </Text>
           <Text style={{ color: colors.mutedForeground, lineHeight: 20 }}>
@@ -194,7 +207,10 @@ export function TournamentIdentitySearch({
     return (
       <View style={{ gap: spacing.xl }}>
         <View style={{ gap: spacing.xs }}>
-          <Text style={{ color: colors.foreground, fontSize: 26, fontWeight: "900" }}>
+          <Text
+            accessibilityRole="header"
+            style={{ color: colors.foreground, fontSize: 26, fontWeight: "900" }}
+          >
             Add manually
           </Text>
           <Text style={{ color: colors.mutedForeground, lineHeight: 20 }}>
@@ -238,7 +254,10 @@ export function TournamentIdentitySearch({
   return (
     <View style={{ gap: spacing.xl }}>
       <View style={{ gap: spacing.xs }}>
-        <Text style={{ color: colors.foreground, fontSize: 26, fontWeight: "900" }}>
+        <Text
+          accessibilityRole="header"
+          style={{ color: colors.foreground, fontSize: 26, fontWeight: "900" }}
+        >
           Which tournament?
         </Text>
         <Text style={{ color: colors.mutedForeground, lineHeight: 20 }}>
@@ -338,7 +357,7 @@ export function TournamentIdentitySearch({
                     <Pressable
                       accessibilityLabel={`${tournament.name}. ${resultDescription(tournament)}`}
                       accessibilityRole="button"
-                      onPress={() => setDiscovery({ mode: "confirm-known", tournament })}
+                      onPress={() => openKnownConfirmation(tournament)}
                       style={({ pressed }) => ({
                         minHeight: 64,
                         gap: 3,

@@ -146,18 +146,23 @@ export function TournamentBuilderContainer({
           mutation.isPending && mutation.variables?.userId === session.user.id
         }
         profileId={profile.id}
-        offerResume={offerResume}
+        resume={
+          offerResume
+            ? {
+                onStartAnotherTournament: () => {
+                  resetDraft();
+                  setSubmitError(null);
+                  setCreateSession((current) => current + 1);
+                },
+              }
+            : undefined
+        }
         saveCompleted={Boolean(savedProjection)}
         sport={profile.sport}
         submitError={
           submitError?.userId === session.user.id ? submitError.message : null
         }
         onClearSubmitError={() => setSubmitError(null)}
-        onStartAnotherTournament={() => {
-          resetDraft();
-          setSubmitError(null);
-          setCreateSession((current) => current + 1);
-        }}
         onSubmit={(nextDraft) => {
           setSubmitError(null);
           if (!session.user.id || !profile.id) {
