@@ -27,7 +27,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     gap: spacing.lg,
     padding: spacing.lg,
-    borderRadius: radii.lg,
+    borderRadius: radii.md,
     borderCurve: "continuous",
     backgroundColor: colors.brand,
     boxShadow:
@@ -190,7 +190,7 @@ export function ScenarioStrip({
           style={{
             gap: spacing.sm,
             padding: spacing.lg,
-            borderRadius: radii.lg,
+            borderRadius: radii.md,
             backgroundColor: colors.warningSoft,
           }}
         >

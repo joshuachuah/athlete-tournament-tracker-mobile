@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
   },
   list: {
     overflow: "hidden",
-    borderRadius: radii.lg,
+    borderRadius: radii.md,
     borderCurve: "continuous",
     backgroundColor: colors.surface,
     boxShadow:

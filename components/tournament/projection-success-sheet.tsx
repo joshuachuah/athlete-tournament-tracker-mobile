@@ -93,7 +93,7 @@ export function ProjectionSuccessSheet({
               padding: spacing.lg,
               borderWidth: 1,
               borderColor: colors.border,
-              borderRadius: radii.lg,
+              borderRadius: radii.md,
               backgroundColor: colors.surfaceMuted,
             }}
           >

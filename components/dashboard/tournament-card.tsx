@@ -74,7 +74,7 @@ export function TournamentCard({ tournament }: { tournament: TournamentWithPnL }
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: radii.lg,
+    borderRadius: radii.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     boxShadow:

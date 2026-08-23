@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.lg,
     padding: spacing.xl,
-    borderRadius: radii.lg,
+    borderRadius: radii.md,
     borderCurve: "continuous",
     backgroundColor: colors.surface,
     boxShadow:

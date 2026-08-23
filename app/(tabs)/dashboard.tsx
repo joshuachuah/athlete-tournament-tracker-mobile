@@ -123,7 +123,7 @@ export default function DashboardScreen() {
             style={{
               gap: spacing.lg,
               padding: spacing.lg,
-              borderRadius: radii.lg,
+              borderRadius: radii.md,
               backgroundColor: colors.brand,
               boxShadow:
                 "0 2px 5px rgba(16, 23, 18, 0.10), 0 22px 42px -24px rgba(23, 63, 49, 0.70)",

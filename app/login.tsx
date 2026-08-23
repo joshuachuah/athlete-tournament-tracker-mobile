@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.12)",
-    borderRadius: radii.lg,
+    borderRadius: radii.md,
     borderCurve: "continuous",
     backgroundColor: "rgba(3, 22, 15, 0.34)",
   },
