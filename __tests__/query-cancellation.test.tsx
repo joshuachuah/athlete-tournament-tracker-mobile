@@ -139,13 +139,12 @@ describe("TanStack query cancellation", () => {
       <TournamentIdentitySearch
         draft={createDefaultTournamentDraft(new Date(2026, 0, 1))}
         inputRef={{ current: null }}
-        onChangeDraft={jest.fn()}
-        onResolutionChange={jest.fn()}
+        onSelectDraft={jest.fn()}
         sport="tennis"
       />,
     );
 
-    fireEvent.changeText(screen.getByPlaceholderText("Search or enter a tournament"), "op");
+    fireEvent.changeText(screen.getByPlaceholderText("Search by tournament name"), "op");
     await act(async () => {
       await jest.advanceTimersByTimeAsync(300);
     });
@@ -156,7 +155,7 @@ describe("TanStack query cancellation", () => {
     });
 
     fireEvent.changeText(
-      screen.getByPlaceholderText("Search or enter a tournament"),
+      screen.getByPlaceholderText("Search by tournament name"),
       "open",
     );
     await act(async () => {

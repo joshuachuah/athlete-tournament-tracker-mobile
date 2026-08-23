@@ -1,6 +1,7 @@
 import { useNavigation, usePreventRemove } from "@react-navigation/native";
 import { useEffect, useReducer, useRef, useState } from "react";
 import {
+  AccessibilityInfo,
   Alert,
   Keyboard,
   Platform,
@@ -43,19 +44,29 @@ type BuilderState = {
   assumptionPickerOpen: boolean;
   formDraft: TournamentDraft;
   identityResetVersion: number;
+  isReplacingIdentity: boolean;
   identityResolved: boolean;
-  stage: "identity" | "projection";
+  stage: "identity" | "projection" | "resume";
   submissionSummary: string | null;
 };
 
-function createBuilderState(initialDraft: TournamentDraft): BuilderState {
+function createBuilderState(
+  initialDraft: TournamentDraft,
+  offerResume: boolean,
+): BuilderState {
   return {
     activeEditor: null,
     assumptionPickerOpen: false,
     formDraft: initialDraft,
     identityResetVersion: 0,
+    isReplacingIdentity: false,
     identityResolved: Boolean(initialDraft.name.trim()),
-    stage: initialDraft.name.trim() ? "projection" : "identity",
+    stage:
+      offerResume && initialDraft.name.trim()
+        ? "resume"
+        : initialDraft.name.trim()
+          ? "projection"
+          : "identity",
     submissionSummary: null,
   };
 }
@@ -104,8 +115,8 @@ function firstInvalidEditor(draft: TournamentDraft): ProjectionEditor | null {
 }
 
 function actionLabel(draft: TournamentDraft, identityResolved: boolean) {
-  if (draft.editId) return "Save changes";
   if (!identityResolved || !draft.name.trim()) return "Choose tournament";
+  if (draft.editId) return "Save changes";
 
   const invalid = firstInvalidEditor(draft);
   if (invalid === "details") return "Complete tournament details";
@@ -124,8 +135,10 @@ export function TournamentProjectionBuilder({
   homeCurrency,
   initialDraft,
   loading = false,
+  onClearSubmitError,
   onSubmit,
   profileId,
+  resume,
   saveCompleted = false,
   sport,
   submitError,
@@ -134,8 +147,10 @@ export function TournamentProjectionBuilder({
   homeCurrency: string;
   initialDraft: TournamentDraft;
   loading?: boolean;
+  onClearSubmitError?: () => void;
   onSubmit: (draft: TournamentDraft) => void;
   profileId: string;
+  resume?: { onStartAnotherTournament: () => void };
   saveCompleted?: boolean;
   sport?: string;
   submitError?: string | null;
@@ -143,14 +158,14 @@ export function TournamentProjectionBuilder({
   const { setDraft } = useTournamentDraft();
   const [builderState, updateBuilderState] = useReducer(
     builderReducer,
-    initialDraft,
-    createBuilderState,
+    createBuilderState(initialDraft, Boolean(resume)),
   );
   const {
     activeEditor,
     assumptionPickerOpen,
     formDraft,
     identityResetVersion,
+    isReplacingIdentity,
     identityResolved,
     stage,
     submissionSummary,
@@ -202,19 +217,29 @@ export function TournamentProjectionBuilder({
     setDraft(next);
   }
 
+  function selectDraft(next: TournamentDraft) {
+    setDraft(next);
+    onClearSubmitError?.();
+    Keyboard.dismiss();
+    updateBuilderState({
+      formDraft: next,
+      identityResolved: true,
+      isReplacingIdentity: false,
+      stage: "projection",
+      submissionSummary: null,
+    });
+  }
+
   function handlePrimaryAction() {
     if (!identityResolved || !formDraft.name.trim()) {
       updateBuilderState({
+        stage: "identity",
         submissionSummary:
           "Choose a known tournament or enter a new tournament name.",
       });
-      identityInputRef.current?.focus();
-      return;
-    }
-
-    if (stage === "identity") {
-      Keyboard.dismiss();
-      updateBuilderState({ stage: "projection", submissionSummary: null });
+      AccessibilityInfo.announceForAccessibility(
+        "Choose a known tournament or enter a new tournament name.",
+      );
       return;
     }
 
@@ -245,20 +270,59 @@ export function TournamentProjectionBuilder({
         contentInset={{ bottom: actionAreaBottomPadding }}
         scrollIndicatorInsets={{ bottom: actionAreaBottomPadding }}
         contentContainerStyle={{
-          gap: stage === "identity" ? spacing.xl : spacing.xxl,
+          gap: stage === "projection" ? spacing.xxl : spacing.xl,
           padding: spacing.xl,
           paddingBottom: 0,
         }}
       >
-        {stage === "identity" ? (
+        {stage === "resume" && resume ? (
+          <View style={{ gap: spacing.xl }}>
+            <View style={{ gap: spacing.xs }}>
+              <Text style={{ color: colors.foreground, fontSize: 26, fontWeight: "900" }}>
+                Continue your draft?
+              </Text>
+              <Text style={{ color: colors.mutedForeground, lineHeight: 20 }}>
+                {formDraft.name}
+              </Text>
+            </View>
+            <View style={{ gap: spacing.sm }}>
+              <Button
+                label="Continue draft"
+                onPress={() =>
+                  updateBuilderState({ stage: "projection", submissionSummary: null })
+                }
+              />
+              <Button
+                label="Start another tournament"
+                variant="ghost"
+                onPress={() => {
+                  Alert.alert(
+                    "Start another tournament?",
+                    "This clears the local create draft for this tournament.",
+                    [
+                      { text: "Cancel", style: "cancel" },
+                      {
+                        text: "Start another",
+                        style: "destructive",
+                        onPress: () => {
+                          onClearSubmitError?.();
+                          updateBuilderState({ submissionSummary: null });
+                          resume.onStartAnotherTournament();
+                        },
+                      },
+                    ],
+                  );
+                }}
+              />
+            </View>
+          </View>
+        ) : stage === "identity" ? (
           <TournamentIdentitySearch
             key={`identity:${formDraft.name}:${identityResetVersion}`}
             draft={formDraft}
             inputRef={identityInputRef}
-            onChangeDraft={updateDraft}
-            onResolutionChange={(identityResolved) =>
-              updateBuilderState({ identityResolved })
-            }
+            isReplacingIdentity={isReplacingIdentity}
+            onSelectDraft={selectDraft}
             sport={sport}
           />
         ) : (
@@ -288,6 +352,9 @@ export function TournamentProjectionBuilder({
                   accessibilityRole="button"
                   onPress={() => {
                     updateBuilderState({
+                      identityResolved: false,
+                      isReplacingIdentity: true,
+                      identityResetVersion: identityResetVersion + 1,
                       stage: "identity",
                       submissionSummary: null,
                     });
@@ -326,42 +393,38 @@ export function TournamentProjectionBuilder({
           </>
         )}
 
-        <View
-          testID="projection-action-area"
-          style={{
-            gap: spacing.sm,
-            paddingBottom:
-              Platform.OS === "android" ? actionAreaBottomPadding : 0,
-          }}
-        >
-          {submissionSummary ? (
-            <Text accessibilityLiveRegion="polite" style={{ color: colors.loss, lineHeight: 19 }}>
-              {submissionSummary}
-            </Text>
-          ) : null}
-          {submitError ? (
-            <Text accessibilityLiveRegion="polite" style={{ color: colors.loss, lineHeight: 19 }}>
-              {submitError}
-            </Text>
-          ) : null}
-          <Button
-            testID="projection-primary-action"
-            label={
-              stage === "identity"
-                ? identityResolved && formDraft.name.trim()
-                  ? "Continue"
-                  : "Choose tournament"
-                : actionLabel(formDraft, identityResolved)
-            }
-            loading={loading}
-            onPress={handlePrimaryAction}
-          />
-          {loading ? (
-            <Text accessibilityLiveRegion="polite" style={{ color: colors.mutedForeground, textAlign: "center" }}>
-              Saving projection. Editing is temporarily disabled.
-            </Text>
-          ) : null}
-        </View>
+        {stage === "projection" ? (
+          <View
+            testID="projection-action-area"
+            style={{
+              gap: spacing.sm,
+              paddingBottom:
+                Platform.OS === "android" ? actionAreaBottomPadding : 0,
+            }}
+          >
+            {submissionSummary ? (
+              <Text accessibilityLiveRegion="polite" style={{ color: colors.loss, lineHeight: 19 }}>
+                {submissionSummary}
+              </Text>
+            ) : null}
+            {submitError ? (
+              <Text accessibilityLiveRegion="polite" style={{ color: colors.loss, lineHeight: 19 }}>
+                {submitError}
+              </Text>
+            ) : null}
+            <Button
+              testID="projection-primary-action"
+              label={actionLabel(formDraft, identityResolved)}
+              loading={loading}
+              onPress={handlePrimaryAction}
+            />
+            {loading ? (
+              <Text accessibilityLiveRegion="polite" style={{ color: colors.mutedForeground, textAlign: "center" }}>
+                Saving projection. Editing is temporarily disabled.
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
       </ScrollView>
 
       {activeEditor ? (
@@ -374,6 +437,7 @@ export function TournamentProjectionBuilder({
               updateBuilderState({
                 activeEditor: null,
                 identityResolved: Boolean(nextDraft.name.trim()),
+                isReplacingIdentity: !nextDraft.name.trim(),
                 identityResetVersion: identityResetVersion + 1,
               });
               return;
