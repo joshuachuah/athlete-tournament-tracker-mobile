@@ -690,6 +690,19 @@ describe("TournamentProjectionBuilder", () => {
     expect(screen.getByText("Renamed Open")).toBeTruthy();
   });
 
+  it("returns to discovery when tournament details clear the identity", () => {
+    const { screen } = renderBuilder(validDraft);
+
+    fireEvent.press(screen.getByText("Tournament details"));
+    const nameInputs = screen.getAllByLabelText("Tournament name");
+    fireEvent.changeText(nameInputs[nameInputs.length - 1], " ");
+    fireEvent.press(screen.getByText("Apply tournament details"));
+    fireEvent.press(screen.getByText("Choose tournament"));
+
+    expect(screen.getByRole("header", { name: "Which tournament?" })).toBeTruthy();
+    expect(screen.getByPlaceholderText("Search by tournament name")).toBeTruthy();
+  });
+
   it("clears a known tournament's prize snapshot when its identity is renamed", async () => {
     const initialDraft = tournamentDraftFromKnown({
       name: "Known Open",

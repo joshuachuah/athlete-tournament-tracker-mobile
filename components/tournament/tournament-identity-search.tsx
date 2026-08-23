@@ -180,7 +180,7 @@ export function TournamentIdentitySearch({
             {tournament.name}
           </Text>
           {knownTournamentDetails(tournament).map((detail) => (
-            <View key={detail.label} style={{ gap: 2 }}>
+            <View key={detail.label} style={{ gap: spacing.xs }}>
               <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>
                 {detail.label}
               </Text>

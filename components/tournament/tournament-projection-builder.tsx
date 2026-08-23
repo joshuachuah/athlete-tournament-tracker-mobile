@@ -228,10 +228,10 @@ export function TournamentProjectionBuilder({
   function handlePrimaryAction() {
     if (!identityResolved || !formDraft.name.trim()) {
       updateBuilderState({
+        stage: "identity",
         submissionSummary:
           "Choose a known tournament or enter a new tournament name.",
       });
-      identityInputRef.current?.focus();
       return;
     }
 
