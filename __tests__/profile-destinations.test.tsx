@@ -1,9 +1,11 @@
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
 import { usePreventRemove } from "@react-navigation/native";
-import { router } from "expo-router";
-import { AppState, type AppStateStatus } from "react-native";
+import type { Session } from "@supabase/supabase-js";
+import { Redirect, router } from "expo-router";
+import { AppState, StyleSheet, type AppStateStatus } from "react-native";
 
 import AccountScreen from "@/app/(tabs)/account";
+import AccountControlsScreen from "@/app/account-controls";
 import ProfileScreen from "@/app/(tabs)/profile";
 import EditProfileScreen from "@/app/edit-profile";
 import PrivateFinancesScreen from "@/app/private-finances";
@@ -13,7 +15,7 @@ import { authenticatePrivateFinances } from "@/lib/private-finance-auth";
 import type { AthleteProfile } from "@/types";
 
 jest.mock("expo-router", () => ({
-  Redirect: () => null,
+  Redirect: jest.fn(() => null),
   router: {
     back: jest.fn(),
     push: jest.fn(),
@@ -37,6 +39,7 @@ jest.mock("@/lib/private-finance-auth", () => ({
 }));
 
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
+const mockRedirect = Redirect as jest.MockedFunction<typeof Redirect>;
 const mockUsePreventRemove = usePreventRemove as jest.MockedFunction<
   typeof usePreventRemove
 >;
@@ -57,13 +60,27 @@ const profile: AthleteProfile = {
   monthly_sponsorship: 1_200,
   created_at: "2026-01-01",
 };
+const session = {
+  access_token: "access-token",
+  expires_in: 3_600,
+  refresh_token: "refresh-token",
+  token_type: "bearer",
+  user: {
+    app_metadata: { provider: "email" },
+    aud: "authenticated",
+    created_at: "2026-01-01",
+    email: "signed-in@example.com",
+    id: "user-1",
+    user_metadata: {},
+  },
+} satisfies Session;
 
 describe("split profile destinations", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseAuth.mockReturnValue({
       profile,
-      session: {} as ReturnType<typeof useAuth>["session"],
+      session,
       status: "ready",
       authError: null,
       profileLoadError: null,
@@ -145,6 +162,56 @@ describe("split profile destinations", () => {
     );
 
     expect(router.push).toHaveBeenCalledWith("/private-finances");
+  });
+
+  it("moves account actions behind one neutral destination", () => {
+    const screen = render(<AccountScreen />);
+
+    expect(screen.getAllByLabelText("Account controls")).toHaveLength(1);
+    expect(screen.queryByLabelText("Sign out")).toBeNull();
+    expect(screen.queryByLabelText("Delete account")).toBeNull();
+
+    fireEvent.press(screen.getByLabelText("Account controls"));
+
+    expect(router.push).toHaveBeenCalledWith("/account-controls");
+  });
+
+  it("shows only non-financial account context on account controls", () => {
+    const screen = render(<AccountControlsScreen />);
+
+    expect(screen.getByText(/signed-in@example\.com/)).toBeTruthy();
+    expect(screen.queryByText(/alex@example\.com/)).toBeNull();
+    expect(screen.getByLabelText("Sign out")).toBeTruthy();
+    expect(screen.getByLabelText("Delete account")).toBeTruthy();
+    expect(
+      StyleSheet.flatten(screen.getByLabelText("Sign out").props.style),
+    ).toEqual(expect.objectContaining({ minHeight: 48 }));
+    expect(
+      StyleSheet.flatten(screen.getByLabelText("Delete account").props.style),
+    ).toEqual(expect.objectContaining({ minHeight: 44 }));
+    expect(screen.queryByText(profile.home_currency)).toBeNull();
+    expect(screen.queryByText("Monthly income")).toBeNull();
+    expect(screen.queryByText("Savings balance")).toBeNull();
+    expect(screen.queryByText("Monthly sponsorship")).toBeNull();
+    expect(screen.queryByText(/8,500/)).toBeNull();
+    expect(screen.queryByText(/32,400/)).toBeNull();
+    expect(screen.queryByText(/1,200/)).toBeNull();
+  });
+
+  it("redirects to login without a session, even if a stale profile remains", () => {
+    const unauthenticatedAuth = mockUseAuth();
+    mockUseAuth.mockReturnValue({
+      ...unauthenticatedAuth,
+      profile,
+      session: null,
+    });
+    const screen = render(<AccountControlsScreen />);
+
+    expect(screen.queryByLabelText("Sign out")).toBeNull();
+    expect(screen.queryByLabelText("Delete account")).toBeNull();
+    expect(mockRedirect.mock.calls.at(-1)?.[0]).toEqual(
+      expect.objectContaining({ href: "/login" }),
+    );
   });
 
   it("does not mount financial values until authentication succeeds", async () => {
