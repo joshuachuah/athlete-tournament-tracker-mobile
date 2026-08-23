@@ -853,7 +853,7 @@ const styles = StyleSheet.create({
     height: 42,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: radii.md,
+    borderRadius: radii.sm,
   },
   headerCopy: {
     flex: 1,
