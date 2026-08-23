@@ -115,29 +115,24 @@ export function TournamentIdentitySearch({
         </Text>
       </View>
 
-      <View style={{ position: "relative" }}>
-        <Input
-          inputRef={inputRef}
-          label="Tournament name"
-          value={query}
-          onChangeText={(value) => {
-            setQuery(value);
-            setCommitted(false);
-            onResolutionChange(false);
-          }}
-          autoCapitalize="words"
-          autoCorrect={false}
-          returnKeyType="search"
-          onSubmitEditing={() => {
-            if (!results?.length && query.trim()) chooseNew();
-          }}
-          placeholder="Search or enter a tournament"
-          style={{ paddingLeft: 44 }}
-        />
-        <View pointerEvents="none" style={{ position: "absolute", left: 14, top: 39 }}>
-          <Search color={colors.mutedForeground} size={20} />
-        </View>
-      </View>
+      <Input
+        inputRef={inputRef}
+        label="Tournament name"
+        value={query}
+        onChangeText={(value) => {
+          setQuery(value);
+          setCommitted(false);
+          onResolutionChange(false);
+        }}
+        autoCapitalize="words"
+        autoCorrect={false}
+        returnKeyType="search"
+        onSubmitEditing={() => {
+          if (!results?.length && query.trim()) chooseNew();
+        }}
+        placeholder="Search or enter a tournament"
+        leadingIcon={<Search color={colors.mutedForeground} size={20} />}
+      />
 
       {committed && draft.name ? (
         <Pressable
