@@ -52,6 +52,10 @@ export default function RootLayout() {
             options={{ gestureEnabled: false, headerShown: false }}
           />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="account-controls"
+            options={{ headerBackTitle: "Account", title: "Account controls" }}
+          />
           <Stack.Screen name="search" options={{ title: "Tournament search" }} />
           <Stack.Screen
             name="tournaments/[id]"
