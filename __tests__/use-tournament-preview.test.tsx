@@ -104,4 +104,56 @@ describe("useTournamentPreview", () => {
       expect(result.current.data?.estimated_withholding_rate).toBe(20),
     );
   });
+
+  it("clears cached data when previewing becomes disabled", async () => {
+    mockPreview.mockResolvedValue(previewResult(10));
+    const client = new QueryClient({
+      defaultOptions: { queries: { gcTime: Infinity, retry: false } },
+    });
+    function Wrapper({ children }: PropsWithChildren) {
+      return (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      );
+    }
+    const draft = {
+      ...createDefaultTournamentDraft(new Date(2026, 0, 1)),
+      name: "Malaysia Open",
+      location: "Kuala Lumpur",
+      country: "Malaysia",
+      country_code: "MY" as const,
+      prize_tax_rate: 10,
+      prize_rounds: {
+        ...createDefaultTournamentDraft().prize_rounds,
+        w: 100,
+      },
+    };
+    const { result, rerender } = renderHook(
+      ({ enabled }: { enabled: boolean }) =>
+        useTournamentPreview({
+          authenticatedUserId: "account-1",
+          draft,
+          enabled,
+          homeCurrency: "USD",
+          profileId: "athlete-1",
+        }),
+      { initialProps: { enabled: true }, wrapper: Wrapper },
+    );
+
+    await waitFor(() =>
+      expect(result.current.data?.estimated_withholding_rate).toBe(10),
+    );
+
+    rerender({ enabled: false });
+
+    expect(result.current.data).toBeUndefined();
+    expect(result.current.isError).toBe(false);
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(350);
+    });
+
+    expect(result.current.data).toBeUndefined();
+    expect(result.current.isError).toBe(false);
+    expect(mockPreview).toHaveBeenCalledTimes(1);
+  });
 });

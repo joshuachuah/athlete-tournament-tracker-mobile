@@ -21,9 +21,13 @@ import {
   type PrizeTierId,
 } from "@/lib/prize-distributions";
 
-const countryCodeSchema = z.custom<CountryCode>(
-  (value) => typeof value === "string" && isCountryCode(value),
-  "Choose a country from the list.",
+const countryCodeSchema = z.preprocess(
+  (value) =>
+    typeof value === "string" ? value.trim().toUpperCase() : value,
+  z.custom<CountryCode>(
+    (value) => typeof value === "string" && isCountryCode(value),
+    "Choose a country from the list.",
+  ),
 );
 
 export type TournamentDraft = {

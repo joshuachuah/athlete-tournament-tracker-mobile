@@ -154,8 +154,19 @@ describe("API response schemas", () => {
         },
       };
 
-      expect(tournamentWithPnLSchema.parse(unknown).prize_tax_rate).toBeNull();
-      expect(tournamentWithPnLSchema.parse(confirmedZero).prize_tax_rate).toBe(0);
+      const parsedUnknown = tournamentWithPnLSchema.parse(unknown);
+      const parsedConfirmedZero = tournamentWithPnLSchema.parse(confirmedZero);
+
+      expect(parsedUnknown.prize_tax_rate).toBeNull();
+      expect(parsedUnknown.pnl.estimated_withholding_rate).toBeNull();
+      expect(
+        parsedUnknown.pnl.prize_rounds_after_estimated_withholding,
+      ).toBeNull();
+      expect(parsedConfirmedZero.prize_tax_rate).toBe(0);
+      expect(parsedConfirmedZero.pnl.estimated_withholding_rate).toBe(0);
+      expect(
+        parsedConfirmedZero.pnl.prize_rounds_after_estimated_withholding,
+      ).toEqual(tournament.prize_rounds);
     });
 
     it.each(["US", "MY"])("accepts ISO country code %s", (countryCode) => {

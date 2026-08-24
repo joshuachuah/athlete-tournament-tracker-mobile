@@ -260,11 +260,11 @@ const countryByName = new Map<string, (typeof countries)[number]>(
 );
 
 export function isCountryCode(value: string): value is CountryCode {
-  return countryByCode.has(value.toUpperCase());
+  return countryByCode.has(value);
 }
 
 export function getCountryByCode(code: string | null | undefined) {
-  return code ? countryByCode.get(code.toUpperCase()) ?? null : null;
+  return code ? countryByCode.get(code.trim().toUpperCase()) ?? null : null;
 }
 
 export function getCountryByName(name: string | null | undefined) {

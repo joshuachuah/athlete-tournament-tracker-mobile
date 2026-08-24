@@ -569,6 +569,19 @@ describe("normalizeTournamentDraft", () => {
     expect(normalizeTournamentDraft(persisted)).toEqual(storedDraft);
   });
 
+  it("normalizes a lowercase country code in a current stored draft", () => {
+    const storedDraft = {
+      ...defaultTournamentDraft,
+      country: "United States",
+      country_code: " us ",
+      prize_tax_rate: 30,
+    };
+
+    expect(
+      normalizeTournamentDraft({ version: 4, draft: storedDraft }).country_code,
+    ).toBe("US");
+  });
+
   it("preserves a current server-backed empty prize snapshot", () => {
     const storedDraft = {
       ...defaultTournamentDraft,

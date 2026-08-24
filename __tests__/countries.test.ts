@@ -3,6 +3,7 @@ import {
   estimatedWithholdingAfterCountryChange,
   getCountryByCode,
   getCountryByName,
+  isCountryCode,
 } from "@/lib/countries";
 
 describe("bundled country data", () => {
@@ -14,6 +15,11 @@ describe("bundled country data", () => {
   it("supports name and code lookup locally", () => {
     expect(getCountryByCode("my")?.name).toBe("Malaysia");
     expect(getCountryByName("United States")?.code).toBe("US");
+  });
+
+  it("keeps the stored country-code type canonical", () => {
+    expect(isCountryCode("US")).toBe(true);
+    expect(isCountryCode("us")).toBe(false);
   });
 });
 

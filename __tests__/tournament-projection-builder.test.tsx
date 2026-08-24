@@ -867,7 +867,7 @@ describe("TournamentProjectionBuilder", () => {
     fireEvent.press(screen.getByText("Tour Finals"));
     fireEvent.press(screen.getByText("Apply prize money"));
 
-    expect(screen.getByText("5 gross estimates · 30% estimated withholding")).toBeTruthy();
+    expect(screen.getByText("5 gross estimates")).toBeTruthy();
     fireEvent.press(screen.getByText("Create projection"));
 
     expect(onSubmit).toHaveBeenCalledWith(
@@ -883,6 +883,29 @@ describe("TournamentProjectionBuilder", () => {
         }),
       }),
     );
+  });
+
+  it("labels server-provided payout amounts after estimated withholding", async () => {
+    mockPreview.mockResolvedValue({
+      total_expenses: 0,
+      total_income_base: 0,
+      scenarios: [],
+      break_even_round: null,
+      estimated_withholding_rate: 30,
+      prize_rounds_after_estimated_withholding: { qf: 350 },
+    });
+    const { screen } = renderBuilder(validDraft);
+
+    await advance(350);
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "1 estimate after estimated withholding · 30% rate",
+        ),
+      ).toBeTruthy(),
+    );
+    expect(screen.getByText("Up to +$350 USD")).toBeTruthy();
   });
 
   it("allows a known tournament with no supplied payout schedule", () => {

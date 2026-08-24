@@ -201,15 +201,18 @@ export function ImpactLedger({
   prizeRoundsAfterEstimatedWithholding?: PrizeRounds | null;
 }) {
   const prizes = prizeEstimates(draft);
+  const displaysAfterEstimatedWithholding =
+    draft.prize_tax_rate !== null &&
+    prizeRoundsAfterEstimatedWithholding !== null &&
+    prizeRoundsAfterEstimatedWithholding !== undefined;
   const displayedPrizes =
-    draft.prize_tax_rate !== null && prizeRoundsAfterEstimatedWithholding
+    displaysAfterEstimatedWithholding
       ? prizeRoundKeys
           .filter((round) => draft.prize_rounds[round] > 0)
           .flatMap((round) => {
             const value = prizeRoundsAfterEstimatedWithholding[round];
             return value === undefined ? [] : [value];
           })
-          .filter((amount): amount is number => amount !== undefined)
       : prizes;
   const lowestPrize =
     displayedPrizes.length > 0 ? Math.min(...displayedPrizes) : 0;
@@ -221,8 +224,10 @@ export function ImpactLedger({
     ? `${[draft.location.trim(), draft.country.trim()].filter(Boolean).join(", ")}${parseDateOnly(draft.start_date) ? ` · ${formatDate(draft.start_date)}` : ""}`
     : "Location, dates, currency, and entry fee";
   const prizeSummary =
-    prizes.length > 0
-      ? `${prizes.length} gross estimate${prizes.length === 1 ? "" : "s"}${draft.prize_tax_rate !== null ? ` · ${draft.prize_tax_rate}% estimated withholding` : ""}`
+    displayedPrizes.length > 0
+      ? displaysAfterEstimatedWithholding
+        ? `${displayedPrizes.length} estimate${displayedPrizes.length === 1 ? "" : "s"} after estimated withholding · ${draft.prize_tax_rate}% rate`
+        : `${displayedPrizes.length} gross estimate${displayedPrizes.length === 1 ? "" : "s"}`
       : draft.currency.toUpperCase() !== prizeDistributionCurrency
           ? "Official USD outcomes unavailable"
           : draft.editId

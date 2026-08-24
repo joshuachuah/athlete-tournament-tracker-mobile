@@ -44,7 +44,7 @@ export function useTournamentPreview({
 
   return {
     ...query,
-    data: isLoadingPreview ? undefined : query.data,
+    data: !enabled || isLoadingPreview ? undefined : query.data,
     isLoadingPreview,
   };
 }

@@ -28,7 +28,9 @@ export function NullablePercentageInput({
           if (!/^\d{0,3}(?:\.\d{0,2})?$/.test(normalized)) return;
 
           setText(normalized);
-          onChangeValue(normalized === "" ? null : Number(normalized));
+          onChangeValue(
+            normalized === "" || normalized === "." ? null : Number(normalized),
+          );
         }}
         placeholder="Unknown"
         value={text}

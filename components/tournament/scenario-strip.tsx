@@ -1,16 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { colors, radii, spacing } from "@/constants/theme";
-import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import { api } from "@/lib/api";
+import { useTournamentPreview } from "@/hooks/use-tournament-preview";
 import { prizeDistributionCurrency } from "@/lib/prize-distributions";
 import {
   detailsSchema,
   prizesSchema,
   spendingSchema,
   subsidySchema,
-  toTournamentPreviewPayload,
   travelSchema,
   type TournamentDraft,
 } from "@/lib/tournament-draft";
@@ -91,29 +88,19 @@ export function ScenarioStrip({
             title: "No outcomes yet",
             body: "Choose a supported PSA tier and draw to see worst, middle, and best outcomes.",
           };
-  const serializedPayload = previewReady
-    ? JSON.stringify(toTournamentPreviewPayload(draft, profileId))
-    : "";
-  const debouncedPayload = useDebouncedValue(serializedPayload, 350);
-  const waitingForDebounce =
-    previewReady && serializedPayload !== debouncedPayload;
   const {
     data,
     error,
     isError,
-    isFetching,
+    isLoadingPreview: loading,
     refetch,
-  } = useQuery({
-    queryKey: ["tournament-pnl-preview", homeCurrency.toUpperCase(), debouncedPayload],
-    queryFn: ({ signal }) =>
-      api.tournaments.preview(JSON.parse(debouncedPayload), {
-        signal,
-        authenticatedUserId,
-      }),
-    enabled: previewReady && Boolean(debouncedPayload) && !waitingForDebounce,
-    retry: false,
+  } = useTournamentPreview({
+    authenticatedUserId,
+    draft,
+    enabled: previewReady,
+    homeCurrency,
+    profileId,
   });
-  const loading = waitingForDebounce || isFetching;
 
   return (
     <View style={styles.projectionHero}>
