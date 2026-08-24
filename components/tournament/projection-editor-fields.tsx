@@ -208,6 +208,10 @@ function PrizeEditorFields({
   const generated =
     workingDraft.prize_distribution_mode === "generated" &&
     selectedTemplate !== null;
+  const appliedEstimatedWithholdingRate =
+    prizePreview?.estimated_withholding_rate === undefined
+      ? workingDraft.prize_tax_rate
+      : prizePreview.estimated_withholding_rate;
   const rounds = prizeRoundKeys.filter(
     (round) =>
       workingDraft.prize_rounds[round] > 0 &&
@@ -284,7 +288,7 @@ function PrizeEditorFields({
                 currency={workingDraft.currency}
                 estimateLoading={prizePreviewLoading}
                 players={generated ? selectedTemplate?.players[round] : undefined}
-                rateKnown={workingDraft.prize_tax_rate !== null}
+                rateKnown={appliedEstimatedWithholdingRate !== null}
                 value={workingDraft.prize_rounds[round]}
               />
             ))}
@@ -301,19 +305,21 @@ function PrizeEditorFields({
           paddingLeft: spacing.md,
           borderLeftWidth: 3,
           borderLeftColor:
-            workingDraft.prize_tax_rate !== null ? colors.accent : colors.warning,
+            appliedEstimatedWithholdingRate !== null
+              ? colors.accent
+              : colors.warning,
         }}
       >
         <Text style={{ color: colors.foreground, fontWeight: "800" }}>
-          {workingDraft.prize_tax_rate !== null
+          {appliedEstimatedWithholdingRate !== null
             ? "Estimated withholding included"
             : "Gross prize only"}
         </Text>
         <Text
           style={{ color: colors.mutedForeground, fontSize: 12, lineHeight: 18 }}
         >
-          {workingDraft.prize_tax_rate !== null
-            ? `This projection uses a ${workingDraft.prize_tax_rate}% estimated withholding rate.`
+          {appliedEstimatedWithholdingRate !== null
+            ? `This projection uses a ${appliedEstimatedWithholdingRate}% estimated withholding rate.`
             : "No estimated withholding rate is known for this tournament."}
         </Text>
         {errors.prize_tax_rate ? (

@@ -533,7 +533,7 @@ describe("PrizeDistributionSelector", () => {
     expect(screen.queryByLabelText(/Estimated withholding/)).toBeNull();
   });
 
-  it("renders the server-provided after-withholding payout beside gross", () => {
+  it("labels a server-provided payout with the server's effective rate", () => {
     const draft = createDefaultTournamentDraft();
     const screen = renderPrizeEditor(
       {
@@ -551,14 +551,53 @@ describe("PrizeDistributionSelector", () => {
         total_income_base: 0,
         scenarios: [],
         break_even_round: "w",
-        estimated_withholding_rate: 30,
-        prize_rounds_after_estimated_withholding: { w: 15_162 },
+        estimated_withholding_rate: 20,
+        prize_rounds_after_estimated_withholding: { w: 17_328 },
       },
     );
 
     expect(
       screen.getByLabelText(
-        "Win payout, $21,660 USD gross, $15,162 USD after estimated withholding",
+        "Win payout, $21,660 USD gross, $17,328 USD after estimated withholding",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        "This projection uses a 20% estimated withholding rate.",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.queryByText(
+        "This projection uses a 30% estimated withholding rate.",
+      ),
+    ).toBeNull();
+  });
+
+  it("falls back to the draft rate for a legacy payout preview", () => {
+    const draft = createDefaultTournamentDraft();
+    const screen = renderPrizeEditor(
+      {
+        country: "United States",
+        country_code: "US",
+        prize_tax_rate: 30,
+        prize_distribution_mode: "generated",
+        prize_tier_id: "world_gold",
+        prize_draw_template_id: "draw_32_entries_24",
+        prize_player_total: 114_000,
+        prize_rounds: { ...draft.prize_rounds, w: 21_660 },
+      },
+      {
+        total_expenses: 0,
+        total_income_base: 0,
+        scenarios: [],
+        break_even_round: "w",
+        prize_rounds_after_estimated_withholding: { w: 15_162 },
+      },
+    );
+
+    expect(
+      screen.getByText(
+        "This projection uses a 30% estimated withholding rate.",
       ),
     ).toBeTruthy();
   });
