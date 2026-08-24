@@ -659,7 +659,8 @@ export function toTournamentPayload(
         ([, amount]) => (amount ?? 0) > 0,
       ),
     ),
-    prize_tax_rate: normalized.prize_tax_rate,
+    prize_tax_rate:
+      normalized.country_code === "US" ? 30 : normalized.prize_tax_rate,
   };
 }
 

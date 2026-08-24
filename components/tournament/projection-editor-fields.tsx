@@ -38,6 +38,7 @@ const coverOptions: Array<{ value: SubsidyCovers; label: string }> = [
 function PrizeRoundRow({
   afterEstimatedWithholding,
   currency,
+  estimateLoading,
   label,
   players,
   rateKnown,
@@ -45,6 +46,7 @@ function PrizeRoundRow({
 }: {
   afterEstimatedWithholding?: number;
   currency: string;
+  estimateLoading: boolean;
   label: string;
   players?: number;
   rateKnown: boolean;
@@ -84,9 +86,20 @@ function PrizeRoundRow({
           {formatMoney(value, currency)} gross
         </Text>
         {rateKnown ? (
-          <Text style={{ color: colors.accent, fontSize: 12, fontWeight: "800" }}>
+          <Text
+            style={{
+              color:
+                afterEstimatedWithholding !== undefined || estimateLoading
+                  ? colors.accent
+                  : colors.mutedForeground,
+              fontSize: 12,
+              fontWeight: "800",
+            }}
+          >
             {afterEstimatedWithholding === undefined
-              ? "Calculating estimate..."
+              ? estimateLoading
+                ? "Calculating estimate..."
+                : "Estimate unavailable"
               : `${formatMoney(afterEstimatedWithholding, currency)} after estimated withholding`}
           </Text>
         ) : null}
@@ -99,6 +112,7 @@ type EditorFieldsProps = {
   errors: Record<string, string>;
   onUpdate: (changes: Partial<TournamentDraft>) => void;
   prizePreview?: PnLResult;
+  prizePreviewLoading?: boolean;
   workingDraft: TournamentDraft;
 };
 
@@ -178,6 +192,7 @@ function PrizeEditorFields({
   errors,
   onUpdate,
   prizePreview,
+  prizePreviewLoading = false,
   workingDraft,
 }: EditorFieldsProps) {
   const selectedTier = workingDraft.prize_tier_id
@@ -263,6 +278,7 @@ function PrizeEditorFields({
                   prizePreview?.prize_rounds_after_estimated_withholding?.[round]
                 }
                 currency={workingDraft.currency}
+                estimateLoading={prizePreviewLoading}
                 players={generated ? selectedTemplate?.players[round] : undefined}
                 rateKnown={workingDraft.prize_tax_rate !== null}
                 value={workingDraft.prize_rounds[round]}
@@ -455,6 +471,7 @@ export function ProjectionEditorFields({
   onUpdate,
   onUpdateAccommodation,
   prizePreview,
+  prizePreviewLoading,
   workingDraft,
 }: {
   editor: ProjectionEditor;
@@ -465,6 +482,7 @@ export function ProjectionEditorFields({
     accommodation_nights?: number;
   }) => void;
   prizePreview?: PnLResult;
+  prizePreviewLoading?: boolean;
   workingDraft: TournamentDraft;
 }) {
   if (editor === "details") {
@@ -473,6 +491,7 @@ export function ProjectionEditorFields({
         errors={errors}
         onUpdate={onUpdate}
         prizePreview={prizePreview}
+        prizePreviewLoading={prizePreviewLoading}
         workingDraft={workingDraft}
       />
     );
@@ -484,6 +503,7 @@ export function ProjectionEditorFields({
         errors={errors}
         onUpdate={onUpdate}
         prizePreview={prizePreview}
+        prizePreviewLoading={prizePreviewLoading}
         workingDraft={workingDraft}
       />
     );

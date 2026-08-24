@@ -15,9 +15,11 @@ import type { PnLResult } from "@/types";
 function PrizeEditorHarness({
   initialDraft,
   prizePreview,
+  prizePreviewLoading,
 }: {
   initialDraft: TournamentDraft;
   prizePreview?: PnLResult;
+  prizePreviewLoading?: boolean;
 }) {
   const [draft, setDraft] = useState(initialDraft);
 
@@ -26,6 +28,7 @@ function PrizeEditorHarness({
       editor="prize"
       errors={{}}
       prizePreview={prizePreview}
+      prizePreviewLoading={prizePreviewLoading}
       workingDraft={draft}
       onUpdate={(changes) =>
         setDraft((current) => ({ ...current, ...changes }))
@@ -38,10 +41,15 @@ function PrizeEditorHarness({
 function renderPrizeEditor(
   overrides: Partial<TournamentDraft> = {},
   prizePreview?: PnLResult,
+  prizePreviewLoading?: boolean,
 ) {
   const draft = { ...createDefaultTournamentDraft(), ...overrides };
   return render(
-    <PrizeEditorHarness initialDraft={draft} prizePreview={prizePreview} />,
+    <PrizeEditorHarness
+      initialDraft={draft}
+      prizePreview={prizePreview}
+      prizePreviewLoading={prizePreviewLoading}
+    />,
   );
 }
 
@@ -100,6 +108,24 @@ describe("PrizeDistributionSelector", () => {
     expect(screen.queryByLabelText("QF (USD)")).toBeNull();
     expect(screen.queryByLabelText("Edit QF payout")).toBeNull();
     expect(screen.queryByText("Enter payouts manually")).toBeNull();
+  });
+
+  it("stops showing a calculation when an estimate is unavailable", () => {
+    const screen = renderPrizeEditor({ prize_tax_rate: 10 });
+
+    fireEvent.press(screen.getByText("Bronze"));
+
+    expect(screen.getAllByText("Estimate unavailable").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Calculating estimate...")).toBeNull();
+  });
+
+  it("shows calculation copy only while the preview is loading", () => {
+    const screen = renderPrizeEditor({ prize_tax_rate: 10 }, undefined, true);
+
+    fireEvent.press(screen.getByText("Bronze"));
+
+    expect(screen.getAllByText("Calculating estimate...").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Estimate unavailable")).toBeNull();
   });
 
   it("regenerates read-only payouts when the selected tier changes", () => {

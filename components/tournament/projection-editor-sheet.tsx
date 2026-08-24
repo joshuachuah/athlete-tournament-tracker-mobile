@@ -105,7 +105,8 @@ export function ProjectionEditorSheet({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const reducedMotion = useReducedMotion();
   const heading = editorTitles[editor];
-  const { data: prizePreview } = useTournamentPreview({
+  const { data: prizePreview, isLoadingPreview: prizePreviewLoading } =
+    useTournamentPreview({
     authenticatedUserId,
     draft: workingDraft,
     enabled:
@@ -243,6 +244,7 @@ export function ProjectionEditorSheet({
               onUpdate={update}
               onUpdateAccommodation={updateAccommodation}
               prizePreview={prizePreview}
+              prizePreviewLoading={prizePreviewLoading}
               workingDraft={workingDraft}
             />
           </ScrollView>

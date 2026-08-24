@@ -809,6 +809,23 @@ describe("toTournamentPayload", () => {
     );
   });
 
+  it.each([null, 12])(
+    "enforces the fixed US rate at the payload boundary from %p",
+    (prizeTaxRate) => {
+      const payload = toTournamentPayload(
+        {
+          ...defaultTournamentDraft,
+          country: "United States",
+          country_code: "US",
+          prize_tax_rate: prizeTaxRate,
+        },
+        "athlete-1",
+      );
+
+      expect(payload.prize_tax_rate).toBe(30);
+    },
+  );
+
   it("clears subsidy values when subsidies are disabled", () => {
     const payload = toTournamentPayload(
       {
@@ -829,14 +846,14 @@ describe("toTournamentPayload", () => {
   it.each([null, 0, 30])(
     "preserves prize tax rate %p in create and edit payloads",
     (prizeTaxRate) => {
-    const payload = toTournamentPayload(
-      {
-        ...defaultTournamentDraft,
-        country_code: "MY",
-        prize_tax_rate: prizeTaxRate,
-      },
-      "athlete-1",
-    );
+      const payload = toTournamentPayload(
+        {
+          ...defaultTournamentDraft,
+          country_code: "MY",
+          prize_tax_rate: prizeTaxRate,
+        },
+        "athlete-1",
+      );
 
       expect(payload.country_code).toBe("MY");
       expect(payload.prize_tax_rate).toBe(prizeTaxRate);
