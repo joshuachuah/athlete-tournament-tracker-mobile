@@ -191,18 +191,24 @@ function optionalAssumptions(draft: TournamentDraft) {
 
 export function ImpactLedger({
   draft,
+  estimatedWithholdingRate,
   onAddAssumption,
   onOpenEditor,
   prizeRoundsAfterEstimatedWithholding,
 }: {
   draft: TournamentDraft;
+  estimatedWithholdingRate?: number | null;
   onAddAssumption: () => void;
   onOpenEditor: (editor: ProjectionEditor) => void;
   prizeRoundsAfterEstimatedWithholding?: PrizeRounds | null;
 }) {
   const prizes = prizeEstimates(draft);
+  const appliedEstimatedWithholdingRate =
+    estimatedWithholdingRate === undefined
+      ? draft.prize_tax_rate
+      : estimatedWithholdingRate;
   const displaysAfterEstimatedWithholding =
-    draft.prize_tax_rate !== null &&
+    appliedEstimatedWithholdingRate !== null &&
     prizeRoundsAfterEstimatedWithholding !== null &&
     prizeRoundsAfterEstimatedWithholding !== undefined;
   const displayedPrizes =
@@ -226,7 +232,7 @@ export function ImpactLedger({
   const prizeSummary =
     displayedPrizes.length > 0
       ? displaysAfterEstimatedWithholding
-        ? `${displayedPrizes.length} estimate${displayedPrizes.length === 1 ? "" : "s"} after estimated withholding · ${draft.prize_tax_rate}% rate`
+        ? `${displayedPrizes.length} estimate${displayedPrizes.length === 1 ? "" : "s"} after estimated withholding · ${appliedEstimatedWithholdingRate}% rate`
         : `${displayedPrizes.length} gross estimate${displayedPrizes.length === 1 ? "" : "s"}`
       : draft.currency.toUpperCase() !== prizeDistributionCurrency
           ? "Official USD outcomes unavailable"

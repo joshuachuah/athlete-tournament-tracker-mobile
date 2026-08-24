@@ -12,7 +12,11 @@ import {
   roundCurrencyAmount,
 } from "@/lib/utils";
 import type { ApiRequestOptions } from "@/lib/api";
-import { isCountryCode, type CountryCode } from "@/lib/countries";
+import {
+  getCountryByCode,
+  isCountryCode,
+  type CountryCode,
+} from "@/lib/countries";
 import {
   isDrawTemplateId,
   isPrizeTierId,
@@ -503,10 +507,13 @@ export function tournamentDraftFromPrefill(
 
   if (parsedParams.name) next.name = parsedParams.name;
   if (parsedParams.location) next.location = parsedParams.location;
-  if (parsedParams.country) {
+  if (parsedParams.country_code) {
+    const selectedCountry = getCountryByCode(parsedParams.country_code);
+    next.country = selectedCountry?.name ?? next.country;
+    next.country_code = parsedParams.country_code;
+  } else if (parsedParams.country) {
     next.country = parsedParams.country;
   }
-  if (parsedParams.country_code) next.country_code = parsedParams.country_code;
   if (next.country_code === "US") next.prize_tax_rate = 30;
   if (parsedParams.currency) next.currency = parsedParams.currency;
   if (parsedParams.start_date) next.start_date = parsedParams.start_date;

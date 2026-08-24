@@ -390,6 +390,9 @@ export function TournamentProjectionBuilder({
 
             <ImpactLedger
               draft={formDraft}
+              estimatedWithholdingRate={
+                builderPreview?.estimated_withholding_rate
+              }
               onAddAssumption={() =>
                 updateBuilderState({ assumptionPickerOpen: true })
               }

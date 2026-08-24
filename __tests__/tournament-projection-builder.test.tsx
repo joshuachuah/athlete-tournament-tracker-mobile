@@ -891,7 +891,29 @@ describe("TournamentProjectionBuilder", () => {
       total_income_base: 0,
       scenarios: [],
       break_even_round: null,
-      estimated_withholding_rate: 30,
+      estimated_withholding_rate: 20,
+      prize_rounds_after_estimated_withholding: { qf: 350 },
+    });
+    const { screen } = renderBuilder(validDraft);
+
+    await advance(350);
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "1 estimate after estimated withholding · 20% rate",
+        ),
+      ).toBeTruthy(),
+    );
+    expect(screen.getByText("Up to +$350 USD")).toBeTruthy();
+  });
+
+  it("falls back to the draft rate for a legacy payout preview", async () => {
+    mockPreview.mockResolvedValue({
+      total_expenses: 0,
+      total_income_base: 0,
+      scenarios: [],
+      break_even_round: null,
       prize_rounds_after_estimated_withholding: { qf: 350 },
     });
     const { screen } = renderBuilder(validDraft);
@@ -905,7 +927,6 @@ describe("TournamentProjectionBuilder", () => {
         ),
       ).toBeTruthy(),
     );
-    expect(screen.getByText("Up to +$350 USD")).toBeTruthy();
   });
 
   it("allows a known tournament with no supplied payout schedule", () => {

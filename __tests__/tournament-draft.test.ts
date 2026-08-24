@@ -466,6 +466,17 @@ describe("tournamentDraftFromPrefill", () => {
     expect(draft.prize_tax_rate).toBe(defaultTournamentDraft.prize_tax_rate);
   });
 
+  it("derives the country name from a validated prefill code", () => {
+    const draft = tournamentDraftFromPrefill({
+      country: "France",
+      country_code: "US",
+    });
+
+    expect(draft.country).toBe("United States");
+    expect(draft.country_code).toBe("US");
+    expect(draft.prize_tax_rate).toBe(30);
+  });
+
   it("ignores array-valued navigation params", () => {
     const draft = tournamentDraftFromPrefill({
       name: "Known Open",
