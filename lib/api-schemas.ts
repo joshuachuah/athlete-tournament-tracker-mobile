@@ -172,7 +172,7 @@ export const knownTournamentSchema = z.looseObject({
   name: z.string(),
   location: z.string().optional(),
   country: z.string().optional(),
-  country_code: countryCodeSchema.optional(),
+  country_code: countryCodeSchema.nullable().optional(),
   currency: z.string().optional(),
   start_date: z.string().optional(),
   end_date: z.string().optional(),

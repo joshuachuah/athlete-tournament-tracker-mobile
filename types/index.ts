@@ -89,7 +89,7 @@ export type KnownTournament = {
   name: string;
   location?: string;
   country?: string;
-  country_code?: string;
+  country_code?: string | null;
   currency?: string;
   start_date?: string;
   end_date?: string;
