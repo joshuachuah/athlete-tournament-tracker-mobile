@@ -1,19 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { colors, radii, spacing } from "@/constants/theme";
-import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import { api } from "@/lib/api";
-import {
-  getPrizeTier,
-  prizeDistributionCurrency,
-} from "@/lib/prize-distributions";
+import { useTournamentPreview } from "@/hooks/use-tournament-preview";
+import { prizeDistributionCurrency } from "@/lib/prize-distributions";
 import {
   detailsSchema,
   prizesSchema,
   spendingSchema,
   subsidySchema,
-  toTournamentPreviewPayload,
   travelSchema,
   type TournamentDraft,
 } from "@/lib/tournament-draft";
@@ -76,19 +70,11 @@ export function ScenarioStrip({
 }) {
   const draftReady = canPreview(draft);
   const previewReady = identityResolved && draftReady;
-  const selectedTier = draft.prize_tier_id
-    ? getPrizeTier(draft.prize_tier_id)
-    : null;
   const hasPrizeRounds = Object.values(draft.prize_rounds).some(
     (amount) => amount > 0,
   );
   const emptyProjectionCopy =
-    selectedTier?.manualOnly === true
-      ? {
-          title: "Outcomes unavailable",
-          body: "PSA does not publish a round payout schedule for this tier.",
-        }
-      : draft.currency.toUpperCase() !== prizeDistributionCurrency
+    draft.currency.toUpperCase() !== prizeDistributionCurrency
         ? {
             title: "Outcomes unavailable",
             body: "Official USD payout outcomes are unavailable for this tournament currency.",
@@ -102,29 +88,19 @@ export function ScenarioStrip({
             title: "No outcomes yet",
             body: "Choose a supported PSA tier and draw to see worst, middle, and best outcomes.",
           };
-  const serializedPayload = previewReady
-    ? JSON.stringify(toTournamentPreviewPayload(draft, profileId))
-    : "";
-  const debouncedPayload = useDebouncedValue(serializedPayload, 350);
-  const waitingForDebounce =
-    previewReady && serializedPayload !== debouncedPayload;
   const {
     data,
     error,
     isError,
-    isFetching,
+    isLoadingPreview: loading,
     refetch,
-  } = useQuery({
-    queryKey: ["tournament-pnl-preview", homeCurrency.toUpperCase(), debouncedPayload],
-    queryFn: ({ signal }) =>
-      api.tournaments.preview(JSON.parse(debouncedPayload), {
-        signal,
-        authenticatedUserId,
-      }),
-    enabled: previewReady && Boolean(debouncedPayload) && !waitingForDebounce,
-    retry: false,
+  } = useTournamentPreview({
+    authenticatedUserId,
+    draft,
+    enabled: previewReady,
+    homeCurrency,
+    profileId,
   });
-  const loading = waitingForDebounce || isFetching;
 
   return (
     <View style={styles.projectionHero}>

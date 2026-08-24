@@ -36,12 +36,12 @@ describe("PSA prize distributions", () => {
         "USD",
       ),
     ).toEqual({
-      r1: 831.25,
-      r2: 1_306.25,
-      qf: 2_137.5,
-      sf: 3_562.5,
-      f: 5_700,
-      w: 9_025,
+      r1: 997.5,
+      r2: 1_567.5,
+      qf: 2_565,
+      sf: 4_275,
+      f: 6_840,
+      w: 10_830,
     });
   });
 
@@ -54,31 +54,58 @@ describe("PSA prize distributions", () => {
     },
   );
 
-  it("keeps Tour Finals visibly manual-only", () => {
-    expect(getPrizeTier("world_tour_finals")).toEqual(
-      expect.objectContaining({ drawTemplateId: null, manualOnly: true }),
-    );
+  it("generates the published Tour Finals placement schedule", () => {
+    const tier = getPrizeTier("world_tour_finals");
+
+    expect(
+      generatePrizeRounds(
+        tier.playerPrizeMoney,
+        "tour_finals_8_entries_8",
+        "USD",
+      ),
+    ).toEqual({
+      p7_8: 16_625,
+      p5_6: 24_937.5,
+      p3_4: 41_562.5,
+      f: 66_500,
+      w: 99_750,
+    });
   });
 
-  it("contains every resolved Challenger accommodation amount", () => {
+  it("matches every August 2026 Challenger prize and draw rule", () => {
     expect(
       prizeTiers
         .filter((tier) => tier.category === "challenger")
-        .map((tier) => tier.playerPrizeMoney),
+        .map((tier) => [
+          tier.id,
+          tier.onSitePrizeMoney,
+          tier.playerPrizeMoney,
+          tier.allowedDrawTemplateIds,
+        ]),
     ).toEqual([
-      3_000,
-      6_000,
-      5_500,
-      5_000,
-      9_000,
-      8_250,
-      7_500,
-      12_000,
-      11_000,
-      10_000,
-      15_000,
-      13_750,
-      12_500,
+      ["challenger_3_none", 3_000, 3_000, ["draw_16_entries_16", "draw_32_entries_24"]],
+      ["challenger_6_none", 6_000, 6_000, ["draw_16_entries_16", "draw_32_entries_24"]],
+      ["challenger_6_billeting", 5_500, 6_000, ["draw_16_entries_16", "draw_32_entries_24"]],
+      ["challenger_6_hotel", 5_000, 6_000, ["draw_16_entries_16", "draw_32_entries_24"]],
+      ["challenger_9_none", 9_000, 9_000, ["draw_32_entries_24"]],
+      ["challenger_9_billeting", 8_250, 9_000, ["draw_32_entries_24"]],
+      ["challenger_9_hotel", 7_500, 9_000, ["draw_32_entries_24"]],
+      ["challenger_12_none", 12_000, 12_000, ["draw_32_entries_24"]],
+      ["challenger_12_billeting", 11_000, 12_000, ["draw_32_entries_24"]],
+      ["challenger_12_hotel", 10_000, 12_000, ["draw_32_entries_24"]],
+      ["challenger_15_none", 15_000, 15_000, ["draw_32_entries_24"]],
+      ["challenger_15_billeting", 13_750, 15_000, ["draw_32_entries_24"]],
+      ["challenger_15_hotel", 12_500, 15_000, ["draw_32_entries_24"]],
+      ["challenger_18_none", 18_000, 18_000, ["draw_32_entries_24"]],
+      ["challenger_18_billeting", 16_500, 18_000, ["draw_32_entries_24"]],
+      ["challenger_18_hotel", 15_000, 18_000, ["draw_32_entries_24"]],
     ]);
   });
+
+  it.each(
+    prizeTiers.filter((tier) => tier.category === "world"),
+  )("derives $label player payouts from 95% of on-site prize", (tier) => {
+    expect(tier.playerPrizeMoney).toBe(tier.onSitePrizeMoney * 0.95);
+  });
+
 });

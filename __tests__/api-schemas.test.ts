@@ -10,6 +10,7 @@ const tournament = {
   name: "Tournament 1",
   location: "Detroit",
   country: "United States",
+  country_code: "US",
   currency: "USD",
   start_date: "2026-04-01",
   end_date: "2026-04-03",
@@ -38,6 +39,7 @@ const tournament = {
         round: "r1",
         prize_money: 0,
         prize_money_after_tax: 0,
+        prize_money_after_estimated_withholding: 0,
         net_result: -1200,
         profitable: false,
       },
@@ -46,6 +48,7 @@ const tournament = {
         round: "qf",
         prize_money: 700,
         prize_money_after_tax: 490,
+        prize_money_after_estimated_withholding: 490,
         net_result: -500,
         profitable: false,
       },
@@ -54,10 +57,18 @@ const tournament = {
         round: "w",
         prize_money: 1400,
         prize_money_after_tax: 980,
+        prize_money_after_estimated_withholding: 980,
         net_result: 200,
         profitable: true,
       },
     ],
+    estimated_withholding_rate: 30,
+    prize_rounds_after_estimated_withholding: {
+      r1: 0,
+      r2: 70,
+      qf: 210,
+      w: 630,
+    },
   },
 };
 
@@ -71,7 +82,11 @@ describe("API response schemas", () => {
       const response = {
         ...tournament,
         prize_rounds: {},
-        pnl: { ...tournament.pnl, scenarios: [] },
+        pnl: {
+          ...tournament.pnl,
+          scenarios: [],
+          prize_rounds_after_estimated_withholding: {},
+        },
       };
 
       expect(tournamentWithPnLSchema.parse(response)).toEqual(response);
@@ -98,10 +113,40 @@ describe("API response schemas", () => {
       expect(tournamentWithPnLSchema.safeParse(response).success).toBe(false);
     });
 
-    it("rejects a response without prize tax rate", () => {
-      const { prize_tax_rate: _taxRate, ...response } = tournament;
+    it("parses a pre-withholding API response during rollout", () => {
+      const {
+        country_code: _countryCode,
+        pnl: currentPnl,
+        ...legacyTournament
+      } = tournament;
+      const {
+        estimated_withholding_rate: _estimatedRate,
+        prize_rounds_after_estimated_withholding: _afterWithholdingRounds,
+        scenarios,
+        ...legacyPnl
+      } = currentPnl;
+      const legacyScenarios = scenarios.map(
+        ({
+          prize_money_after_estimated_withholding: _afterWithholding,
+          ...scenario
+        }) => scenario,
+      );
 
-      expect(tournamentWithPnLSchema.safeParse(response).success).toBe(false);
+      const parsed = tournamentWithPnLSchema.parse({
+        ...legacyTournament,
+        pnl: { ...legacyPnl, scenarios: legacyScenarios },
+      });
+
+      expect(parsed.country_code).toBeNull();
+      expect(parsed.prize_tax_rate).toBe(30);
+      expect(parsed.pnl.estimated_withholding_rate).toBeUndefined();
+      expect(
+        parsed.pnl.prize_rounds_after_estimated_withholding,
+      ).toBeUndefined();
+      expect(
+        parsed.pnl.scenarios[0]?.prize_money_after_estimated_withholding,
+      ).toBeUndefined();
+      expect(parsed.pnl.scenarios[0]?.prize_money_after_tax).toBe(0);
     });
 
     it.each([-1, 101, Number.POSITIVE_INFINITY])(
@@ -118,6 +163,62 @@ describe("API response schemas", () => {
 
       expect(tournamentWithPnLSchema.safeParse(response).success).toBe(true);
     });
+
+    it("preserves unknown withholding separately from confirmed zero", () => {
+      const unknown = {
+        ...tournament,
+        prize_tax_rate: null,
+        pnl: {
+          ...tournament.pnl,
+          estimated_withholding_rate: null,
+          prize_rounds_after_estimated_withholding: null,
+        },
+      };
+      const confirmedZero = {
+        ...tournament,
+        prize_tax_rate: 0,
+        pnl: {
+          ...tournament.pnl,
+          estimated_withholding_rate: 0,
+          prize_rounds_after_estimated_withholding: tournament.prize_rounds,
+        },
+      };
+
+      const parsedUnknown = tournamentWithPnLSchema.parse(unknown);
+      const parsedConfirmedZero = tournamentWithPnLSchema.parse(confirmedZero);
+
+      expect(parsedUnknown.prize_tax_rate).toBeNull();
+      expect(parsedUnknown.pnl.estimated_withholding_rate).toBeNull();
+      expect(
+        parsedUnknown.pnl.prize_rounds_after_estimated_withholding,
+      ).toBeNull();
+      expect(parsedConfirmedZero.prize_tax_rate).toBe(0);
+      expect(parsedConfirmedZero.pnl.estimated_withholding_rate).toBe(0);
+      expect(
+        parsedConfirmedZero.pnl.prize_rounds_after_estimated_withholding,
+      ).toEqual(tournament.prize_rounds);
+    });
+
+    it.each(["US", "MY"])("accepts ISO country code %s", (countryCode) => {
+      expect(
+        tournamentWithPnLSchema.safeParse({
+          ...tournament,
+          country_code: countryCode,
+        }).success,
+      ).toBe(true);
+    });
+
+    it.each(["us", "USA", "ZZ", ""])(
+      "rejects non-canonical country code %p",
+      (countryCode) => {
+        expect(
+          tournamentWithPnLSchema.safeParse({
+            ...tournament,
+            country_code: countryCode,
+          }).success,
+        ).toBe(false);
+      },
+    );
 
     it.each([-1, Number.POSITIVE_INFINITY])(
       "rejects an invalid prize round amount of %s",
@@ -209,6 +310,7 @@ describe("API response schemas", () => {
   it("accepts known tournament tax defaults for prefill", () => {
     const response = {
       name: "Open Championship",
+      country_code: null,
       prize_rounds: { qf: 500 },
       prize_tax_rate: 30,
     };

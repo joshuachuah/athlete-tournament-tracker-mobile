@@ -222,6 +222,33 @@ describe("TournamentDetailScreen deletion", () => {
     screen.unmount();
   });
 
+  it("labels saved scenarios with the server-applied withholding rate", async () => {
+    const detail = tournament("applied-rate");
+    detail.prize_tax_rate = 30;
+    detail.pnl = {
+      ...detail.pnl,
+      estimated_withholding_rate: 20,
+      scenarios: [
+        {
+          ...losingScenario,
+          prize_money_after_estimated_withholding: 240,
+        },
+      ],
+    };
+    const { screen } = renderDetail(detail);
+
+    expect(
+      await screen.findByText(
+        "Net uses a 20% estimated withholding rate on prize money.",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.queryByText(
+        "Net uses a 30% estimated withholding rate on prize money.",
+      ),
+    ).toBeNull();
+  });
+
   it("evicts only the deleted detail before invalidating its list and routing", async () => {
     const detail = tournament("deleted");
     const { detailKey, listKey, otherDetail, screen } = renderDetail(detail);

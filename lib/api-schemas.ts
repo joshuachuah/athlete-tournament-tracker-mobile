@@ -9,12 +9,27 @@ import type {
   Tournament,
   TournamentWithPnL,
 } from "@/types";
+import { isCountryCode } from "@/lib/countries";
 
-const prizeRoundKeys = ["r1", "r2", "r3", "qf", "sf", "f", "w"] as const;
+const prizeRoundKeys = [
+  "r1",
+  "r2",
+  "r3",
+  "qf",
+  "sf",
+  "p7_8",
+  "p5_6",
+  "p3_4",
+  "f",
+  "w",
+] as const;
 const roundSchema = z.enum(prizeRoundKeys);
 const scenarioKinds = ["worst", "realistic", "best"] as const;
 const prizeAmountSchema = z.number().finite().nonnegative();
-const prizeTaxRateSchema = z.number().finite().min(0).max(100);
+const prizeTaxRateSchema = z.number().finite().min(0).max(100).nullable();
+const countryCodeSchema = z
+  .string()
+  .refine(isCountryCode, "Invalid ISO country code.");
 
 function hasPositivePrizeRounds(prizeRounds: PrizeRounds | undefined) {
   return prizeRoundKeys.some((round) => (prizeRounds?.[round] ?? 0) > 0);
@@ -26,6 +41,9 @@ const prizeRoundsSchema = z.looseObject({
   r3: prizeAmountSchema.optional(),
   qf: prizeAmountSchema.optional(),
   sf: prizeAmountSchema.optional(),
+  p7_8: prizeAmountSchema.optional(),
+  p5_6: prizeAmountSchema.optional(),
+  p3_4: prizeAmountSchema.optional(),
   f: prizeAmountSchema.optional(),
   w: prizeAmountSchema.optional(),
 });
@@ -49,6 +67,7 @@ const tournamentSchema = z.looseObject({
   name: z.string(),
   location: z.string(),
   country: z.string(),
+  country_code: countryCodeSchema.nullable().optional().default(null),
   currency: z.string(),
   start_date: z.string(),
   end_date: z.string(),
@@ -75,6 +94,7 @@ const scenarioResultSchema = z.looseObject({
   round: roundSchema,
   prize_money: z.number(),
   prize_money_after_tax: z.number(),
+  prize_money_after_estimated_withholding: z.number().optional(),
   net_result: z.number(),
   profitable: z.boolean(),
 });
@@ -109,6 +129,10 @@ export const pnlResultSchema = z.looseObject({
       }
     }),
   break_even_round: roundSchema.nullable(),
+  estimated_withholding_rate: prizeTaxRateSchema.optional(),
+  prize_rounds_after_estimated_withholding: prizeRoundsSchema
+    .nullable()
+    .optional(),
 });
 
 export function pnlResultSchemaForPrizeRounds(
@@ -148,6 +172,7 @@ export const knownTournamentSchema = z.looseObject({
   name: z.string(),
   location: z.string().optional(),
   country: z.string().optional(),
+  country_code: countryCodeSchema.nullable().optional(),
   currency: z.string().optional(),
   start_date: z.string().optional(),
   end_date: z.string().optional(),

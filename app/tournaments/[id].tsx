@@ -236,7 +236,11 @@ function TournamentDetailContent() {
                     result={result}
                     homeCurrency={data.home_currency}
                     tournamentCurrency={data.currency}
-                    prizeTaxRate={data.prize_tax_rate}
+                    prizeTaxRate={
+                      data.pnl.estimated_withholding_rate === undefined
+                        ? data.prize_tax_rate
+                        : data.pnl.estimated_withholding_rate
+                    }
                   />
                 ) : null;
               })}

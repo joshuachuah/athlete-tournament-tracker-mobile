@@ -8,6 +8,9 @@ export const roundLabels: Record<keyof PrizeRounds, string> = {
   r3: "R3",
   qf: "QF",
   sf: "SF",
+  p7_8: "7th–8th",
+  p5_6: "5th–6th",
+  p3_4: "3rd–4th",
   f: "Final",
   w: "Win",
 };

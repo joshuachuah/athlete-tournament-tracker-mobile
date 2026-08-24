@@ -23,11 +23,9 @@ import { ScenarioStrip } from "@/components/tournament/scenario-strip";
 import { TournamentIdentitySearch } from "@/components/tournament/tournament-identity-search";
 import { Button } from "@/components/ui/button";
 import { colors, spacing } from "@/constants/theme";
+import { useTournamentPreview } from "@/hooks/use-tournament-preview";
 import { useTournamentDraft } from "@/context/tournament-draft";
-import {
-  getPrizeTier,
-  prizeDistributionCurrency,
-} from "@/lib/prize-distributions";
+import { prizeDistributionCurrency } from "@/lib/prize-distributions";
 import {
   detailsSchema,
   prizesSchema,
@@ -85,17 +83,12 @@ function firstInvalidEditor(draft: TournamentDraft): ProjectionEditor | null {
   const hasPrizeRounds = Object.values(draft.prize_rounds).some(
     (amount) => amount > 0,
   );
-  const selectedTier = draft.prize_tier_id
-    ? getPrizeTier(draft.prize_tier_id)
-    : null;
-  const scheduleUnavailable = selectedTier?.manualOnly === true;
   const hasServerPrizeSnapshot = draft.prize_distribution_mode === "manual";
   // Some PSA events and existing server records have no published schedule.
   // Non-USD tournaments also remain valid without making the client invent FX.
   if (
     !hasPrizeRounds &&
     draft.currency.toUpperCase() === prizeDistributionCurrency &&
-    !scheduleUnavailable &&
     !hasServerPrizeSnapshot &&
     !draft.editId
   ) {
@@ -178,6 +171,18 @@ export function TournamentProjectionBuilder({
   const hasUnsavedEdit =
     Boolean(formDraft.editId) &&
     JSON.stringify(formDraft) !== JSON.stringify(initialDraftBaseline);
+  const previewEnabled =
+    identityResolved &&
+    [detailsSchema, prizesSchema, travelSchema, subsidySchema, spendingSchema].every(
+      (schema) => schema.safeParse(formDraft).success,
+    );
+  const { data: builderPreview } = useTournamentPreview({
+    authenticatedUserId,
+    draft: formDraft,
+    enabled: previewEnabled,
+    homeCurrency,
+    profileId,
+  });
 
   usePreventRemove(hasUnsavedEdit && !saveCompleted, ({ data }) => {
     if (loading) {
@@ -344,7 +349,9 @@ export function TournamentProjectionBuilder({
                   {formDraft.name}
                 </Text>
                 <Text style={{ color: colors.mutedForeground, lineHeight: 20 }}>
-                  {formDraft.location.trim() || "Add the details needed to calculate outcomes."}
+                  {[formDraft.location.trim(), formDraft.country.trim()]
+                    .filter(Boolean)
+                    .join(", ") || "Add the details needed to calculate outcomes."}
                 </Text>
               </View>
               {!formDraft.editId ? (
@@ -383,11 +390,17 @@ export function TournamentProjectionBuilder({
 
             <ImpactLedger
               draft={formDraft}
+              estimatedWithholdingRate={
+                builderPreview?.estimated_withholding_rate
+              }
               onAddAssumption={() =>
                 updateBuilderState({ assumptionPickerOpen: true })
               }
               onOpenEditor={(activeEditor) =>
                 updateBuilderState({ activeEditor })
+              }
+              prizeRoundsAfterEstimatedWithholding={
+                builderPreview?.prize_rounds_after_estimated_withholding
               }
             />
           </>
@@ -429,8 +442,10 @@ export function TournamentProjectionBuilder({
 
       {activeEditor ? (
         <ProjectionEditorSheet
+          authenticatedUserId={authenticatedUserId}
           draft={formDraft}
           editor={activeEditor}
+          homeCurrency={homeCurrency}
           onApply={(nextDraft) => {
             updateDraft(nextDraft);
             if (activeEditor === "details") {
@@ -445,6 +460,7 @@ export function TournamentProjectionBuilder({
             updateBuilderState({ activeEditor: null });
           }}
           onClose={() => updateBuilderState({ activeEditor: null })}
+          profileId={profileId}
         />
       ) : null}
 

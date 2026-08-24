@@ -5,6 +5,7 @@ import {
   deriveAccommodationNightly,
   deriveDraftDates,
   detailsSchema,
+  emptyPrizeRounds,
   normalizeTournamentDraft,
   persistedTournamentDraft,
   prizesSchema,
@@ -33,6 +34,7 @@ function tournament(
     name: "Open Championship",
     location: "Detroit",
     country: "United States",
+    country_code: "US",
     currency: "USD",
     start_date: "2026-04-01",
     end_date: "2026-04-03",
@@ -114,6 +116,9 @@ describe("tournamentToDraft", () => {
       r3: 0,
       qf: 0,
       sf: 0,
+      p7_8: 0,
+      p5_6: 0,
+      p3_4: 0,
       f: 0,
       w: 0,
     });
@@ -123,6 +128,36 @@ describe("tournamentToDraft", () => {
     const draft = tournamentToDraft(tournament({ prize_tax_rate: 30 }));
 
     expect(draft.prize_tax_rate).toBe(30);
+  });
+
+  it("enforces the fixed US rate when reopening an edit draft", () => {
+    const draft = tournamentToDraft(
+      tournament({ country_code: "US", prize_tax_rate: 12 }),
+    );
+
+    expect(draft.prize_tax_rate).toBe(30);
+  });
+
+  it("restores a recognized code and fixed rate for a legacy US record", () => {
+    const draft = tournamentToDraft(
+      tournament({ country_code: null, prize_tax_rate: null }),
+    );
+
+    expect(draft.country_code).toBe("US");
+    expect(draft.prize_tax_rate).toBe(30);
+  });
+
+  it("restores a recognized non-US code without collapsing zero", () => {
+    const draft = tournamentToDraft(
+      tournament({
+        country: "Malaysia",
+        country_code: null,
+        prize_tax_rate: 0,
+      }),
+    );
+
+    expect(draft.country_code).toBe("MY");
+    expect(draft.prize_tax_rate).toBe(0);
   });
 
   it("round-trips tournament-currency fields without relabeling home-currency values", () => {
@@ -407,11 +442,12 @@ describe("tournamentDraftFromPrefill", () => {
         name: "Known Open",
         location: "Paris",
         country: "France",
+        country_code: "FR",
         currency: "EUR",
         start_date: "2026-05-01",
         end_date: "2026-05-04",
         duration_days: 4,
-        prize_tax_rate: 0,
+        prize_tax_rate: null,
       }),
     );
     expect(draft.prize_rounds).toEqual(defaultTournamentDraft.prize_rounds);
@@ -427,7 +463,7 @@ describe("tournamentDraftFromPrefill", () => {
 
     expect(draft.prize_distribution_mode).toBe("generated");
     expect(draft.prize_rounds).toEqual(defaultTournamentDraft.prize_rounds);
-    expect(draft.prize_tax_rate).toBe(0);
+    expect(draft.prize_tax_rate).toBeNull();
   });
 
   it("ignores invalid scalar params independently", () => {
@@ -441,6 +477,17 @@ describe("tournamentDraftFromPrefill", () => {
     expect(draft.currency).toBe(defaultTournamentDraft.currency);
     expect(draft.start_date).toBe(createDefaultTournamentDraft().start_date);
     expect(draft.prize_tax_rate).toBe(defaultTournamentDraft.prize_tax_rate);
+  });
+
+  it("derives the country name from a validated prefill code", () => {
+    const draft = tournamentDraftFromPrefill({
+      country: "France",
+      country_code: "US",
+    });
+
+    expect(draft.country).toBe("United States");
+    expect(draft.country_code).toBe("US");
+    expect(draft.prize_tax_rate).toBe(30);
   });
 
   it("ignores array-valued navigation params", () => {
@@ -477,6 +524,7 @@ describe("tournamentDraftFromKnown", () => {
         name: "Replacement Open",
         location: "Paris",
         country: "France",
+        country_code: "FR",
         currency: "EUR",
         start_date: "2026-06-01",
         end_date: "2026-06-04",
@@ -505,7 +553,7 @@ describe("tournamentDraftFromKnown", () => {
         country: "",
         currency: "USD",
         entry_fee: 0,
-        prize_tax_rate: 0,
+        prize_tax_rate: null,
         prize_distribution_mode: "manual",
       }),
     );
@@ -521,13 +569,16 @@ describe("normalizeTournamentDraft", () => {
     });
 
     expect(draft.name).toBe("Stored draft");
-    expect(draft.prize_tax_rate).toBe(0);
+    expect(draft.prize_tax_rate).toBeNull();
     expect(draft.prize_rounds).toEqual({
       r1: 100,
       r2: 0,
       r3: 0,
       qf: 0,
       sf: 0,
+      p7_8: 0,
+      p5_6: 0,
+      p3_4: 0,
       f: 0,
       w: 0,
     });
@@ -546,8 +597,50 @@ describe("normalizeTournamentDraft", () => {
 
     const persisted = persistedTournamentDraft(storedDraft);
 
-    expect(persisted.version).toBe(3);
+    expect(persisted.version).toBe(4);
     expect(normalizeTournamentDraft(persisted)).toEqual(storedDraft);
+  });
+
+  it("normalizes a lowercase country code in a current stored draft", () => {
+    const storedDraft = {
+      ...defaultTournamentDraft,
+      country: "United States",
+      country_code: " us ",
+      prize_tax_rate: 30,
+    };
+
+    expect(
+      normalizeTournamentDraft({ version: 4, draft: storedDraft }).country_code,
+    ).toBe("US");
+  });
+
+  it("falls back to defaults when a current draft has an invalid country code", () => {
+    const storedDraft = {
+      ...defaultTournamentDraft,
+      name: "Invalid stored draft",
+      country_code: " zz ",
+    };
+    const normalized = normalizeTournamentDraft({
+      version: 4,
+      draft: storedDraft,
+    });
+
+    expect(normalized.country_code).toBeNull();
+    expect(normalized.name).toBe("");
+  });
+
+  it("enforces the fixed US rate in a current stored draft", () => {
+    const storedDraft = {
+      ...defaultTournamentDraft,
+      country: "United States",
+      country_code: "US" as const,
+      prize_tax_rate: null,
+    };
+
+    expect(
+      normalizeTournamentDraft({ version: 4, draft: storedDraft })
+        .prize_tax_rate,
+    ).toBe(30);
   });
 
   it("preserves a current server-backed empty prize snapshot", () => {
@@ -562,228 +655,130 @@ describe("normalizeTournamentDraft", () => {
     );
   });
 
-  it("repairs an edited generated World schedule from a v2 draft", () => {
-    const storedDraft = {
-      ...defaultTournamentDraft,
-      name: "Interrupted generated draft",
-      prize_tier_id: "world_bronze" as const,
-      prize_draw_template_id: "draw_32_entries_24" as const,
+  function legacyRounds(qf = 0) {
+    return { r1: 0, r2: 0, r3: 0, qf, sf: 0, f: 0, w: 0 };
+  }
+
+  function legacySelectorDraft(
+    overrides: Record<string, unknown> = {},
+  ) {
+    const {
+      country_code: _countryCode,
+      prize_rounds: _rounds,
+      ...legacy
+    } = defaultTournamentDraft;
+
+    return { ...legacy, prize_rounds: legacyRounds(), ...overrides };
+  }
+
+  it("preserves a v3 generated payout snapshot until the athlete selects again", () => {
+    const storedDraft = legacySelectorDraft({
+      name: "Saved World snapshot",
+      prize_tier_id: "world_bronze",
+      prize_draw_template_id: "draw_32_entries_24",
       prize_player_total: 47_500,
-      prize_rounds: {
-        ...defaultTournamentDraft.prize_rounds,
-        r1: 0,
-        qf: 2_137.5,
-      },
-      prize_tax_rate: 30,
-    };
-
-    const repaired = normalizeTournamentDraft({ version: 2, draft: storedDraft });
-
-    expect(repaired.prize_player_total).toBe(47_500);
-    expect(repaired.prize_tax_rate).toBe(0);
-    expect(repaired.prize_rounds).toEqual({
-      r1: 831.25,
-      r2: 1_306.25,
-      r3: 0,
-      qf: 2_137.5,
-      sf: 3_562.5,
-      f: 5_700,
-      w: 9_025,
+      prize_rounds: legacyRounds(2_137.5),
+      prize_tax_rate: 25,
     });
-  });
 
-  it("repairs an edited generated Challenger schedule from a v2 draft", () => {
-    const storedDraft = {
-      ...defaultTournamentDraft,
-      prize_tier_id: "challenger_6_none" as const,
-      prize_draw_template_id: "draw_16_entries_16" as const,
-      prize_player_total: 6_000,
-      prize_rounds: {
-        ...defaultTournamentDraft.prize_rounds,
-        r1: 0,
-        qf: 330,
-      },
-    };
-
-    const repaired = normalizeTournamentDraft({ version: 2, draft: storedDraft });
-
-    expect(repaired.prize_rounds).toEqual({
-      r1: 195,
-      r2: 0,
-      r3: 0,
-      qf: 330,
-      sf: 540,
-      f: 840,
-      w: 1_200,
-    });
-  });
-
-  it("preserves manual v2 payout values while clearing editable withholding", () => {
-    const storedDraft = {
-      ...defaultTournamentDraft,
-      prize_distribution_mode: "manual" as const,
-      prize_tier_id: "world_bronze" as const,
-      prize_draw_template_id: "draw_32_entries_24" as const,
-      prize_player_total: 47_500,
-      prize_rounds: { ...defaultTournamentDraft.prize_rounds, r3: 700 },
-      prize_tax_rate: 30,
-    };
-
-    expect(normalizeTournamentDraft({ version: 2, draft: storedDraft })).toEqual({
-      ...storedDraft,
-      prize_tax_rate: 0,
-    });
-  });
-
-  it("does not treat an empty manual v2 draft as server-backed", () => {
-    const storedDraft = {
-      ...defaultTournamentDraft,
-      prize_distribution_mode: "manual" as const,
-    };
-
-    expect(
-      normalizeTournamentDraft({ version: 2, draft: storedDraft }),
-    ).toEqual(
+    expect(normalizeTournamentDraft({ version: 3, draft: storedDraft })).toEqual(
       expect.objectContaining({
-        prize_distribution_mode: "generated",
-        prize_tier_id: null,
-        prize_draw_template_id: null,
-        prize_player_total: 0,
-      }),
-    );
-  });
-
-  it("preserves entered non-USD v2 payouts as a manual snapshot", () => {
-    const storedDraft = {
-      ...defaultTournamentDraft,
-      currency: "EUR",
-      prize_tier_id: "world_bronze" as const,
-      prize_draw_template_id: "draw_32_entries_24" as const,
-      prize_player_total: 47_500,
-      prize_rounds: { ...defaultTournamentDraft.prize_rounds, qf: 500 },
-    };
-
-    expect(
-      normalizeTournamentDraft({ version: 2, draft: storedDraft }),
-    ).toEqual(
-      expect.objectContaining({
+        name: "Saved World snapshot",
+        country_code: null,
         prize_distribution_mode: "manual",
         prize_tier_id: null,
         prize_draw_template_id: null,
         prize_player_total: 0,
-        prize_rounds: storedDraft.prize_rounds,
+        prize_rounds: { ...emptyPrizeRounds(), qf: 2_137.5 },
+        prize_tax_rate: 25,
       }),
     );
   });
 
-  it("keeps an empty v2 unavailable tier as an explicit selection", () => {
-    const storedDraft = {
-      ...defaultTournamentDraft,
-      prize_tier_id: "world_tour_finals" as const,
-      prize_draw_template_id: null,
-      prize_player_total: 285_000,
-    };
+  it("migrates historical zero withholding to unknown", () => {
+    const storedDraft = legacySelectorDraft({
+      prize_rounds: legacyRounds(500),
+      prize_tax_rate: 0,
+    });
 
     expect(
-      normalizeTournamentDraft({ version: 2, draft: storedDraft }),
-    ).toEqual(
+      normalizeTournamentDraft({ version: 3, draft: storedDraft })
+        .prize_tax_rate,
+    ).toBeNull();
+  });
+
+  it("preserves v2 payout values as a manual snapshot without recomputing", () => {
+    const storedDraft = legacySelectorDraft({
+      currency: "EUR",
+      prize_tier_id: "world_bronze",
+      prize_draw_template_id: "draw_32_entries_24",
+      prize_player_total: 47_500,
+      prize_rounds: legacyRounds(500),
+      prize_tax_rate: 30,
+    });
+
+    expect(normalizeTournamentDraft({ version: 2, draft: storedDraft })).toEqual(
       expect.objectContaining({
-        prize_tier_id: "world_tour_finals",
+        currency: "EUR",
+        prize_distribution_mode: "manual",
+        prize_tier_id: null,
         prize_draw_template_id: null,
         prize_player_total: 0,
-        prize_rounds: defaultTournamentDraft.prize_rounds,
+        prize_rounds: { ...emptyPrizeRounds(), qf: 500 },
+        prize_tax_rate: null,
       }),
     );
   });
 
-  it("keeps an incomplete v2 Challenger selection ready for a draw", () => {
-    const storedDraft = {
-      ...defaultTournamentDraft,
-      prize_tier_id: "challenger_6_none" as const,
-      prize_draw_template_id: null,
-      prize_player_total: 0,
-    };
+  it("keeps an empty v2 draft in the generated selection flow", () => {
+    const storedDraft = legacySelectorDraft();
 
-    expect(
-      normalizeTournamentDraft({ version: 2, draft: storedDraft }),
-    ).toEqual(
+    expect(normalizeTournamentDraft({ version: 2, draft: storedDraft })).toEqual(
       expect.objectContaining({
         prize_distribution_mode: "generated",
-        prize_tier_id: "challenger_6_none",
+        prize_tier_id: null,
         prize_draw_template_id: null,
-        prize_player_total: 6_000,
-        prize_rounds: defaultTournamentDraft.prize_rounds,
+        prize_player_total: 0,
+        prize_rounds: emptyPrizeRounds(),
+        prize_tax_rate: null,
       }),
     );
   });
 
-  it("migrates a v1 draft with entered rounds to manual mode without data loss", () => {
+  it("migrates a v1 draft with entered rounds without data loss", () => {
     const {
       prize_distribution_mode: _mode,
       prize_tier_id: _tier,
       prize_draw_template_id: _template,
       prize_player_total: _total,
       ...v1Draft
-    } = {
-      ...defaultTournamentDraft,
+    } = legacySelectorDraft({
       name: "Interrupted draft",
-      prize_rounds: { ...defaultTournamentDraft.prize_rounds, qf: 500 },
-    };
+      prize_rounds: legacyRounds(500),
+      prize_tax_rate: 30,
+    });
 
     const migrated = normalizeTournamentDraft({ version: 1, draft: v1Draft });
 
     expect(migrated).toEqual(
       expect.objectContaining({
         name: "Interrupted draft",
+        country_code: null,
         prize_distribution_mode: "manual",
         prize_tier_id: null,
         prize_draw_template_id: null,
         prize_player_total: 0,
+        prize_tax_rate: null,
       }),
     );
-    expect(migrated.prize_rounds.qf).toBe(500);
+    expect(migrated.prize_rounds).toEqual({ ...emptyPrizeRounds(), qf: 500 });
   });
 
-  it("clears editable withholding from v1 drafts", () => {
-    const {
-      prize_distribution_mode: _mode,
-      prize_tier_id: _tier,
-      prize_draw_template_id: _template,
-      prize_player_total: _total,
-      ...v1Draft
-    } = { ...defaultTournamentDraft, prize_tax_rate: 30 };
-
-    expect(
-      normalizeTournamentDraft({ version: 1, draft: v1Draft }).prize_tax_rate,
-    ).toBe(0);
-  });
-
-  it("clears editable withholding from unversioned drafts", () => {
+  it("clears unverifiable withholding from unversioned drafts", () => {
     expect(
       normalizeTournamentDraft({ name: "Stored draft", prize_tax_rate: 30 })
         .prize_tax_rate,
-    ).toBe(0);
-  });
-
-  it("migrates an empty v1 draft into the primary generated flow", () => {
-    const {
-      prize_distribution_mode: _mode,
-      prize_tier_id: _tier,
-      prize_draw_template_id: _template,
-      prize_player_total: _total,
-      ...v1Draft
-    } = defaultTournamentDraft;
-
-    expect(
-      normalizeTournamentDraft({ version: 1, draft: v1Draft }),
-    ).toEqual(
-      expect.objectContaining({
-        prize_distribution_mode: "generated",
-        prize_tier_id: null,
-        prize_draw_template_id: null,
-        prize_player_total: 0,
-      }),
-    );
+    ).toBeNull();
   });
 
   it.each([
@@ -810,15 +805,7 @@ describe("normalizeTournamentDraft", () => {
         subsidy_covers: "flat_stipend",
       }),
     );
-    expect(draft.prize_rounds).toEqual({
-      r1: 0,
-      r2: 0,
-      r3: 0,
-      qf: 0,
-      sf: 0,
-      f: 0,
-      w: 0,
-    });
+    expect(draft.prize_rounds).toEqual(emptyPrizeRounds());
   });
 });
 
@@ -846,6 +833,23 @@ describe("toTournamentPayload", () => {
     );
   });
 
+  it.each([null, 12])(
+    "enforces the fixed US rate at the payload boundary from %p",
+    (prizeTaxRate) => {
+      const payload = toTournamentPayload(
+        {
+          ...defaultTournamentDraft,
+          country: "United States",
+          country_code: "US",
+          prize_tax_rate: prizeTaxRate,
+        },
+        "athlete-1",
+      );
+
+      expect(payload.prize_tax_rate).toBe(30);
+    },
+  );
+
   it("clears subsidy values when subsidies are disabled", () => {
     const payload = toTournamentPayload(
       {
@@ -863,17 +867,22 @@ describe("toTournamentPayload", () => {
     expect(payload.subsidy_covers).toBeNull();
   });
 
-  it("includes prize tax rate in create and edit payloads", () => {
-    const payload = toTournamentPayload(
-      {
-        ...defaultTournamentDraft,
-        prize_tax_rate: 30,
-      },
-      "athlete-1",
-    );
+  it.each([null, 0, 30])(
+    "preserves prize tax rate %p in create and edit payloads",
+    (prizeTaxRate) => {
+      const payload = toTournamentPayload(
+        {
+          ...defaultTournamentDraft,
+          country_code: "MY",
+          prize_tax_rate: prizeTaxRate,
+        },
+        "athlete-1",
+      );
 
-    expect(payload.prize_tax_rate).toBe(30);
-  });
+      expect(payload.country_code).toBe("MY");
+      expect(payload.prize_tax_rate).toBe(prizeTaxRate);
+    },
+  );
 
   it("omits unentered prize rounds from saved projections", () => {
     const payload = toTournamentPayload(
@@ -936,6 +945,7 @@ describe("wizard schemas", () => {
       name: "Open Championship",
       location: "Detroit",
       country: "United States",
+      country_code: "US",
       currency: "USD",
       start_date: "2026-04-01",
       end_date: "2026-04-03",
@@ -985,6 +995,7 @@ describe("wizard schemas", () => {
       name: "Open Championship",
       location: "Detroit",
       country: "United States",
+      country_code: "US",
       currency: "USD",
       start_date: "2024-02-29",
       end_date: "2024-03-01",

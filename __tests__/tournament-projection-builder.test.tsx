@@ -82,11 +82,13 @@ const mockUsePreventRemove = usePreventRemove as jest.MockedFunction<
 >;
 const mockDispatch = jest.fn();
 const defaultDraft = createDefaultTournamentDraft(new Date(2026, 0, 1));
-const validDraft = {
+const validDraft: TournamentDraft = {
   ...defaultDraft,
   name: "Open Championship",
   location: "Detroit",
   country: "United States",
+  country_code: "US" as const,
+  prize_tax_rate: 30,
   prize_rounds: { ...defaultDraft.prize_rounds, qf: 500 },
 };
 
@@ -96,6 +98,7 @@ const savedTournament: TournamentWithPnL = {
   name: "Open Championship",
   location: "Detroit",
   country: "United States",
+  country_code: "US",
   currency: "USD",
   start_date: "2026-01-01",
   end_date: "2026-01-03",
@@ -135,7 +138,10 @@ function renderWithClient(element: ReactElement) {
   return render(element, { wrapper: Wrapper });
 }
 
-function renderBuilder(initialDraft = validDraft, onSubmit = jest.fn()) {
+function renderBuilder(
+  initialDraft: TournamentDraft = validDraft,
+  onSubmit = jest.fn(),
+) {
   return {
     onSubmit,
     screen: renderWithClient(
@@ -213,6 +219,7 @@ describe("TournamentProjectionBuilder", () => {
         name: "Detroit Open",
         location: "Detroit",
         country: "United States",
+        country_code: "US",
         currency: "USD",
         start_date: "2026-02-01",
         end_date: "2026-02-03",
@@ -267,6 +274,7 @@ describe("TournamentProjectionBuilder", () => {
         name: "Detroit Open",
         location: "Detroit",
         country: "United States",
+        country_code: "US",
         currency: "USD",
         start_date: "2026-02-01",
         end_date: "2026-02-03",
@@ -482,7 +490,9 @@ describe("TournamentProjectionBuilder", () => {
     expect(screen.queryByLabelText("Location")).toBeNull();
     fireEvent.press(screen.getByText("Complete tournament details"));
     fireEvent.changeText(screen.getByLabelText("Location"), "Kuala Lumpur");
-    fireEvent.changeText(screen.getByLabelText("Country"), "Malaysia");
+    fireEvent.press(screen.getByLabelText("Country. Choose a country"));
+    fireEvent.changeText(screen.getByLabelText("Search choose country"), "Malaysia");
+    fireEvent.press(screen.getByText("Malaysia"));
     fireEvent.press(screen.getByText("Apply tournament details"));
     fireEvent.press(screen.getByText("Add prize money"));
     fireEvent.press(screen.getByText("Bronze"));
@@ -546,13 +556,14 @@ describe("TournamentProjectionBuilder", () => {
       ...validDraft,
       location: "Paris",
       country: "France",
+      country_code: "FR",
       currency: "EUR",
       entry_fee: 300,
       prize_distribution_mode: "generated",
       prize_tier_id: "world_bronze",
       prize_draw_template_id: "draw_32_entries_24",
-      prize_player_total: 47_500,
-      prize_rounds: { ...defaultDraft.prize_rounds, qf: 2_137.5 },
+      prize_player_total: 57_000,
+      prize_rounds: { ...defaultDraft.prize_rounds, qf: 2_565 },
       prize_tax_rate: 30,
       flight_cost: 500,
       accommodation_total: 600,
@@ -586,7 +597,7 @@ describe("TournamentProjectionBuilder", () => {
         currency: "USD",
         entry_fee: 0,
         prize_rounds: defaultDraft.prize_rounds,
-        prize_tax_rate: 0,
+        prize_tax_rate: null,
         flight_cost: 0,
         accommodation_total: 0,
         coaching_cost: 0,
@@ -634,7 +645,7 @@ describe("TournamentProjectionBuilder", () => {
         start_date: "2026-06-01",
         end_date: "2026-06-03",
         prize_rounds: defaultDraft.prize_rounds,
-        prize_tax_rate: 0,
+        prize_tax_rate: null,
       }),
     );
   });
@@ -646,6 +657,7 @@ describe("TournamentProjectionBuilder", () => {
         name: "Replacement Open",
         location: "Paris",
         country: "France",
+        country_code: "FR",
         currency: "USD",
         start_date: "2026-06-01",
         end_date: "2026-06-03",
@@ -674,7 +686,7 @@ describe("TournamentProjectionBuilder", () => {
         country: "France",
         entry_fee: 0,
         prize_rounds: {},
-        prize_tax_rate: 0,
+        prize_tax_rate: null,
       }),
     );
   });
@@ -712,7 +724,9 @@ describe("TournamentProjectionBuilder", () => {
     fireEvent.press(screen.getByText("Continue manually"));
     fireEvent.press(screen.getByText("Complete tournament details"));
     fireEvent.changeText(screen.getByLabelText("Location"), "Paris");
-    fireEvent.changeText(screen.getByLabelText("Country"), "France");
+    fireEvent.press(screen.getByLabelText("Country. Choose a country"));
+    fireEvent.changeText(screen.getByLabelText("Search choose country"), "France");
+    fireEvent.press(screen.getByText("France"));
     fireEvent.changeText(screen.getByLabelText("Currency"), "EUR");
     fireEvent.press(screen.getByText("Apply tournament details"));
     fireEvent.press(screen.getByText("Create projection"));
@@ -739,6 +753,7 @@ describe("TournamentProjectionBuilder", () => {
       name: "Known Open",
       location: "Detroit",
       country: "United States",
+      country_code: "US",
       currency: "USD",
       prize_rounds: { qf: 500 },
       prize_tax_rate: 30,
@@ -755,7 +770,7 @@ describe("TournamentProjectionBuilder", () => {
       expect.objectContaining({
         name: "Unrelated Open",
         prize_rounds: {},
-        prize_tax_rate: 0,
+        prize_tax_rate: 30,
       }),
     );
     expect(screen.getByText("Add prize money")).toBeTruthy();
@@ -768,6 +783,7 @@ describe("TournamentProjectionBuilder", () => {
       name: "Known Open",
       location: "Detroit",
       country: "United States",
+      country_code: "US",
       currency: "USD",
       prize_tax_rate: 30,
     });
@@ -786,7 +802,7 @@ describe("TournamentProjectionBuilder", () => {
       expect.objectContaining({
         name: "Unrelated Open",
         prize_rounds: {},
-        prize_tax_rate: 0,
+        prize_tax_rate: 30,
       }),
     );
     expect(screen.getByText("Add prize money")).toBeTruthy();
@@ -843,7 +859,7 @@ describe("TournamentProjectionBuilder", () => {
     );
   });
 
-  it("allows a USD event whose official payout schedule is unavailable", () => {
+  it("allows a USD Tour Finals event with its placement schedule", () => {
     const onSubmit = jest.fn();
     const { screen } = renderBuilder(validDraft, onSubmit);
 
@@ -851,16 +867,103 @@ describe("TournamentProjectionBuilder", () => {
     fireEvent.press(screen.getByText("Tour Finals"));
     fireEvent.press(screen.getByText("Apply prize money"));
 
-    expect(screen.getByText("Official payout schedule unavailable")).toBeTruthy();
+    expect(screen.getByText("5 gross estimates")).toBeTruthy();
     fireEvent.press(screen.getByText("Create projection"));
 
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({
         prize_tier_id: "world_tour_finals",
-        prize_player_total: 0,
-        prize_rounds: defaultDraft.prize_rounds,
+        prize_player_total: 332_500,
+        prize_rounds: expect.objectContaining({
+          p7_8: 16_625,
+          p5_6: 24_937.5,
+          p3_4: 41_562.5,
+          f: 66_500,
+          w: 99_750,
+        }),
       }),
     );
+  });
+
+  it("labels server-provided payout amounts after estimated withholding", async () => {
+    mockPreview.mockResolvedValue({
+      total_expenses: 0,
+      total_income_base: 0,
+      scenarios: [],
+      break_even_round: null,
+      estimated_withholding_rate: 20,
+      prize_rounds_after_estimated_withholding: { qf: 350 },
+    });
+    const { screen } = renderBuilder({
+      ...validDraft,
+      country: "France",
+      country_code: "FR",
+      currency: "EUR",
+      prize_tax_rate: 20,
+      prize_distribution_mode: "manual",
+    });
+
+    await advance(350);
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "1 estimate after estimated withholding · 20% rate",
+        ),
+      ).toBeTruthy(),
+    );
+    expect(screen.getByText("Up to +€350 EUR")).toBeTruthy();
+  });
+
+  it("falls back to the draft rate for a legacy payout preview", async () => {
+    mockPreview.mockResolvedValue({
+      total_expenses: 0,
+      total_income_base: 0,
+      scenarios: [],
+      break_even_round: null,
+      prize_rounds_after_estimated_withholding: { qf: 350 },
+    });
+    const { screen } = renderBuilder(validDraft);
+
+    await advance(350);
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "1 estimate after estimated withholding · 30% rate",
+        ),
+      ).toBeTruthy(),
+    );
+  });
+
+  it("keeps the complete gross range when adjusted payouts are partial", async () => {
+    mockPreview.mockResolvedValue({
+      total_expenses: 0,
+      total_income_base: 0,
+      scenarios: [],
+      break_even_round: null,
+      estimated_withholding_rate: 20,
+      prize_rounds_after_estimated_withholding: { w: 800 },
+    });
+    const draft = {
+      ...validDraft,
+      prize_rounds: { ...validDraft.prize_rounds, w: 1_000 },
+    };
+    const { screen } = renderBuilder(draft);
+
+    await advance(350);
+
+    expect(screen.getByText("2 gross estimates")).toBeTruthy();
+    expect(screen.getByText("+$500 USD–+$1,000 USD")).toBeTruthy();
+  });
+
+  it("shows the selected country before a location is entered", () => {
+    const { screen } = renderBuilder({ ...validDraft, location: "" });
+
+    expect(screen.getByText(/^United States ·/)).toBeTruthy();
+    expect(
+      screen.queryByText("Location, dates, currency, and entry fee"),
+    ).toBeNull();
   });
 
   it("allows a known tournament with no supplied payout schedule", () => {
@@ -868,6 +971,7 @@ describe("TournamentProjectionBuilder", () => {
       name: "Known Open",
       location: "Detroit",
       country: "United States",
+      country_code: "US",
       currency: "USD",
     });
     const { onSubmit, screen } = renderBuilder(initialDraft);

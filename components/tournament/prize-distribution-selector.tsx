@@ -1,6 +1,6 @@
 import { Check } from "lucide-react-native";
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Button } from "@/components/ui/button";
 import { colors, radii, spacing } from "@/constants/theme";
@@ -19,9 +19,10 @@ import {
   type PrizeTierId,
 } from "@/lib/prize-distributions";
 import type { TournamentDraft } from "@/lib/tournament-draft";
+import { emptyPrizeRounds } from "@/lib/tournament-draft";
 import { formatMoney } from "@/lib/utils";
 
-const challengerLevels = [3, 6, 9, 12, 15] as const;
+const challengerLevels = [3, 6, 9, 12, 15, 18] as const;
 const stayOptions = [
   { suffix: "none", label: "None" },
   { suffix: "billeting", label: "Billeting" },
@@ -144,6 +145,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
+  calculationPanel: {
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    backgroundColor: colors.surface,
+  },
+  calculationRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  lossText: {
+    color: colors.loss,
+  },
 });
 
 function ChoiceRow({
@@ -220,10 +236,6 @@ function HeroPill({
   );
 }
 
-function emptyPrizeRounds(): TournamentDraft["prize_rounds"] {
-  return { r1: 0, r2: 0, r3: 0, qf: 0, sf: 0, f: 0, w: 0 };
-}
-
 export function PrizeDistributionSelector({
   draft,
   onUpdate,
@@ -243,6 +255,13 @@ export function PrizeDistributionSelector({
     : null;
   const currencyMatches =
     draft.currency.toUpperCase() === prizeDistributionCurrency;
+  const challengerDraws = drawTemplates.filter((template) => {
+    if (template.id === "tour_finals_8_entries_8") return false;
+    if (activeTier?.category !== "challenger") {
+      return ["draw_16_entries_16", "draw_32_entries_24"].includes(template.id);
+    }
+    return activeTier.allowedDrawTemplateIds?.includes(template.id) ?? false;
+  });
 
   // Challenger tier ids follow challenger_<level>_<stay>, so the selected
   // level/stay pair can be read straight off the id.
@@ -255,7 +274,13 @@ export function PrizeDistributionSelector({
     tier: PrizeTier,
     templateId: DrawTemplateId | null,
   ): TournamentDraft["prize_rounds"] {
-    if (tier.manualOnly || !templateId || !currencyMatches) {
+    if (!templateId || !currencyMatches) {
+      return emptyPrizeRounds();
+    }
+    if (
+      tier.category === "challenger" &&
+      !tier.allowedDrawTemplateIds?.includes(templateId)
+    ) {
       return emptyPrizeRounds();
     }
 
@@ -271,22 +296,23 @@ export function PrizeDistributionSelector({
 
   function selectTier(tierId: PrizeTierId) {
     const tier = getPrizeTier(tierId);
-    const templateId =
-      tier.category === "world"
-        ? tier.drawTemplateId
-        : draft.prize_draw_template_id;
+    const templateId = tier.category === "world"
+      ? tier.drawTemplateId
+      : draft.prize_draw_template_id &&
+          tier.allowedDrawTemplateIds?.includes(draft.prize_draw_template_id)
+        ? draft.prize_draw_template_id
+        : null;
 
     onUpdate({
       prize_distribution_mode: "generated",
       prize_tier_id: tierId,
-      prize_player_total:
-        currencyMatches && !tier.manualOnly ? tier.playerPrizeMoney : 0,
+      prize_player_total: currencyMatches ? tier.playerPrizeMoney : 0,
       prize_draw_template_id: templateId,
       prize_rounds: roundsFor(tier, templateId),
     });
   }
 
-  function selectTemplate(templateId: DrawTemplateId) {
+  function applyTemplate(templateId: DrawTemplateId) {
     onUpdate({
       prize_distribution_mode: "generated",
       ...(selectedTier?.category === "world"
@@ -297,6 +323,25 @@ export function PrizeDistributionSelector({
         ? roundsFor(activeTier, templateId)
         : emptyPrizeRounds(),
     });
+  }
+
+  function selectTemplate(templateId: DrawTemplateId) {
+    if (category === "challenger" && templateId === "draw_16_entries_16") {
+      Alert.alert(
+        "Territory-based events only",
+        "The 16-player draw applies only to territory-based Challenger 3 and Challenger 6 events.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Confirm territory event",
+            onPress: () => applyTemplate(templateId),
+          },
+        ],
+      );
+      return;
+    }
+
+    applyTemplate(templateId);
   }
 
   return (
@@ -330,17 +375,11 @@ export function PrizeDistributionSelector({
           {prizeTiers
             .filter((tier) => tier.category === "world")
             .map((tier) => {
-              const manualOnly = "manualOnly" in tier && tier.manualOnly;
-
               return (
                 <ChoiceRow
                   key={tier.id}
                   label={tier.label}
-                  detail={
-                    manualOnly
-                      ? "Payout schedule unavailable"
-                      : formatMoney(tier.playerPrizeMoney, prizeDistributionCurrency)
-                  }
+                  detail={`${formatMoney(tier.onSitePrizeMoney, prizeDistributionCurrency)} on-site prize`}
                   disabled={!currencyMatches}
                   selected={draft.prize_tier_id === tier.id}
                   onPress={() => selectTier(tier.id)}
@@ -418,14 +457,15 @@ export function PrizeDistributionSelector({
           <View style={{ gap: spacing.xs }}>
             <Text style={styles.sectionHeading}>Draw</Text>
             <Text style={styles.helper}>
-              Challenger draw sizes are not fixed by the tier table.
+              The 16-player draw is only for territory-based Challenger 3 and
+              Challenger 6 events.
             </Text>
           </View>
           <View
             accessibilityRole="radiogroup"
             style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}
           >
-            {drawTemplates.map((template) => {
+            {challengerDraws.map((template) => {
               const selected = draft.prize_draw_template_id === template.id;
 
               return (
@@ -464,6 +504,44 @@ export function PrizeDistributionSelector({
               );
             })}
           </View>
+        </View>
+      ) : null}
+
+      {activeTier ? (
+        <View style={styles.calculationPanel}>
+          <Text style={styles.sectionHeading}>Player-prize calculation</Text>
+          <View style={styles.calculationRow}>
+            <Text style={styles.helper}>
+              {activeTier.category === "world" ? "On-site prize" : "On-site minimum"}
+            </Text>
+            <Text style={styles.choiceLabel}>
+              {formatMoney(activeTier.onSitePrizeMoney, prizeDistributionCurrency)}
+            </Text>
+          </View>
+          {activeTier.category === "world" ? (
+            <View style={styles.calculationRow}>
+              <Text style={[styles.helper, styles.lossText]}>
+                PSA contribution, 5%
+              </Text>
+              <Text style={[styles.choiceLabel, styles.lossText]}>
+                −{formatMoney(
+                  activeTier.onSitePrizeMoney - activeTier.playerPrizeMoney,
+                  prizeDistributionCurrency,
+                )}
+              </Text>
+            </View>
+          ) : null}
+          <View style={styles.calculationRow}>
+            <Text style={styles.choiceLabel}>Player distribution</Text>
+            <Text style={styles.choiceLabel}>
+              {formatMoney(activeTier.playerPrizeMoney, prizeDistributionCurrency)}
+            </Text>
+          </View>
+          {activeTier.category === "challenger" ? (
+            <Text style={styles.helper}>
+              The 5% contribution does not apply to Challenger events.
+            </Text>
+          ) : null}
         </View>
       ) : null}
 

@@ -16,7 +16,17 @@ const draft = {
   name: "Open",
   location: "Detroit",
   country: "United States",
-  prize_rounds: { r1: 100, r2: 200, r3: 300, qf: 400, sf: 500, f: 600, w: 700 },
+  country_code: "US" as const,
+  prize_rounds: {
+    ...createDefaultTournamentDraft().prize_rounds,
+    r1: 100,
+    r2: 200,
+    r3: 300,
+    qf: 400,
+    sf: 500,
+    f: 600,
+    w: 700,
+  },
 };
 
 function renderStrip(currentDraft = draft) {
@@ -110,18 +120,7 @@ it("shows the explicit empty and unavailable states without blocking edits", asy
   expect(unavailable.getByText(/You can keep editing/)).toBeTruthy();
 });
 
-it.each([
-  [
-    "Tour Finals",
-    { prize_tier_id: "world_tour_finals" as const },
-    "PSA does not publish a round payout schedule for this tier.",
-  ],
-  [
-    "a non-USD tournament",
-    { currency: "EUR" },
-    "Official USD payout outcomes are unavailable for this tournament currency.",
-  ],
-])("explains unavailable outcomes for %s", async (_label, changes, body) => {
+it("explains unavailable outcomes for a non-USD tournament", async () => {
   mockPreview.mockResolvedValue({
     total_expenses: 0,
     total_income_base: 0,
@@ -130,7 +129,7 @@ it.each([
   });
   const screen = renderStrip({
     ...draft,
-    ...changes,
+    currency: "EUR",
     prize_rounds: createDefaultTournamentDraft().prize_rounds,
   });
   await settlePreview();
@@ -138,7 +137,11 @@ it.each([
   await waitFor(() =>
     expect(screen.getByText("Outcomes unavailable")).toBeTruthy(),
   );
-  expect(screen.getByText(body)).toBeTruthy();
+  expect(
+    screen.getByText(
+      "Official USD payout outcomes are unavailable for this tournament currency.",
+    ),
+  ).toBeTruthy();
   expect(
     screen.queryByText(
       "Based on your earliest, middle, and latest entered prize rounds.",

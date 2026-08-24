@@ -22,12 +22,14 @@ export function SelectionSheet({
   title,
   onClose,
   onSelect,
+  emptyBody = "Try another search or choose the custom option.",
 }: {
   options: OnboardingOption[];
   selectedValue: string;
   title: string;
   onClose: () => void;
   onSelect: (value: string) => void;
+  emptyBody?: string;
 }) {
   const [query, setQuery] = useState("");
   const reducedMotion = useReducedMotion();
@@ -150,7 +152,7 @@ export function SelectionSheet({
               <View style={styles.empty}>
                 <Text style={styles.emptyTitle}>No matching option</Text>
                 <Text style={styles.emptyBody}>
-                  Try another search or choose the custom option.
+                  {emptyBody}
                 </Text>
               </View>
             }

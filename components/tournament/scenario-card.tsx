@@ -11,14 +11,14 @@ export function ScenarioCard({
   result,
   homeCurrency,
   tournamentCurrency,
-  prizeTaxRate = 0,
+  prizeTaxRate = null,
 }: {
   result: ScenarioResult;
   homeCurrency: string;
   tournamentCurrency: string;
-  prizeTaxRate?: number;
+  prizeTaxRate?: number | null;
 }) {
-  const hasPrizeTax = prizeTaxRate > 0;
+  const hasEstimatedWithholding = prizeTaxRate !== null;
 
   return (
     <Card style={{ gap: spacing.md }}>
@@ -58,10 +58,13 @@ export function ScenarioCard({
           fromCurrency={homeCurrency}
           toCurrency={tournamentCurrency}
         />
-        {hasPrizeTax ? (
+        {hasEstimatedWithholding ? (
           <MoneyPair
-            label="Prize after tax"
-            amount={result.prize_money_after_tax}
+            label="Prize after estimated withholding"
+            amount={
+              result.prize_money_after_estimated_withholding ??
+              result.prize_money_after_tax
+            }
             fromCurrency={homeCurrency}
             toCurrency={tournamentCurrency}
           />
@@ -73,9 +76,9 @@ export function ScenarioCard({
           toCurrency={tournamentCurrency}
         />
       </View>
-      {hasPrizeTax ? (
+      {hasEstimatedWithholding ? (
         <Text style={{ color: colors.mutedForeground, lineHeight: 20 }} selectable>
-          Net is after {prizeTaxRate}% tax withholding on prize money.
+          Net uses a {prizeTaxRate}% estimated withholding rate on prize money.
         </Text>
       ) : null}
     </Card>

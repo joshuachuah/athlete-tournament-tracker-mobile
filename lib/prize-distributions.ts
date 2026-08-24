@@ -1,7 +1,7 @@
 import { roundCurrencyAmount } from "@/lib/utils";
 import type { PrizeRounds } from "@/types";
 
-export const prizeDistributionRevision = "PSA rulebook · August 2025";
+export const prizeDistributionRevision = "PSA rulebook · August 2026";
 export const prizeDistributionCurrency = "USD";
 
 export const drawTemplateIds = [
@@ -10,6 +10,7 @@ export const drawTemplateIds = [
   "draw_32_entries_32",
   "draw_64_entries_48",
   "draw_64_entries_64",
+  "tour_finals_8_entries_8",
 ] as const;
 
 export type DrawTemplateId = (typeof drawTemplateIds)[number];
@@ -20,6 +21,9 @@ export const prizeRoundKeys: readonly PrizeRoundKey[] = [
   "r3",
   "qf",
   "sf",
+  "p7_8",
+  "p5_6",
+  "p3_4",
   "f",
   "w",
 ];
@@ -27,7 +31,7 @@ export const prizeRoundKeys: readonly PrizeRoundKey[] = [
 export type DrawTemplate = {
   id: DrawTemplateId;
   label: string;
-  drawSize: 16 | 32 | 64;
+  drawSize: 8 | 16 | 32 | 64;
   entries: number;
   requiresByeConfirmation: boolean;
   /** Basis points keep the rulebook's quarter-percent values exact. */
@@ -112,6 +116,15 @@ export const drawTemplates = [
     },
     players: { r1: 32, r2: 16, r3: 8, qf: 4, sf: 2, f: 1, w: 1 },
   },
+  {
+    id: "tour_finals_8_entries_8",
+    label: "Tour Finals · 8 entries",
+    drawSize: 8,
+    entries: 8,
+    requiresByeConfirmation: false,
+    percentages: { p7_8: 500, p5_6: 750, p3_4: 1_250, f: 2_000, w: 3_000 },
+    players: { p7_8: 2, p5_6: 2, p3_4: 2, f: 1, w: 1 },
+  },
 ] as const satisfies readonly DrawTemplate[];
 
 export type PrizeTierCategory = "world" | "challenger";
@@ -120,9 +133,10 @@ export type PrizeTier = {
   id: string;
   category: PrizeTierCategory;
   label: string;
+  onSitePrizeMoney: number;
   playerPrizeMoney: number;
   drawTemplateId: DrawTemplateId | null;
-  manualOnly?: boolean;
+  allowedDrawTemplateIds?: readonly DrawTemplateId[];
 };
 
 export const prizeTiers = [
@@ -130,149 +144,209 @@ export const prizeTiers = [
     id: "world_copper",
     category: "world",
     label: "Copper",
-    playerPrizeMoney: 23_750,
+    onSitePrizeMoney: 30_000,
+    playerPrizeMoney: 28_500,
     drawTemplateId: "draw_32_entries_24",
   },
   {
     id: "world_bronze",
     category: "world",
     label: "Bronze",
-    playerPrizeMoney: 47_500,
+    onSitePrizeMoney: 60_000,
+    playerPrizeMoney: 57_000,
     drawTemplateId: "draw_32_entries_24",
   },
   {
     id: "world_silver",
     category: "world",
     label: "Silver",
-    playerPrizeMoney: 71_250,
+    onSitePrizeMoney: 90_000,
+    playerPrizeMoney: 85_500,
     drawTemplateId: "draw_32_entries_24",
   },
   {
     id: "world_gold",
     category: "world",
     label: "Gold",
-    playerPrizeMoney: 95_000,
+    onSitePrizeMoney: 120_000,
+    playerPrizeMoney: 114_000,
     drawTemplateId: "draw_32_entries_24",
   },
   {
     id: "world_platinum",
     category: "world",
     label: "Platinum",
-    playerPrizeMoney: 181_500,
+    onSitePrizeMoney: 220_000,
+    playerPrizeMoney: 209_000,
     drawTemplateId: "draw_32_entries_32",
   },
   {
     id: "world_diamond",
     category: "world",
     label: "Diamond",
-    playerPrizeMoney: 285_000,
+    onSitePrizeMoney: 350_000,
+    playerPrizeMoney: 332_500,
     drawTemplateId: "draw_64_entries_48",
   },
   {
     id: "world_tour_finals",
     category: "world",
     label: "Tour Finals",
-    playerPrizeMoney: 285_000,
-    drawTemplateId: null,
-    manualOnly: true,
+    onSitePrizeMoney: 350_000,
+    playerPrizeMoney: 332_500,
+    drawTemplateId: "tour_finals_8_entries_8",
   },
   {
     id: "world_championships",
     category: "world",
     label: "World Championships",
-    playerPrizeMoney: 570_000,
+    onSitePrizeMoney: 700_000,
+    playerPrizeMoney: 665_000,
     drawTemplateId: "draw_64_entries_64",
   },
   {
     id: "challenger_3_none",
     category: "challenger",
     label: "Challenger 3 · No accommodation",
+    onSitePrizeMoney: 3_000,
     playerPrizeMoney: 3_000,
     drawTemplateId: null,
+    allowedDrawTemplateIds: ["draw_16_entries_16", "draw_32_entries_24"],
   },
   {
     id: "challenger_6_none",
     category: "challenger",
     label: "Challenger 6 · No accommodation",
+    onSitePrizeMoney: 6_000,
     playerPrizeMoney: 6_000,
     drawTemplateId: null,
+    allowedDrawTemplateIds: ["draw_16_entries_16", "draw_32_entries_24"],
   },
   {
     id: "challenger_6_billeting",
     category: "challenger",
     label: "Challenger 6 · Billeting",
-    playerPrizeMoney: 5_500,
+    onSitePrizeMoney: 5_500,
+    playerPrizeMoney: 6_000,
     drawTemplateId: null,
+    allowedDrawTemplateIds: ["draw_16_entries_16", "draw_32_entries_24"],
   },
   {
     id: "challenger_6_hotel",
     category: "challenger",
     label: "Challenger 6 · Hotel",
-    playerPrizeMoney: 5_000,
+    onSitePrizeMoney: 5_000,
+    playerPrizeMoney: 6_000,
     drawTemplateId: null,
+    allowedDrawTemplateIds: ["draw_16_entries_16", "draw_32_entries_24"],
   },
   {
     id: "challenger_9_none",
     category: "challenger",
     label: "Challenger 9 · No accommodation",
+    onSitePrizeMoney: 9_000,
     playerPrizeMoney: 9_000,
     drawTemplateId: null,
+    allowedDrawTemplateIds: ["draw_32_entries_24"],
   },
   {
     id: "challenger_9_billeting",
     category: "challenger",
     label: "Challenger 9 · Billeting",
-    playerPrizeMoney: 8_250,
+    onSitePrizeMoney: 8_250,
+    playerPrizeMoney: 9_000,
     drawTemplateId: null,
+    allowedDrawTemplateIds: ["draw_32_entries_24"],
   },
   {
     id: "challenger_9_hotel",
     category: "challenger",
     label: "Challenger 9 · Hotel",
-    playerPrizeMoney: 7_500,
+    onSitePrizeMoney: 7_500,
+    playerPrizeMoney: 9_000,
     drawTemplateId: null,
+    allowedDrawTemplateIds: ["draw_32_entries_24"],
   },
   {
     id: "challenger_12_none",
     category: "challenger",
     label: "Challenger 12 · No accommodation",
+    onSitePrizeMoney: 12_000,
     playerPrizeMoney: 12_000,
     drawTemplateId: null,
+    allowedDrawTemplateIds: ["draw_32_entries_24"],
   },
   {
     id: "challenger_12_billeting",
     category: "challenger",
     label: "Challenger 12 · Billeting",
-    playerPrizeMoney: 11_000,
+    onSitePrizeMoney: 11_000,
+    playerPrizeMoney: 12_000,
     drawTemplateId: null,
+    allowedDrawTemplateIds: ["draw_32_entries_24"],
   },
   {
     id: "challenger_12_hotel",
     category: "challenger",
     label: "Challenger 12 · Hotel",
-    playerPrizeMoney: 10_000,
+    onSitePrizeMoney: 10_000,
+    playerPrizeMoney: 12_000,
     drawTemplateId: null,
+    allowedDrawTemplateIds: ["draw_32_entries_24"],
   },
   {
     id: "challenger_15_none",
     category: "challenger",
     label: "Challenger 15 · No accommodation",
+    onSitePrizeMoney: 15_000,
     playerPrizeMoney: 15_000,
     drawTemplateId: null,
+    allowedDrawTemplateIds: ["draw_32_entries_24"],
   },
   {
     id: "challenger_15_billeting",
     category: "challenger",
     label: "Challenger 15 · Billeting",
-    playerPrizeMoney: 13_750,
+    onSitePrizeMoney: 13_750,
+    playerPrizeMoney: 15_000,
     drawTemplateId: null,
+    allowedDrawTemplateIds: ["draw_32_entries_24"],
   },
   {
     id: "challenger_15_hotel",
     category: "challenger",
     label: "Challenger 15 · Hotel",
-    playerPrizeMoney: 12_500,
+    onSitePrizeMoney: 12_500,
+    playerPrizeMoney: 15_000,
     drawTemplateId: null,
+    allowedDrawTemplateIds: ["draw_32_entries_24"],
+  },
+  {
+    id: "challenger_18_none",
+    category: "challenger",
+    label: "Challenger 18 · No accommodation",
+    onSitePrizeMoney: 18_000,
+    playerPrizeMoney: 18_000,
+    drawTemplateId: null,
+    allowedDrawTemplateIds: ["draw_32_entries_24"],
+  },
+  {
+    id: "challenger_18_billeting",
+    category: "challenger",
+    label: "Challenger 18 · Billeting",
+    onSitePrizeMoney: 16_500,
+    playerPrizeMoney: 18_000,
+    drawTemplateId: null,
+    allowedDrawTemplateIds: ["draw_32_entries_24"],
+  },
+  {
+    id: "challenger_18_hotel",
+    category: "challenger",
+    label: "Challenger 18 · Hotel",
+    onSitePrizeMoney: 15_000,
+    playerPrizeMoney: 18_000,
+    drawTemplateId: null,
+    allowedDrawTemplateIds: ["draw_32_entries_24"],
   },
 ] as const satisfies readonly PrizeTier[];
 
