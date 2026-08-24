@@ -192,14 +192,12 @@ function optionalAssumptions(draft: TournamentDraft) {
 export function ImpactLedger({
   draft,
   estimatedWithholdingRate,
-  homeCurrency,
   onAddAssumption,
   onOpenEditor,
   prizeRoundsAfterEstimatedWithholding,
 }: {
   draft: TournamentDraft;
   estimatedWithholdingRate?: number | null;
-  homeCurrency: string;
   onAddAssumption: () => void;
   onOpenEditor: (editor: ProjectionEditor) => void;
   prizeRoundsAfterEstimatedWithholding?: PrizeRounds | null;
@@ -249,15 +247,12 @@ export function ImpactLedger({
             : draft.prize_distribution_mode === "manual"
               ? "No prize outcomes supplied"
               : "Choose a PSA tier and draw";
-  const prizeImpactCurrency = displaysAfterEstimatedWithholding
-    ? homeCurrency
-    : draft.currency;
   const prizeImpact =
     displayedPrizes.length === 0
       ? formatMoney(0, draft.currency)
       : displayedPrizes.length === 1 || lowestPrize === highestPrize
-        ? `Up to +${formatMoney(highestPrize, prizeImpactCurrency)}`
-        : `+${formatMoney(lowestPrize, prizeImpactCurrency)}–+${formatMoney(highestPrize, prizeImpactCurrency)}`;
+        ? `Up to +${formatMoney(highestPrize, draft.currency)}`
+        : `+${formatMoney(lowestPrize, draft.currency)}–+${formatMoney(highestPrize, draft.currency)}`;
   const travelSummary =
     travel > 0
       ? `${draft.accommodation_nights} night${draft.accommodation_nights === 1 ? "" : "s"} planned`

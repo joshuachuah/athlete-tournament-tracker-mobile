@@ -241,7 +241,6 @@ export function ProjectionEditorSheet({
             <ProjectionEditorFields
               editor={editor}
               errors={errors}
-              homeCurrency={homeCurrency}
               onUpdate={update}
               onUpdateAccommodation={updateAccommodation}
               prizePreview={prizePreview}

@@ -912,8 +912,7 @@ describe("TournamentProjectionBuilder", () => {
         ),
       ).toBeTruthy(),
     );
-    expect(screen.getByText("Up to +$350 USD")).toBeTruthy();
-    expect(screen.queryByText("Up to +€350 EUR")).toBeNull();
+    expect(screen.getByText("Up to +€350 EUR")).toBeTruthy();
   });
 
   it("falls back to the draft rate for a legacy payout preview", async () => {

@@ -37,7 +37,6 @@ const coverOptions: Array<{ value: SubsidyCovers; label: string }> = [
  */
 function PrizeRoundRow({
   afterEstimatedWithholding,
-  afterEstimatedWithholdingCurrency,
   currency,
   estimateLoading,
   label,
@@ -46,7 +45,6 @@ function PrizeRoundRow({
   value,
 }: {
   afterEstimatedWithholding?: number;
-  afterEstimatedWithholdingCurrency: string;
   currency: string;
   estimateLoading: boolean;
   label: string;
@@ -61,7 +59,7 @@ function PrizeRoundRow({
         !rateKnown
           ? ""
           : afterEstimatedWithholding !== undefined
-            ? `, ${formatMoney(afterEstimatedWithholding, afterEstimatedWithholdingCurrency)} after estimated withholding`
+            ? `, ${formatMoney(afterEstimatedWithholding, currency)} after estimated withholding`
             : estimateLoading
               ? ", estimated withholding calculating"
               : ", estimated withholding unavailable"
@@ -106,7 +104,7 @@ function PrizeRoundRow({
               ? estimateLoading
                 ? "Calculating estimate..."
                 : "Estimate unavailable"
-              : `${formatMoney(afterEstimatedWithholding, afterEstimatedWithholdingCurrency)} after estimated withholding`}
+              : `${formatMoney(afterEstimatedWithholding, currency)} after estimated withholding`}
           </Text>
         ) : null}
       </View>
@@ -116,7 +114,6 @@ function PrizeRoundRow({
 
 type EditorFieldsProps = {
   errors: Record<string, string>;
-  homeCurrency?: string;
   onUpdate: (changes: Partial<TournamentDraft>) => void;
   prizePreview?: PnLResult;
   prizePreviewLoading?: boolean;
@@ -197,14 +194,11 @@ function DetailsEditorFields({
 
 function PrizeEditorFields({
   errors,
-  homeCurrency,
   onUpdate,
   prizePreview,
   prizePreviewLoading = false,
   workingDraft,
 }: EditorFieldsProps) {
-  const afterEstimatedWithholdingCurrency =
-    homeCurrency ?? workingDraft.currency;
   const selectedTier = workingDraft.prize_tier_id
     ? getPrizeTier(workingDraft.prize_tier_id)
     : null;
@@ -290,9 +284,6 @@ function PrizeEditorFields({
                 label={roundLabels[round]}
                 afterEstimatedWithholding={
                   prizePreview?.prize_rounds_after_estimated_withholding?.[round]
-                }
-                afterEstimatedWithholdingCurrency={
-                  afterEstimatedWithholdingCurrency
                 }
                 currency={workingDraft.currency}
                 estimateLoading={prizePreviewLoading}
@@ -487,7 +478,6 @@ function SubsidyEditorFields({
 export function ProjectionEditorFields({
   editor,
   errors,
-  homeCurrency,
   onUpdate,
   onUpdateAccommodation,
   prizePreview,
@@ -496,7 +486,6 @@ export function ProjectionEditorFields({
 }: {
   editor: ProjectionEditor;
   errors: Record<string, string>;
-  homeCurrency?: string;
   onUpdate: (changes: Partial<TournamentDraft>) => void;
   onUpdateAccommodation: (changes: {
     accommodation_nightly?: number;
@@ -522,7 +511,6 @@ export function ProjectionEditorFields({
     return (
       <PrizeEditorFields
         errors={errors}
-        homeCurrency={homeCurrency}
         onUpdate={onUpdate}
         prizePreview={prizePreview}
         prizePreviewLoading={prizePreviewLoading}

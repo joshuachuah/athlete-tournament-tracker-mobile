@@ -13,12 +13,10 @@ import {
 import type { PnLResult } from "@/types";
 
 function PrizeEditorHarness({
-  homeCurrency,
   initialDraft,
   prizePreview,
   prizePreviewLoading,
 }: {
-  homeCurrency?: string;
   initialDraft: TournamentDraft;
   prizePreview?: PnLResult;
   prizePreviewLoading?: boolean;
@@ -29,7 +27,6 @@ function PrizeEditorHarness({
     <ProjectionEditorFields
       editor="prize"
       errors={{}}
-      homeCurrency={homeCurrency}
       prizePreview={prizePreview}
       prizePreviewLoading={prizePreviewLoading}
       workingDraft={draft}
@@ -45,12 +42,10 @@ function renderPrizeEditor(
   overrides: Partial<TournamentDraft> = {},
   prizePreview?: PnLResult,
   prizePreviewLoading?: boolean,
-  homeCurrency?: string,
 ) {
   const draft = { ...createDefaultTournamentDraft(), ...overrides };
   return render(
     <PrizeEditorHarness
-      homeCurrency={homeCurrency}
       initialDraft={draft}
       prizePreview={prizePreview}
       prizePreviewLoading={prizePreviewLoading}
@@ -607,14 +602,14 @@ describe("PrizeDistributionSelector", () => {
     ).toBeTruthy();
   });
 
-  it("labels server payout amounts with the home currency", () => {
+  it("labels the adjusted payout map with tournament currency", () => {
     const draft = createDefaultTournamentDraft();
     const screen = renderPrizeEditor(
       {
         currency: "EUR",
         country: "France",
         country_code: "FR",
-        prize_tax_rate: 20,
+        prize_tax_rate: 10,
         prize_distribution_mode: "manual",
         prize_rounds: { ...draft.prize_rounds, w: 500 },
       },
@@ -623,16 +618,14 @@ describe("PrizeDistributionSelector", () => {
         total_income_base: 0,
         scenarios: [],
         break_even_round: "w",
-        estimated_withholding_rate: 20,
-        prize_rounds_after_estimated_withholding: { w: 350 },
+        estimated_withholding_rate: 10,
+        prize_rounds_after_estimated_withholding: { w: 450 },
       },
-      false,
-      "USD",
     );
 
     expect(
       screen.getByLabelText(
-        "Win payout, €500 EUR gross, $350 USD after estimated withholding",
+        "Win payout, €500 EUR gross, €450 EUR after estimated withholding",
       ),
     ).toBeTruthy();
   });
