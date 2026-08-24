@@ -208,6 +208,18 @@ describe("API response schemas", () => {
       ).toBe(true);
     });
 
+    it.each(["us", "USA", "ZZ", ""])(
+      "rejects non-canonical country code %p",
+      (countryCode) => {
+        expect(
+          tournamentWithPnLSchema.safeParse({
+            ...tournament,
+            country_code: countryCode,
+          }).success,
+        ).toBe(false);
+      },
+    );
+
     it.each([-1, Number.POSITIVE_INFINITY])(
       "rejects an invalid prize round amount of %s",
       (prizeAmount) => {

@@ -130,6 +130,14 @@ describe("tournamentToDraft", () => {
     expect(draft.prize_tax_rate).toBe(30);
   });
 
+  it("enforces the fixed US rate when reopening an edit draft", () => {
+    const draft = tournamentToDraft(
+      tournament({ country_code: "US", prize_tax_rate: 12 }),
+    );
+
+    expect(draft.prize_tax_rate).toBe(30);
+  });
+
   it("keeps a legacy country-name record unknown until a code is selected", () => {
     const draft = tournamentToDraft(
       tournament({ country_code: null, prize_tax_rate: null }),
@@ -580,6 +588,35 @@ describe("normalizeTournamentDraft", () => {
     expect(
       normalizeTournamentDraft({ version: 4, draft: storedDraft }).country_code,
     ).toBe("US");
+  });
+
+  it("falls back to defaults when a current draft has an invalid country code", () => {
+    const storedDraft = {
+      ...defaultTournamentDraft,
+      name: "Invalid stored draft",
+      country_code: " zz ",
+    };
+    const normalized = normalizeTournamentDraft({
+      version: 4,
+      draft: storedDraft,
+    });
+
+    expect(normalized.country_code).toBeNull();
+    expect(normalized.name).toBe("");
+  });
+
+  it("enforces the fixed US rate in a current stored draft", () => {
+    const storedDraft = {
+      ...defaultTournamentDraft,
+      country: "United States",
+      country_code: "US" as const,
+      prize_tax_rate: null,
+    };
+
+    expect(
+      normalizeTournamentDraft({ version: 4, draft: storedDraft })
+        .prize_tax_rate,
+    ).toBe(30);
   });
 
   it("preserves a current server-backed empty prize snapshot", () => {

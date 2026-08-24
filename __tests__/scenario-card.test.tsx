@@ -68,10 +68,11 @@ describe("ScenarioCard", () => {
     ).toBeTruthy();
   });
 
-  it("shows matching gross and after values for a confirmed zero rate", () => {
+  it("renders the server-provided after amount for a confirmed zero rate", () => {
     const screen = renderScenarioCard(scenario, 0);
 
     expect(screen.getByText("Prize after estimated withholding")).toBeTruthy();
+    expect(screen.getByText(formatMoney(700, "USD"))).toBeTruthy();
     expect(
       screen.getByText("Net uses a 0% estimated withholding rate on prize money."),
     ).toBeTruthy();

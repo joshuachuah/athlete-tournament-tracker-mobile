@@ -16,6 +16,31 @@ const mockPreview = api.tournaments.preview as jest.MockedFunction<
 
 type PreviewResult = Awaited<ReturnType<typeof api.tournaments.preview>>;
 
+function createWrapper() {
+  const client = new QueryClient({
+    defaultOptions: { queries: { gcTime: Infinity, retry: false } },
+  });
+
+  return function Wrapper({ children }: PropsWithChildren) {
+    return (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+  };
+}
+
+function previewDraft() {
+  const defaults = createDefaultTournamentDraft(new Date(2026, 0, 1));
+  return {
+    ...defaults,
+    name: "Malaysia Open",
+    location: "Kuala Lumpur",
+    country: "Malaysia",
+    country_code: "MY" as const,
+    prize_tax_rate: 10,
+    prize_rounds: { ...defaults.prize_rounds, w: 100 },
+  };
+}
+
 function previewResult(rate: number): PreviewResult {
   return {
     total_expenses: 0,
@@ -46,27 +71,7 @@ describe("useTournamentPreview", () => {
           }),
       );
 
-    const client = new QueryClient({
-      defaultOptions: { queries: { gcTime: Infinity, retry: false } },
-    });
-    function Wrapper({ children }: PropsWithChildren) {
-      return (
-        <QueryClientProvider client={client}>{children}</QueryClientProvider>
-      );
-    }
-
-    const initialDraft = {
-      ...createDefaultTournamentDraft(new Date(2026, 0, 1)),
-      name: "Malaysia Open",
-      location: "Kuala Lumpur",
-      country: "Malaysia",
-      country_code: "MY" as const,
-      prize_tax_rate: 10,
-      prize_rounds: {
-        ...createDefaultTournamentDraft().prize_rounds,
-        w: 100,
-      },
-    };
+    const initialDraft = previewDraft();
     const { result, rerender } = renderHook(
       ({ rate }: { rate: number }) =>
         useTournamentPreview({
@@ -76,11 +81,17 @@ describe("useTournamentPreview", () => {
           homeCurrency: "USD",
           profileId: "athlete-1",
         }),
-      { initialProps: { rate: 10 }, wrapper: Wrapper },
+      { initialProps: { rate: 10 }, wrapper: createWrapper() },
     );
 
     await waitFor(() =>
       expect(result.current.data?.estimated_withholding_rate).toBe(10),
+    );
+    expect(mockPreview.mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({
+        authenticatedUserId: "account-1",
+        signal: expect.anything(),
+      }),
     );
 
     rerender({ rate: 20 });
@@ -94,6 +105,13 @@ describe("useTournamentPreview", () => {
 
     expect(result.current.isLoadingPreview).toBe(true);
     expect(result.current.data).toBeUndefined();
+    await waitFor(() => expect(mockPreview).toHaveBeenCalledTimes(2));
+    expect(mockPreview.mock.calls[1]?.[1]).toEqual(
+      expect.objectContaining({
+        authenticatedUserId: "account-1",
+        signal: expect.anything(),
+      }),
+    );
 
     await act(async () => {
       resolveUpdatedPreview?.(previewResult(20));
@@ -107,26 +125,7 @@ describe("useTournamentPreview", () => {
 
   it("clears cached data when previewing becomes disabled", async () => {
     mockPreview.mockResolvedValue(previewResult(10));
-    const client = new QueryClient({
-      defaultOptions: { queries: { gcTime: Infinity, retry: false } },
-    });
-    function Wrapper({ children }: PropsWithChildren) {
-      return (
-        <QueryClientProvider client={client}>{children}</QueryClientProvider>
-      );
-    }
-    const draft = {
-      ...createDefaultTournamentDraft(new Date(2026, 0, 1)),
-      name: "Malaysia Open",
-      location: "Kuala Lumpur",
-      country: "Malaysia",
-      country_code: "MY" as const,
-      prize_tax_rate: 10,
-      prize_rounds: {
-        ...createDefaultTournamentDraft().prize_rounds,
-        w: 100,
-      },
-    };
+    const draft = previewDraft();
     const { result, rerender } = renderHook(
       ({ enabled }: { enabled: boolean }) =>
         useTournamentPreview({
@@ -136,7 +135,7 @@ describe("useTournamentPreview", () => {
           homeCurrency: "USD",
           profileId: "athlete-1",
         }),
-      { initialProps: { enabled: true }, wrapper: Wrapper },
+      { initialProps: { enabled: true }, wrapper: createWrapper() },
     );
 
     await waitFor(() =>

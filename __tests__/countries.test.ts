@@ -27,6 +27,7 @@ describe("country-driven estimated withholding", () => {
   it("sets and locks the US estimate at 30 percent", () => {
     expect(estimatedWithholdingAfterCountryChange("MY", "US", 12)).toBe(30);
     expect(estimatedWithholdingAfterCountryChange("US", "US", 30)).toBe(30);
+    expect(estimatedWithholdingAfterCountryChange(null, "US", null)).toBe(30);
   });
 
   it("clears the estimate when leaving the US", () => {
@@ -37,6 +38,10 @@ describe("country-driven estimated withholding", () => {
     expect(estimatedWithholdingAfterCountryChange("MY", "GB", null)).toBeNull();
     expect(estimatedWithholdingAfterCountryChange("MY", "GB", 0)).toBeNull();
     expect(estimatedWithholdingAfterCountryChange("MY", "GB", 12)).toBeNull();
+  });
+
+  it("preserves a retained rate when the first ISO country is selected", () => {
+    expect(estimatedWithholdingAfterCountryChange(null, "MY", 12)).toBe(12);
   });
 
   it.each([null, 0, 12])(

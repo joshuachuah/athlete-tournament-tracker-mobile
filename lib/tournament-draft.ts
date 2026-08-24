@@ -406,7 +406,10 @@ export function normalizeTournamentDraft(stored: unknown): TournamentDraft {
   const current = storedTournamentDraftSchema.safeParse(stored);
 
   if (current.success) {
-    return current.data.draft;
+    const draft = current.data.draft;
+    return draft.country_code === "US" && draft.prize_tax_rate !== 30
+      ? { ...draft, prize_tax_rate: 30 }
+      : draft;
   }
 
   const version3 = storedTournamentDraftV3Schema.safeParse(stored);

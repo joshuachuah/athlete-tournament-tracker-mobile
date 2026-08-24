@@ -9,6 +9,7 @@ import type {
   Tournament,
   TournamentWithPnL,
 } from "@/types";
+import { isCountryCode } from "@/lib/countries";
 
 const prizeRoundKeys = [
   "r1",
@@ -26,7 +27,9 @@ const roundSchema = z.enum(prizeRoundKeys);
 const scenarioKinds = ["worst", "realistic", "best"] as const;
 const prizeAmountSchema = z.number().finite().nonnegative();
 const prizeTaxRateSchema = z.number().finite().min(0).max(100).nullable();
-const countryCodeSchema = z.string().regex(/^[A-Z]{2}$/);
+const countryCodeSchema = z
+  .string()
+  .refine(isCountryCode, "Invalid ISO country code.");
 
 function hasPositivePrizeRounds(prizeRounds: PrizeRounds | undefined) {
   return prizeRoundKeys.some((round) => (prizeRounds?.[round] ?? 0) > 0);

@@ -58,11 +58,17 @@ const alertSpy = jest.spyOn(Alert, "alert");
 
 function confirmTerritoryDraw() {
   const latestCall = alertSpy.mock.calls[alertSpy.mock.calls.length - 1];
+  if (!latestCall) {
+    throw new Error("Expected the territory-event confirmation alert.");
+  }
   const confirmButton = latestCall?.[2]?.find(
     (button) => button.text === "Confirm territory event",
   );
+  if (!confirmButton?.onPress) {
+    throw new Error("Expected the territory-event confirmation action.");
+  }
 
-  act(() => confirmButton?.onPress?.());
+  act(() => confirmButton.onPress?.());
 }
 
 describe("PrizeDistributionSelector", () => {

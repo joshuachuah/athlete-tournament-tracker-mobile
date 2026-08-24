@@ -1,5 +1,4 @@
 import { fireEvent, render } from "@testing-library/react-native";
-import { TextInput } from "react-native";
 
 import { NullablePercentageInput } from "@/components/ui/nullable-percentage-input";
 
@@ -14,7 +13,10 @@ describe("NullablePercentageInput", () => {
       />,
     );
 
-    fireEvent.changeText(screen.UNSAFE_getByType(TextInput), text);
+    fireEvent.changeText(
+      screen.getByLabelText("Estimated withholding (%)"),
+      text,
+    );
 
     expect(onChangeValue).toHaveBeenLastCalledWith(null);
   });
@@ -29,9 +31,10 @@ describe("NullablePercentageInput", () => {
       />,
     );
 
-    fireEvent.changeText(screen.UNSAFE_getByType(TextInput), "0");
+    const input = screen.getByLabelText("Estimated withholding (%)");
+    fireEvent.changeText(input, "0");
 
     expect(onChangeValue).toHaveBeenLastCalledWith(0);
-    expect(screen.UNSAFE_getByType(TextInput).props.value).toBe("0");
+    expect(input.props.value).toBe("0");
   });
 });

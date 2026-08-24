@@ -107,3 +107,25 @@ it("keeps unknown withholding outcomes explicitly gross", () => {
     ),
   ).toBeNull();
 });
+
+it("keeps confirmed zero distinct from unknown withholding", () => {
+  const screen = render(
+    <ProjectionSuccessSheet
+      mode="create"
+      tournament={{ ...saved, prize_tax_rate: 0 }}
+      onView={jest.fn()}
+      onDismiss={jest.fn()}
+    />,
+  );
+
+  expect(
+    screen.getByText(
+      "This projection now reflects the tournament's current estimated withholding.",
+    ),
+  ).toBeTruthy();
+  expect(
+    screen.queryByText(
+      "Prize outcomes remain gross because estimated withholding is unknown.",
+    ),
+  ).toBeNull();
+});

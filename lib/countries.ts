@@ -277,5 +277,5 @@ export function estimatedWithholdingAfterCountryChange(
   currentRate: number | null,
 ): number | null {
   if (nextCode === "US") return 30;
-  return previousCode === nextCode ? currentRate : null;
+  return previousCode === null || previousCode === nextCode ? currentRate : null;
 }
