@@ -28,7 +28,7 @@ export function CountrySelector({
 
   return (
     <>
-      <View style={{ gap: spacing.xs }}>
+      <View style={styles.container}>
         <Text style={styles.label}>Country</Text>
         <Pressable
           accessibilityLabel={`Country. ${name || "Choose a country"}`}
@@ -71,6 +71,9 @@ export function CountrySelector({
 }
 
 const styles = StyleSheet.create({
+  container: {
+    gap: spacing.xs,
+  },
   label: {
     color: colors.foreground,
     fontSize: 13,

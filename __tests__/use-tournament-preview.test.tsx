@@ -47,7 +47,6 @@ function previewResult(rate: number): PreviewResult {
     total_income_base: 0,
     break_even_round: null,
     estimated_withholding_rate: rate,
-    prize_rounds_after_estimated_withholding: { w: 100 - rate },
     scenarios: [],
   };
 }

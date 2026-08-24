@@ -138,13 +138,26 @@ describe("tournamentToDraft", () => {
     expect(draft.prize_tax_rate).toBe(30);
   });
 
-  it("keeps a legacy country-name record unknown until a code is selected", () => {
+  it("restores a recognized code and fixed rate for a legacy US record", () => {
     const draft = tournamentToDraft(
       tournament({ country_code: null, prize_tax_rate: null }),
     );
 
-    expect(draft.country_code).toBeNull();
-    expect(draft.prize_tax_rate).toBeNull();
+    expect(draft.country_code).toBe("US");
+    expect(draft.prize_tax_rate).toBe(30);
+  });
+
+  it("restores a recognized non-US code without collapsing zero", () => {
+    const draft = tournamentToDraft(
+      tournament({
+        country: "Malaysia",
+        country_code: null,
+        prize_tax_rate: 0,
+      }),
+    );
+
+    expect(draft.country_code).toBe("MY");
+    expect(draft.prize_tax_rate).toBe(0);
   });
 
   it("round-trips tournament-currency fields without relabeling home-currency values", () => {
@@ -429,7 +442,7 @@ describe("tournamentDraftFromPrefill", () => {
         name: "Known Open",
         location: "Paris",
         country: "France",
-        country_code: null,
+        country_code: "FR",
         currency: "EUR",
         start_date: "2026-05-01",
         end_date: "2026-05-04",
@@ -511,7 +524,7 @@ describe("tournamentDraftFromKnown", () => {
         name: "Replacement Open",
         location: "Paris",
         country: "France",
-        country_code: null,
+        country_code: "FR",
         currency: "EUR",
         start_date: "2026-06-01",
         end_date: "2026-06-04",

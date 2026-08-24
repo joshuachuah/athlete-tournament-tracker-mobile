@@ -1,4 +1,4 @@
-import { Switch, Text, View } from "react-native";
+import { StyleSheet, Switch, Text, View } from "react-native";
 
 import type { ProjectionEditor } from "@/components/tournament/impact-ledger";
 import { CountrySelector } from "@/components/tournament/country-selector";
@@ -29,6 +29,92 @@ const coverOptions: Array<{ value: SubsidyCovers; label: string }> = [
   { value: "full_expenses", label: "Full expenses" },
   { value: "flat_stipend", label: "Flat stipend" },
 ];
+
+const styles = StyleSheet.create({
+  prizeRound: {
+    minHeight: 56,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  prizeRoundLabelGroup: {
+    gap: spacing.xs,
+  },
+  prizeRoundTitle: {
+    color: colors.foreground,
+    fontWeight: "800",
+  },
+  prizeRoundPlayers: {
+    color: colors.mutedForeground,
+    fontSize: 12,
+  },
+  prizeRoundAmounts: {
+    alignItems: "flex-end",
+    gap: spacing.xs,
+  },
+  prizeRoundGross: {
+    color: colors.foreground,
+    fontWeight: "800",
+  },
+  prizeRoundAfter: {
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  estimateAvailable: {
+    color: colors.accent,
+  },
+  estimateUnavailable: {
+    color: colors.mutedForeground,
+  },
+  withholdingSummary: {
+    gap: spacing.xs,
+    paddingLeft: spacing.md,
+    borderLeftWidth: 3,
+  },
+  withholdingKnown: {
+    borderLeftColor: colors.accent,
+  },
+  withholdingUnknown: {
+    borderLeftColor: colors.warning,
+  },
+  withholdingHeading: {
+    color: colors.foreground,
+    fontWeight: "800",
+  },
+  withholdingBody: {
+    color: colors.mutedForeground,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  error: {
+    color: colors.loss,
+    fontSize: 12,
+  },
+  fixedRate: {
+    gap: spacing.xs,
+  },
+  fixedRateLabel: {
+    color: colors.mutedForeground,
+    fontSize: 13,
+  },
+  fixedRateValue: {
+    color: colors.foreground,
+    fontSize: 24,
+    fontWeight: "900",
+  },
+  fixedRateCaption: {
+    color: colors.mutedForeground,
+    fontSize: 12,
+  },
+  missingCountry: {
+    color: colors.warning,
+    lineHeight: 20,
+  },
+});
 
 /**
  * PSA choices own payout generation, so round amounts are deliberately
@@ -64,41 +150,28 @@ function PrizeRoundRow({
               ? ", estimated withholding calculating"
               : ", estimated withholding unavailable"
       }`}
-      style={{
-        minHeight: 56,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: spacing.md,
-        paddingVertical: spacing.sm,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
-      }}
+      style={styles.prizeRound}
     >
-      <View style={{ gap: spacing.xs }}>
-        <Text style={{ color: colors.foreground, fontWeight: "800" }}>
-          {label}
-        </Text>
+      <View style={styles.prizeRoundLabelGroup}>
+        <Text style={styles.prizeRoundTitle}>{label}</Text>
         {players !== undefined ? (
-          <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>
+          <Text style={styles.prizeRoundPlayers}>
             {players} player{players === 1 ? "" : "s"} paid
           </Text>
         ) : null}
       </View>
-      <View style={{ alignItems: "flex-end", gap: spacing.xs }}>
-        <Text style={{ color: colors.foreground, fontWeight: "800" }}>
+      <View style={styles.prizeRoundAmounts}>
+        <Text style={styles.prizeRoundGross}>
           {formatMoney(value, currency)} gross
         </Text>
         {rateKnown ? (
           <Text
-            style={{
-              color:
-                afterEstimatedWithholding !== undefined || estimateLoading
-                  ? colors.accent
-                  : colors.mutedForeground,
-              fontSize: 12,
-              fontWeight: "800",
-            }}
+            style={[
+              styles.prizeRoundAfter,
+              afterEstimatedWithholding !== undefined || estimateLoading
+                ? styles.estimateAvailable
+                : styles.estimateUnavailable,
+            ]}
           >
             {afterEstimatedWithholding === undefined
               ? estimateLoading
@@ -300,45 +373,32 @@ function PrizeEditorFields({
         )}
       </View>
       <View
-        style={{
-          gap: spacing.xs,
-          paddingLeft: spacing.md,
-          borderLeftWidth: 3,
-          borderLeftColor:
-            appliedEstimatedWithholdingRate !== null
-              ? colors.accent
-              : colors.warning,
-        }}
+        style={[
+          styles.withholdingSummary,
+          appliedEstimatedWithholdingRate !== null
+            ? styles.withholdingKnown
+            : styles.withholdingUnknown,
+        ]}
       >
-        <Text style={{ color: colors.foreground, fontWeight: "800" }}>
+        <Text style={styles.withholdingHeading}>
           {appliedEstimatedWithholdingRate !== null
             ? "Estimated withholding included"
             : "Gross prize only"}
         </Text>
-        <Text
-          style={{ color: colors.mutedForeground, fontSize: 12, lineHeight: 18 }}
-        >
+        <Text style={styles.withholdingBody}>
           {appliedEstimatedWithholdingRate !== null
             ? `This projection uses a ${appliedEstimatedWithholdingRate}% estimated withholding rate.`
             : "No estimated withholding rate is known for this tournament."}
         </Text>
         {errors.prize_tax_rate ? (
-          <Text style={{ color: colors.loss, fontSize: 12 }}>
-            {errors.prize_tax_rate}
-          </Text>
+          <Text style={styles.error}>{errors.prize_tax_rate}</Text>
         ) : null}
       </View>
       {workingDraft.country_code === "US" ? (
-        <View style={{ gap: spacing.xs }}>
-          <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>
-            Estimated withholding
-          </Text>
-          <Text style={{ color: colors.foreground, fontSize: 24, fontWeight: "900" }}>
-            30%
-          </Text>
-          <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>
-            United States · Fixed rate
-          </Text>
+        <View style={styles.fixedRate}>
+          <Text style={styles.fixedRateLabel}>Estimated withholding</Text>
+          <Text style={styles.fixedRateValue}>30%</Text>
+          <Text style={styles.fixedRateCaption}>United States · Fixed rate</Text>
         </View>
       ) : workingDraft.country_code ? (
         <NullablePercentageInput
@@ -348,7 +408,7 @@ function PrizeEditorFields({
           value={workingDraft.prize_tax_rate}
         />
       ) : (
-        <Text style={{ color: colors.warning, lineHeight: 20 }}>
+        <Text style={styles.missingCountry}>
           Choose the tournament country before adding estimated withholding.
         </Text>
       )}

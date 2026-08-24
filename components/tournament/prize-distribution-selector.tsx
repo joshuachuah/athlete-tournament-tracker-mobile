@@ -145,6 +145,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
+  calculationPanel: {
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    backgroundColor: colors.surface,
+  },
+  calculationRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  lossText: {
+    color: colors.loss,
+  },
 });
 
 function ChoiceRow({
@@ -493,18 +508,9 @@ export function PrizeDistributionSelector({
       ) : null}
 
       {activeTier ? (
-        <View
-          style={{
-            gap: spacing.sm,
-            padding: spacing.md,
-            borderWidth: 1,
-            borderColor: colors.border,
-            borderRadius: radii.md,
-            backgroundColor: colors.surface,
-          }}
-        >
+        <View style={styles.calculationPanel}>
           <Text style={styles.sectionHeading}>Player-prize calculation</Text>
-          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+          <View style={styles.calculationRow}>
             <Text style={styles.helper}>
               {activeTier.category === "world" ? "On-site prize" : "On-site minimum"}
             </Text>
@@ -513,9 +519,11 @@ export function PrizeDistributionSelector({
             </Text>
           </View>
           {activeTier.category === "world" ? (
-            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-              <Text style={[styles.helper, { color: colors.loss }]}>PSA contribution, 5%</Text>
-              <Text style={[styles.choiceLabel, { color: colors.loss }]}>
+            <View style={styles.calculationRow}>
+              <Text style={[styles.helper, styles.lossText]}>
+                PSA contribution, 5%
+              </Text>
+              <Text style={[styles.choiceLabel, styles.lossText]}>
                 −{formatMoney(
                   activeTier.onSitePrizeMoney - activeTier.playerPrizeMoney,
                   prizeDistributionCurrency,
@@ -523,7 +531,7 @@ export function PrizeDistributionSelector({
               </Text>
             </View>
           ) : null}
-          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+          <View style={styles.calculationRow}>
             <Text style={styles.choiceLabel}>Player distribution</Text>
             <Text style={styles.choiceLabel}>
               {formatMoney(activeTier.playerPrizeMoney, prizeDistributionCurrency)}

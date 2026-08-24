@@ -14,6 +14,7 @@ import {
 import type { ApiRequestOptions } from "@/lib/api";
 import {
   getCountryByCode,
+  getCountryByName,
   isCountryCode,
   type CountryCode,
 } from "@/lib/countries";
@@ -512,7 +513,9 @@ export function tournamentDraftFromPrefill(
     next.country = selectedCountry?.name ?? next.country;
     next.country_code = parsedParams.country_code;
   } else if (parsedParams.country) {
-    next.country = parsedParams.country;
+    const selectedCountry = getCountryByName(parsedParams.country);
+    next.country = selectedCountry?.name ?? parsedParams.country;
+    next.country_code = selectedCountry?.code ?? null;
   }
   if (next.country_code === "US") next.prize_tax_rate = 30;
   if (parsedParams.currency) next.currency = parsedParams.currency;
@@ -547,7 +550,7 @@ export function tournamentDraftFromKnown(
   const knownCountryCode =
     tournament.country_code && isCountryCode(tournament.country_code)
       ? tournament.country_code
-      : null;
+      : (getCountryByName(tournament.country)?.code ?? null);
 
   const prizeRounds = tournament.prize_rounds
     ? { ...defaults.prize_rounds, ...tournament.prize_rounds }
@@ -580,7 +583,7 @@ export function tournamentToDraft(tournament: TournamentWithPnL): TournamentDraf
   const savedCountryCode =
     tournament.country_code && isCountryCode(tournament.country_code)
       ? tournament.country_code
-      : null;
+      : (getCountryByName(tournament.country)?.code ?? null);
 
   return {
     ...defaults,
