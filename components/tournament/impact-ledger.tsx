@@ -15,11 +15,12 @@ import { Pressable, Text, View } from "react-native";
 
 import { colors, radii, spacing } from "@/constants/theme";
 import {
-  getPrizeTier,
   prizeDistributionCurrency,
+  prizeRoundKeys,
 } from "@/lib/prize-distributions";
 import { formatDate, formatMoney, parseDateOnly } from "@/lib/utils";
 import type { TournamentDraft } from "@/lib/tournament-draft";
+import type { PrizeRounds } from "@/types";
 
 export type AssumptionEditor =
   | "daily-spending"
@@ -192,29 +193,37 @@ export function ImpactLedger({
   draft,
   onAddAssumption,
   onOpenEditor,
+  prizeRoundsAfterEstimatedWithholding,
 }: {
   draft: TournamentDraft;
   onAddAssumption: () => void;
   onOpenEditor: (editor: ProjectionEditor) => void;
+  prizeRoundsAfterEstimatedWithholding?: PrizeRounds | null;
 }) {
   const prizes = prizeEstimates(draft);
-  const lowestPrize = prizes.length > 0 ? Math.min(...prizes) : 0;
-  const highestPrize = prizes.length > 0 ? Math.max(...prizes) : 0;
+  const displayedPrizes =
+    draft.prize_tax_rate !== null && prizeRoundsAfterEstimatedWithholding
+      ? prizeRoundKeys
+          .filter((round) => draft.prize_rounds[round] > 0)
+          .flatMap((round) => {
+            const value = prizeRoundsAfterEstimatedWithholding[round];
+            return value === undefined ? [] : [value];
+          })
+          .filter((amount): amount is number => amount !== undefined)
+      : prizes;
+  const lowestPrize =
+    displayedPrizes.length > 0 ? Math.min(...displayedPrizes) : 0;
+  const highestPrize =
+    displayedPrizes.length > 0 ? Math.max(...displayedPrizes) : 0;
   const travel = draft.flight_cost + draft.accommodation_total;
   const assumptions = optionalAssumptions(draft);
   const detailSummary = draft.location.trim()
-    ? `${draft.location.trim()}${parseDateOnly(draft.start_date) ? ` · ${formatDate(draft.start_date)}` : ""}`
+    ? `${[draft.location.trim(), draft.country.trim()].filter(Boolean).join(", ")}${parseDateOnly(draft.start_date) ? ` · ${formatDate(draft.start_date)}` : ""}`
     : "Location, dates, currency, and entry fee";
-  const selectedPrizeTier = draft.prize_tier_id
-    ? getPrizeTier(draft.prize_tier_id)
-    : null;
-  const scheduleUnavailable = selectedPrizeTier?.manualOnly === true;
   const prizeSummary =
     prizes.length > 0
-      ? `${prizes.length} round estimate${prizes.length === 1 ? "" : "s"}${draft.prize_tax_rate > 0 ? ` · ${draft.prize_tax_rate}% tax` : ""}`
-      : scheduleUnavailable
-        ? "Official payout schedule unavailable"
-        : draft.currency.toUpperCase() !== prizeDistributionCurrency
+      ? `${prizes.length} gross estimate${prizes.length === 1 ? "" : "s"}${draft.prize_tax_rate !== null ? ` · ${draft.prize_tax_rate}% estimated withholding` : ""}`
+      : draft.currency.toUpperCase() !== prizeDistributionCurrency
           ? "Official USD outcomes unavailable"
           : draft.editId
             ? "No prize outcomes saved"
@@ -222,9 +231,9 @@ export function ImpactLedger({
               ? "No prize outcomes supplied"
               : "Choose a PSA tier and draw";
   const prizeImpact =
-    prizes.length === 0
+    displayedPrizes.length === 0
       ? formatMoney(0, draft.currency)
-      : prizes.length === 1 || lowestPrize === highestPrize
+      : displayedPrizes.length === 1 || lowestPrize === highestPrize
         ? `Up to +${formatMoney(highestPrize, draft.currency)}`
         : `+${formatMoney(lowestPrize, draft.currency)}–+${formatMoney(highestPrize, draft.currency)}`;
   const travelSummary =

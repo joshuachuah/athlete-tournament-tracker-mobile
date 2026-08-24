@@ -66,6 +66,7 @@ describe("api client", () => {
           round: "r1",
           prize_money: 0,
           prize_money_after_tax: 0,
+          prize_money_after_estimated_withholding: 0,
           net_result: -100,
           profitable: false,
         },
@@ -74,6 +75,7 @@ describe("api client", () => {
           round: "qf",
           prize_money: 100,
           prize_money_after_tax: 100,
+          prize_money_after_estimated_withholding: 100,
           net_result: 0,
           profitable: false,
         },
@@ -82,11 +84,14 @@ describe("api client", () => {
           round: "w",
           prize_money: 500,
           prize_money_after_tax: 500,
+          prize_money_after_estimated_withholding: 500,
           net_result: 400,
           profitable: true,
         },
       ],
       break_even_round: "qf",
+      estimated_withholding_rate: 30,
+      prize_rounds_after_estimated_withholding: { qf: 350 },
     };
     fetchMock.mockResolvedValue({ ok: true, json: async () => preview } as Response);
 
@@ -129,6 +134,8 @@ describe("api client", () => {
         total_income_base: 0,
         scenarios: [],
         break_even_round: null,
+        estimated_withholding_rate: null,
+        prize_rounds_after_estimated_withholding: null,
       }),
     } as Response);
 
@@ -143,6 +150,8 @@ describe("api client", () => {
       total_income_base: 0,
       scenarios: [],
       break_even_round: null,
+      estimated_withholding_rate: null,
+      prize_rounds_after_estimated_withholding: null,
     };
     fetchMock.mockResolvedValue({ ok: true, json: async () => preview } as Response);
 

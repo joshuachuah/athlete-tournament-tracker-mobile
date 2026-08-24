@@ -12,29 +12,33 @@ import {
   roundCurrencyAmount,
 } from "@/lib/utils";
 import type { ApiRequestOptions } from "@/lib/api";
+import { isCountryCode, type CountryCode } from "@/lib/countries";
 import {
-  generatePrizeRounds,
-  getPrizeTier,
   isDrawTemplateId,
   isPrizeTierId,
-  prizeDistributionCurrency,
   type DrawTemplateId,
   type PrizeDistributionMode,
   type PrizeTierId,
 } from "@/lib/prize-distributions";
+
+const countryCodeSchema = z.custom<CountryCode>(
+  (value) => typeof value === "string" && isCountryCode(value),
+  "Choose a country from the list.",
+);
 
 export type TournamentDraft = {
   editId?: string;
   name: string;
   location: string;
   country: string;
+  country_code: CountryCode | null;
   currency: string;
   start_date: string;
   end_date: string;
   duration_days: number;
   entry_fee: number;
   prize_rounds: Required<PrizeRounds>;
-  prize_tax_rate: number;
+  prize_tax_rate: number | null;
   prize_distribution_mode: PrizeDistributionMode;
   prize_tier_id: PrizeTierId | null;
   prize_draw_template_id: DrawTemplateId | null;
@@ -53,8 +57,19 @@ export type TournamentDraft = {
   sponsorship_allocated: number;
 };
 
-function emptyPrizeRounds(): Required<PrizeRounds> {
-  return { r1: 0, r2: 0, r3: 0, qf: 0, sf: 0, f: 0, w: 0 };
+export function emptyPrizeRounds(): Required<PrizeRounds> {
+  return {
+    r1: 0,
+    r2: 0,
+    r3: 0,
+    qf: 0,
+    sf: 0,
+    p7_8: 0,
+    p5_6: 0,
+    p3_4: 0,
+    f: 0,
+    w: 0,
+  };
 }
 
 type TournamentDraftPrefillParam = string | string[];
@@ -63,13 +78,25 @@ export type TournamentDraftPrefill = {
   name?: TournamentDraftPrefillParam;
   location?: TournamentDraftPrefillParam;
   country?: TournamentDraftPrefillParam;
+  country_code?: TournamentDraftPrefillParam;
   currency?: TournamentDraftPrefillParam;
   start_date?: TournamentDraftPrefillParam;
   end_date?: TournamentDraftPrefillParam;
   duration_days?: TournamentDraftPrefillParam;
 };
 
-const prizeRoundKeys = ["r1", "r2", "r3", "qf", "sf", "f", "w"] as const;
+const prizeRoundKeys = [
+  "r1",
+  "r2",
+  "r3",
+  "qf",
+  "sf",
+  "p7_8",
+  "p5_6",
+  "p3_4",
+  "f",
+  "w",
+] as const;
 const apiDateTimePattern =
   /^(\d{4}-\d{2}-\d{2})T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?$/;
 
@@ -114,13 +141,14 @@ export function createDefaultTournamentDraft(
     name: "",
     location: "",
     country: "",
+    country_code: null,
     currency: "USD",
     start_date: startDate,
     end_date: addDateOnlyDays(startDate, 2) ?? startDate,
     duration_days: 3,
     entry_fee: 0,
     prize_rounds: emptyPrizeRounds(),
-    prize_tax_rate: 0,
+    prize_tax_rate: null,
     prize_distribution_mode: "generated",
     prize_tier_id: null,
     prize_draw_template_id: null,
@@ -151,6 +179,7 @@ export const detailsSchema = z
     name: requiredText,
     location: requiredText,
     country: requiredText,
+    country_code: countryCodeSchema,
     currency: z.string().length(3, "Use a 3-letter code."),
     start_date: dateOnly,
     end_date: dateOnly,
@@ -176,13 +205,18 @@ export const prizesSchema = z.object({
     r3: money,
     qf: money,
     sf: money,
+    p7_8: money,
+    p5_6: money,
+    p3_4: money,
     f: money,
     w: money,
   }),
-  prize_tax_rate: z.coerce
+  prize_tax_rate: z
     .number()
+    .finite()
     .min(0, "Must be between 0 and 100.")
-    .max(100, "Must be between 0 and 100."),
+    .max(100, "Must be between 0 and 100.")
+    .nullable(),
 });
 
 export const travelSchema = z.object({
@@ -241,7 +275,7 @@ const nonNegativeInteger = finiteNonNegativeNumber.int();
 const persistedDateOnly = z.string().refine(
   (value) => parseDateOnly(value) !== null,
 );
-const persistedPrizeRoundsSchema = z.strictObject({
+const legacyPersistedPrizeRoundsSchema = z.strictObject({
   r1: finiteNonNegativeNumber,
   r2: finiteNonNegativeNumber,
   r3: finiteNonNegativeNumber,
@@ -249,6 +283,11 @@ const persistedPrizeRoundsSchema = z.strictObject({
   sf: finiteNonNegativeNumber,
   f: finiteNonNegativeNumber,
   w: finiteNonNegativeNumber,
+});
+const persistedPrizeRoundsSchema = legacyPersistedPrizeRoundsSchema.extend({
+  p7_8: finiteNonNegativeNumber,
+  p5_6: finiteNonNegativeNumber,
+  p3_4: finiteNonNegativeNumber,
 });
 const persistedTournamentDraftV1Schema = z.strictObject({
   editId: z.string().min(1).optional(),
@@ -260,7 +299,7 @@ const persistedTournamentDraftV1Schema = z.strictObject({
   end_date: persistedDateOnly,
   duration_days: nonNegativeInteger,
   entry_fee: finiteNonNegativeNumber,
-  prize_rounds: persistedPrizeRoundsSchema,
+  prize_rounds: legacyPersistedPrizeRoundsSchema,
   prize_tax_rate: finiteNonNegativeNumber.max(100),
   flight_cost: finiteNonNegativeNumber,
   accommodation_nightly: finiteNonNegativeNumber,
@@ -280,7 +319,7 @@ const persistedTournamentDraftV1Schema = z.strictObject({
   ]),
   sponsorship_allocated: finiteNonNegativeNumber,
 });
-const persistedTournamentDraftSchema = persistedTournamentDraftV1Schema.extend({
+const legacyPersistedSelectorDraftSchema = persistedTournamentDraftV1Schema.extend({
   prize_distribution_mode: z.enum(["generated", "manual"]),
   prize_tier_id: z
     .string()
@@ -292,24 +331,33 @@ const persistedTournamentDraftSchema = persistedTournamentDraftV1Schema.extend({
     .nullable(),
   prize_player_total: finiteNonNegativeNumber,
 });
+const persistedTournamentDraftSchema = legacyPersistedSelectorDraftSchema.extend({
+  country_code: countryCodeSchema.nullable(),
+  prize_rounds: persistedPrizeRoundsSchema,
+  prize_tax_rate: finiteNonNegativeNumber.max(100).nullable(),
+});
 const storedTournamentDraftSchema = z.strictObject({
-  version: z.literal(3),
+  version: z.literal(4),
   draft: persistedTournamentDraftSchema,
+});
+const storedTournamentDraftV3Schema = z.strictObject({
+  version: z.literal(3),
+  draft: legacyPersistedSelectorDraftSchema,
 });
 const storedTournamentDraftV2Schema = z.strictObject({
   version: z.literal(2),
-  draft: persistedTournamentDraftSchema,
+  draft: legacyPersistedSelectorDraftSchema,
 });
 const storedTournamentDraftV1Schema = z.strictObject({
   version: z.literal(1),
   draft: persistedTournamentDraftV1Schema,
 });
 const legacyTournamentDraftSchema = persistedTournamentDraftV1Schema.extend({
-  prize_rounds: persistedPrizeRoundsSchema.partial().optional(),
+  prize_rounds: legacyPersistedPrizeRoundsSchema.partial().optional(),
 }).partial();
 
 export function persistedTournamentDraft(draft: TournamentDraft) {
-  return { version: 3 as const, draft };
+  return { version: 4 as const, draft };
 }
 
 function prizeSelectorMigration(
@@ -331,99 +379,21 @@ function prizeSelectorMigration(
   };
 }
 
-function migrateV2GeneratedPrizeSchedule(
-  draft: TournamentDraft,
+function migrateLegacySelectorDraft(
+  draft: z.infer<typeof legacyPersistedSelectorDraftSchema>,
+  preserveNonZeroRate: boolean,
 ): TournamentDraft {
-  const hasPrizeRounds = Object.values(draft.prize_rounds).some(
-    (amount) => amount > 0,
-  );
-
-  if (draft.prize_distribution_mode !== "generated") {
-    return hasPrizeRounds
-      ? draft
-      : {
-          ...draft,
-          prize_distribution_mode: "generated",
-          prize_tier_id: null,
-          prize_draw_template_id: null,
-          prize_player_total: 0,
-        };
-  }
-
-  const currencyMatches =
-    draft.currency.toUpperCase() === prizeDistributionCurrency;
-
-  function preserveAsManualSnapshot() {
-    return {
-      ...draft,
-      prize_distribution_mode: "manual" as const,
-      prize_tier_id: null,
-      prize_draw_template_id: null,
-      prize_player_total: 0,
-    };
-  }
-
-  if (!currencyMatches) {
-    if (hasPrizeRounds) {
-      return preserveAsManualSnapshot();
-    }
-
-    return {
-      ...draft,
-      prize_tier_id: null,
-      prize_draw_template_id: null,
-      prize_player_total: 0,
-      prize_rounds: emptyPrizeRounds(),
-    };
-  }
-
-  if (!draft.prize_tier_id) {
-    return hasPrizeRounds
-      ? preserveAsManualSnapshot()
-      : { ...draft, prize_player_total: 0 };
-  }
-
-  const tier = getPrizeTier(draft.prize_tier_id);
-  const templateId =
-    tier.category === "world"
-      ? tier.drawTemplateId
-      : draft.prize_draw_template_id;
-
-  if (tier.manualOnly) {
-    return hasPrizeRounds
-      ? preserveAsManualSnapshot()
-      : {
-          ...draft,
-          prize_draw_template_id: null,
-          prize_player_total: 0,
-          prize_rounds: emptyPrizeRounds(),
-        };
-  }
-
-  if (!templateId) {
-    if (hasPrizeRounds) {
-      return preserveAsManualSnapshot();
-    }
-
-    return {
-      ...draft,
-      prize_player_total: tier.playerPrizeMoney,
-      prize_rounds: emptyPrizeRounds(),
-    };
-  }
+  const prizeRounds = { ...emptyPrizeRounds(), ...draft.prize_rounds };
 
   return {
     ...draft,
-    prize_draw_template_id: templateId,
-    prize_player_total: tier.playerPrizeMoney,
-    prize_rounds: {
-      ...emptyPrizeRounds(),
-      ...generatePrizeRounds(
-        tier.playerPrizeMoney,
-        templateId,
-        prizeDistributionCurrency,
-      ),
-    },
+    country_code: null,
+    ...prizeSelectorMigration(prizeRounds),
+    prize_rounds: prizeRounds,
+    prize_tax_rate:
+      preserveNonZeroRate && draft.prize_tax_rate > 0
+        ? draft.prize_tax_rate
+        : null,
   };
 }
 
@@ -435,23 +405,33 @@ export function normalizeTournamentDraft(stored: unknown): TournamentDraft {
     return current.data.draft;
   }
 
+  const version3 = storedTournamentDraftV3Schema.safeParse(stored);
+
+  if (version3.success) {
+    return migrateLegacySelectorDraft(version3.data.draft, true);
+  }
+
   const version2 = storedTournamentDraftV2Schema.safeParse(stored);
 
   if (version2.success) {
-    return {
-      ...migrateV2GeneratedPrizeSchedule(version2.data.draft),
-      // Older drafts allowed athletes to edit withholding, so the stored rate
-      // cannot be treated as server-supplied once the field becomes read-only.
-      prize_tax_rate: defaults.prize_tax_rate,
-    };
+    return migrateLegacySelectorDraft(version2.data.draft, false);
   }
 
   const previous = storedTournamentDraftV1Schema.safeParse(stored);
 
   if (previous.success) {
     return {
+      ...defaults,
       ...previous.data.draft,
-      ...prizeSelectorMigration(previous.data.draft.prize_rounds),
+      country_code: null,
+      prize_rounds: {
+        ...defaults.prize_rounds,
+        ...previous.data.draft.prize_rounds,
+      },
+      ...prizeSelectorMigration({
+        ...defaults.prize_rounds,
+        ...previous.data.draft.prize_rounds,
+      }),
       prize_tax_rate: defaults.prize_tax_rate,
     };
   }
@@ -487,6 +467,12 @@ const prefillParamsSchema = z.object({
   name: z.string().min(1).optional().catch(undefined),
   location: z.string().min(1).optional().catch(undefined),
   country: z.string().min(1).optional().catch(undefined),
+  country_code: z
+    .string()
+    .transform((value) => value.toUpperCase())
+    .refine(isCountryCode)
+    .optional()
+    .catch(undefined),
   currency: z
     .string()
     .length(3)
@@ -510,7 +496,11 @@ export function tournamentDraftFromPrefill(
 
   if (parsedParams.name) next.name = parsedParams.name;
   if (parsedParams.location) next.location = parsedParams.location;
-  if (parsedParams.country) next.country = parsedParams.country;
+  if (parsedParams.country) {
+    next.country = parsedParams.country;
+  }
+  if (parsedParams.country_code) next.country_code = parsedParams.country_code;
+  if (next.country_code === "US") next.prize_tax_rate = 30;
   if (parsedParams.currency) next.currency = parsedParams.currency;
   if (parsedParams.start_date) next.start_date = parsedParams.start_date;
   if (parsedParams.end_date) next.end_date = parsedParams.end_date;
@@ -540,6 +530,10 @@ export function tournamentDraftFromKnown(
       : null) ??
     defaults.end_date;
   const knownCurrency = tournament.currency?.toUpperCase();
+  const knownCountryCode =
+    tournament.country_code && isCountryCode(tournament.country_code)
+      ? tournament.country_code
+      : null;
 
   const prizeRounds = tournament.prize_rounds
     ? { ...defaults.prize_rounds, ...tournament.prize_rounds }
@@ -550,6 +544,7 @@ export function tournamentDraftFromKnown(
     name: tournament.name,
     location: tournament.location ?? defaults.location,
     country: tournament.country ?? defaults.country,
+    country_code: knownCountryCode,
     currency:
       knownCurrency?.length === 3 ? knownCurrency : defaults.currency,
     start_date: validStartDate ?? defaults.start_date,
@@ -558,13 +553,20 @@ export function tournamentDraftFromKnown(
     // Known-tournament prize data is a server-owned snapshot, including an
     // explicitly empty schedule. Manual mode preserves that provenance.
     prize_distribution_mode: "manual",
-    prize_tax_rate: tournament.prize_tax_rate ?? defaults.prize_tax_rate,
+    prize_tax_rate:
+      knownCountryCode === "US"
+        ? 30
+        : (tournament.prize_tax_rate ?? defaults.prize_tax_rate),
   });
 }
 
 export function tournamentToDraft(tournament: TournamentWithPnL): TournamentDraft {
   const accommodationNights = Math.max(0, tournament.duration_days - 1);
   const defaults = createDefaultTournamentDraft();
+  const savedCountryCode =
+    tournament.country_code && isCountryCode(tournament.country_code)
+      ? tournament.country_code
+      : null;
 
   return {
     ...defaults,
@@ -572,6 +574,7 @@ export function tournamentToDraft(tournament: TournamentWithPnL): TournamentDraf
     name: tournament.name,
     location: tournament.location,
     country: tournament.country,
+    country_code: savedCountryCode,
     currency: tournament.currency,
     // Treat API dates as calendar values. Some deployed responses still include
     // a midnight timestamp, which should never leak into the date editor.
@@ -583,7 +586,8 @@ export function tournamentToDraft(tournament: TournamentWithPnL): TournamentDraf
       ...defaults.prize_rounds,
       ...tournament.prize_rounds,
     },
-    prize_tax_rate: tournament.prize_tax_rate ?? 0,
+    prize_tax_rate:
+      savedCountryCode === "US" ? 30 : tournament.prize_tax_rate,
     prize_distribution_mode: "manual",
     prize_tier_id: null,
     prize_draw_template_id: null,
@@ -625,6 +629,7 @@ export function toTournamentPayload(
     name: normalized.name.trim(),
     location: normalized.location.trim(),
     country: normalized.country.trim(),
+    country_code: normalized.country_code,
     currency: normalized.currency.toUpperCase(),
     start_date: normalized.start_date,
     end_date: normalized.end_date,

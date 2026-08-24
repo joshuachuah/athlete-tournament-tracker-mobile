@@ -10,6 +10,7 @@ const tournament = {
   name: "Tournament 1",
   location: "Detroit",
   country: "United States",
+  country_code: "US",
   currency: "USD",
   start_date: "2026-04-01",
   end_date: "2026-04-03",
@@ -38,6 +39,7 @@ const tournament = {
         round: "r1",
         prize_money: 0,
         prize_money_after_tax: 0,
+        prize_money_after_estimated_withholding: 0,
         net_result: -1200,
         profitable: false,
       },
@@ -46,6 +48,7 @@ const tournament = {
         round: "qf",
         prize_money: 700,
         prize_money_after_tax: 490,
+        prize_money_after_estimated_withholding: 490,
         net_result: -500,
         profitable: false,
       },
@@ -54,10 +57,18 @@ const tournament = {
         round: "w",
         prize_money: 1400,
         prize_money_after_tax: 980,
+        prize_money_after_estimated_withholding: 980,
         net_result: 200,
         profitable: true,
       },
     ],
+    estimated_withholding_rate: 30,
+    prize_rounds_after_estimated_withholding: {
+      r1: 0,
+      r2: 70,
+      qf: 210,
+      w: 630,
+    },
   },
 };
 
@@ -71,7 +82,11 @@ describe("API response schemas", () => {
       const response = {
         ...tournament,
         prize_rounds: {},
-        pnl: { ...tournament.pnl, scenarios: [] },
+        pnl: {
+          ...tournament.pnl,
+          scenarios: [],
+          prize_rounds_after_estimated_withholding: {},
+        },
       };
 
       expect(tournamentWithPnLSchema.parse(response)).toEqual(response);
@@ -117,6 +132,39 @@ describe("API response schemas", () => {
       const response = { ...tournament, prize_tax_rate: prizeTaxRate };
 
       expect(tournamentWithPnLSchema.safeParse(response).success).toBe(true);
+    });
+
+    it("preserves unknown withholding separately from confirmed zero", () => {
+      const unknown = {
+        ...tournament,
+        prize_tax_rate: null,
+        pnl: {
+          ...tournament.pnl,
+          estimated_withholding_rate: null,
+          prize_rounds_after_estimated_withholding: null,
+        },
+      };
+      const confirmedZero = {
+        ...tournament,
+        prize_tax_rate: 0,
+        pnl: {
+          ...tournament.pnl,
+          estimated_withholding_rate: 0,
+          prize_rounds_after_estimated_withholding: tournament.prize_rounds,
+        },
+      };
+
+      expect(tournamentWithPnLSchema.parse(unknown).prize_tax_rate).toBeNull();
+      expect(tournamentWithPnLSchema.parse(confirmedZero).prize_tax_rate).toBe(0);
+    });
+
+    it.each(["US", "MY"])("accepts ISO country code %s", (countryCode) => {
+      expect(
+        tournamentWithPnLSchema.safeParse({
+          ...tournament,
+          country_code: countryCode,
+        }).success,
+      ).toBe(true);
     });
 
     it.each([-1, Number.POSITIVE_INFINITY])(

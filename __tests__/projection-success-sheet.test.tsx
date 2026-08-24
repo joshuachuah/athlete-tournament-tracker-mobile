@@ -51,7 +51,9 @@ it("renders the actual returned projection and delegates view or dismiss", () =>
   );
 
   expect(
-    screen.getByText("This projection now reflects the tournament's current tax settings."),
+    screen.getByText(
+      "This projection now reflects the tournament's current estimated withholding.",
+    ),
   ).toBeTruthy();
   expect(screen.getByText("Middle case")).toBeTruthy();
   expect(screen.getByText("R2")).toBeTruthy();
@@ -76,8 +78,32 @@ it("uses distinct update confirmation copy in edit mode", () => {
 
   expect(screen.getByText("Projection updated")).toBeTruthy();
   expect(
-    screen.getByText("This projection now reflects the tournament's current tax settings."),
+    screen.getByText(
+      "This projection now reflects the tournament's current estimated withholding.",
+    ),
   ).toBeTruthy();
   expect(screen.getByLabelText("Server Open projection updated")).toBeTruthy();
   expect(screen.getByLabelText("Dismiss updated projection")).toBeTruthy();
+});
+
+it("keeps unknown withholding outcomes explicitly gross", () => {
+  const screen = render(
+    <ProjectionSuccessSheet
+      mode="create"
+      tournament={{ ...saved, prize_tax_rate: null }}
+      onView={jest.fn()}
+      onDismiss={jest.fn()}
+    />,
+  );
+
+  expect(
+    screen.getByText(
+      "Prize outcomes remain gross because estimated withholding is unknown.",
+    ),
+  ).toBeTruthy();
+  expect(
+    screen.queryByText(
+      "This projection now reflects the tournament's current estimated withholding.",
+    ),
+  ).toBeNull();
 });

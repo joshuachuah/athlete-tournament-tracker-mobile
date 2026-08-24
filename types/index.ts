@@ -12,6 +12,9 @@ export type PrizeRounds = {
   r3?: number;
   qf?: number;
   sf?: number;
+  p7_8?: number;
+  p5_6?: number;
+  p3_4?: number;
   f?: number;
   w?: number;
 };
@@ -35,6 +38,7 @@ export type Tournament = {
   name: string;
   location: string;
   country: string;
+  country_code?: string | null;
   currency: string;
   start_date: string;
   end_date: string;
@@ -50,7 +54,7 @@ export type Tournament = {
   subsidy_covers: SubsidyCovers | null;
   sponsorship_allocated: number;
   prize_rounds: PrizeRounds;
-  prize_tax_rate: number;
+  prize_tax_rate: number | null;
   created_at: string;
 };
 
@@ -61,6 +65,7 @@ export type ScenarioResult = {
   round: keyof PrizeRounds;
   prize_money: number;
   prize_money_after_tax: number;
+  prize_money_after_estimated_withholding?: number;
   net_result: number;
   profitable: boolean;
 };
@@ -70,6 +75,8 @@ export type PnLResult = {
   total_income_base: number;
   scenarios: ScenarioResult[];
   break_even_round: keyof PrizeRounds | null;
+  estimated_withholding_rate?: number | null;
+  prize_rounds_after_estimated_withholding?: PrizeRounds | null;
 };
 
 export type TournamentWithPnL = Tournament & {
@@ -82,6 +89,7 @@ export type KnownTournament = {
   name: string;
   location?: string;
   country?: string;
+  country_code?: string;
   currency?: string;
   start_date?: string;
   end_date?: string;
@@ -90,5 +98,5 @@ export type KnownTournament = {
   tour_level?: string;
   estimated_prize_total?: number;
   prize_rounds?: PrizeRounds;
-  prize_tax_rate?: number;
+  prize_tax_rate?: number | null;
 };

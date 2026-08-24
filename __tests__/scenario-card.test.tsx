@@ -47,6 +47,7 @@ const scenario: ScenarioResult = {
   round: "w",
   prize_money: 1000,
   prize_money_after_tax: 700,
+  prize_money_after_estimated_withholding: 700,
   net_result: 200,
   profitable: true,
 };
@@ -59,19 +60,28 @@ describe("ScenarioCard", () => {
   it("annotates net results when prize tax is withheld", () => {
     const screen = renderScenarioCard(scenario, 30);
 
-    expect(screen.getByText("Prize after tax")).toBeTruthy();
+    expect(screen.getByText("Prize after estimated withholding")).toBeTruthy();
     expect(
-      screen.getByText("Net is after 30% tax withholding on prize money."),
+      screen.getByText(
+        "Net uses a 30% estimated withholding rate on prize money.",
+      ),
     ).toBeTruthy();
   });
 
-  it("does not show tax annotation when tax rate is zero", () => {
+  it("shows matching gross and after values for a confirmed zero rate", () => {
     const screen = renderScenarioCard(scenario, 0);
 
-    expect(screen.queryByText("Prize after tax")).toBeNull();
+    expect(screen.getByText("Prize after estimated withholding")).toBeTruthy();
     expect(
-      screen.queryByText("Net is after 30% tax withholding on prize money."),
-    ).toBeNull();
+      screen.getByText("Net uses a 0% estimated withholding rate on prize money."),
+    ).toBeTruthy();
+  });
+
+  it("shows gross only while the withholding rate is unknown", () => {
+    const screen = renderScenarioCard(scenario);
+
+    expect(screen.queryByText("Prize after estimated withholding")).toBeNull();
+    expect(screen.queryByText(/estimated withholding rate/)).toBeNull();
   });
 
   it("shares one rate request across tax-bearing scenario amounts", async () => {

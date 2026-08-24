@@ -16,10 +16,12 @@ import { ProjectionEditorFields } from "@/components/tournament/projection-edito
 import { Button } from "@/components/ui/button";
 import { colors, spacing } from "@/constants/theme";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
+import { useTournamentPreview } from "@/hooks/use-tournament-preview";
 import {
   calculateAccommodationTotal,
   deriveDraftDates,
   detailsSchema,
+  emptyPrizeRounds,
   prizesSchema,
   spendingSchema,
   subsidySchema,
@@ -79,20 +81,22 @@ function schemaForEditor(editor: ProjectionEditor) {
   return spendingSchema;
 }
 
-function emptyPrizeRounds(): TournamentDraft["prize_rounds"] {
-  return { r1: 0, r2: 0, r3: 0, qf: 0, sf: 0, f: 0, w: 0 };
-}
-
 export function ProjectionEditorSheet({
   draft,
   editor,
+  authenticatedUserId = "",
+  homeCurrency = "USD",
   onApply,
   onClose,
+  profileId = "",
 }: {
+  authenticatedUserId?: string;
   draft: TournamentDraft;
   editor: ProjectionEditor;
+  homeCurrency?: string;
   onApply: (draft: TournamentDraft) => void;
   onClose: () => void;
+  profileId?: string;
 }) {
   const [workingDraft, setWorkingDraft] = useState(() => ({
     ...draft,
@@ -101,6 +105,17 @@ export function ProjectionEditorSheet({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const reducedMotion = useReducedMotion();
   const heading = editorTitles[editor];
+  const { data: prizePreview } = useTournamentPreview({
+    authenticatedUserId,
+    draft: workingDraft,
+    enabled:
+      editor === "prize" &&
+      Boolean(authenticatedUserId) &&
+      Boolean(profileId) &&
+      prizesSchema.safeParse(workingDraft).success,
+    homeCurrency,
+    profileId,
+  });
 
   function update(changes: Partial<TournamentDraft>) {
     setWorkingDraft((current) => deriveDraftDates({ ...current, ...changes }));
@@ -151,7 +166,9 @@ export function ProjectionEditorSheet({
             prize_player_total: 0,
             prize_rounds: emptyPrizeRounds(),
             prize_tax_rate: createTournamentRenamed
-              ? 0
+              ? workingDraft.country_code === "US"
+                ? 30
+                : null
               : workingDraft.prize_tax_rate,
           }
         : workingDraft;
@@ -225,6 +242,7 @@ export function ProjectionEditorSheet({
               errors={errors}
               onUpdate={update}
               onUpdateAccommodation={updateAccommodation}
+              prizePreview={prizePreview}
               workingDraft={workingDraft}
             />
           </ScrollView>

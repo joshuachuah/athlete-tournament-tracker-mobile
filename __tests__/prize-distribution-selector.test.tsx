@@ -1,6 +1,7 @@
 import { act, fireEvent, render } from "@testing-library/react-native";
-import { useState } from "react";
-import { ScrollView } from "react-native";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useState, type ReactElement } from "react";
+import { Alert, ScrollView } from "react-native";
 
 import { PrizeDistributionSelector } from "@/components/tournament/prize-distribution-selector";
 import { ProjectionEditorFields } from "@/components/tournament/projection-editor-fields";
@@ -9,14 +10,22 @@ import {
   createDefaultTournamentDraft,
   type TournamentDraft,
 } from "@/lib/tournament-draft";
+import type { PnLResult } from "@/types";
 
-function PrizeEditorHarness({ initialDraft }: { initialDraft: TournamentDraft }) {
+function PrizeEditorHarness({
+  initialDraft,
+  prizePreview,
+}: {
+  initialDraft: TournamentDraft;
+  prizePreview?: PnLResult;
+}) {
   const [draft, setDraft] = useState(initialDraft);
 
   return (
     <ProjectionEditorFields
       editor="prize"
       errors={{}}
+      prizePreview={prizePreview}
       workingDraft={draft}
       onUpdate={(changes) =>
         setDraft((current) => ({ ...current, ...changes }))
@@ -26,12 +35,44 @@ function PrizeEditorHarness({ initialDraft }: { initialDraft: TournamentDraft })
   );
 }
 
-function renderPrizeEditor(overrides: Partial<TournamentDraft> = {}) {
+function renderPrizeEditor(
+  overrides: Partial<TournamentDraft> = {},
+  prizePreview?: PnLResult,
+) {
   const draft = { ...createDefaultTournamentDraft(), ...overrides };
-  return render(<PrizeEditorHarness initialDraft={draft} />);
+  return render(
+    <PrizeEditorHarness initialDraft={draft} prizePreview={prizePreview} />,
+  );
+}
+
+function renderWithClient(element: ReactElement) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { gcTime: Infinity, retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={client}>{element}</QueryClientProvider>,
+  );
+}
+
+const alertSpy = jest.spyOn(Alert, "alert");
+
+function confirmTerritoryDraw() {
+  const latestCall = alertSpy.mock.calls[alertSpy.mock.calls.length - 1];
+  const confirmButton = latestCall?.[2]?.find(
+    (button) => button.text === "Confirm territory event",
+  );
+
+  act(() => confirmButton?.onPress?.());
 }
 
 describe("PrizeDistributionSelector", () => {
+  beforeEach(() => {
+    alertSpy.mockReset();
+    alertSpy.mockImplementation(() => undefined);
+  });
+
+  afterAll(() => alertSpy.mockRestore());
+
   it("fills the implied Bronze draw payouts as soon as the tier is tapped", () => {
     const screen = renderPrizeEditor();
 
@@ -39,8 +80,8 @@ describe("PrizeDistributionSelector", () => {
 
     expect(screen.getByText("Draw set by tier")).toBeTruthy();
     expect(screen.getByText("Confirm bye adjustments")).toBeTruthy();
-    expect(screen.getByText("$831.25 USD")).toBeTruthy();
-    expect(screen.getByText("$9,025 USD")).toBeTruthy();
+    expect(screen.getByLabelText("R1 payout, $997.5 USD gross")).toBeTruthy();
+    expect(screen.getByLabelText("Win payout, $10,830 USD gross")).toBeTruthy();
     expect(screen.queryByText("R3")).toBeNull();
   });
 
@@ -49,7 +90,7 @@ describe("PrizeDistributionSelector", () => {
 
     fireEvent.press(screen.getByText("Bronze"));
 
-    expect(screen.getByText("$2,137.5 USD")).toBeTruthy();
+    expect(screen.getByLabelText("QF payout, $2,565 USD gross")).toBeTruthy();
     expect(screen.queryByLabelText("QF (USD)")).toBeNull();
     expect(screen.queryByLabelText("Edit QF payout")).toBeNull();
     expect(screen.queryByText("Enter payouts manually")).toBeNull();
@@ -62,10 +103,10 @@ describe("PrizeDistributionSelector", () => {
     fireEvent.press(screen.getByText("Gold"));
 
     expect(screen.queryByLabelText("QF (USD)")).toBeNull();
-    expect(screen.getByText("$4,275 USD")).toBeTruthy();
+    expect(screen.getByLabelText("QF payout, $5,130 USD gross")).toBeTruthy();
   });
 
-  it("fills Challenger payouts from the accommodation-adjusted base once a draw is chosen", () => {
+  it("fills Challenger payouts from the published player prize once a draw is chosen", () => {
     const screen = renderPrizeEditor();
 
     fireEvent.press(screen.getByText("Challenger"));
@@ -82,8 +123,17 @@ describe("PrizeDistributionSelector", () => {
 
     fireEvent.press(screen.getByText("16 draw · 16 entries"));
 
-    expect(screen.getByText("$162.5 USD")).toBeTruthy();
-    expect(screen.getByText("$1,000 USD")).toBeTruthy();
+    expect(alertSpy).toHaveBeenCalledWith(
+      "Territory-based events only",
+      "The 16-player draw applies only to territory-based Challenger 3 and Challenger 6 events.",
+      expect.any(Array),
+    );
+    expect(screen.queryByLabelText("R1 payout, $195 USD gross")).toBeNull();
+
+    confirmTerritoryDraw();
+
+    expect(screen.getByLabelText("R1 payout, $195 USD gross")).toBeTruthy();
+    expect(screen.getByLabelText("Win payout, $1,200 USD gross")).toBeTruthy();
   });
 
   it("keeps a Challenger draw chosen before the level", () => {
@@ -91,6 +141,7 @@ describe("PrizeDistributionSelector", () => {
 
     fireEvent.press(screen.getByText("Challenger"));
     fireEvent.press(screen.getByText("16 draw · 16 entries"));
+    confirmTerritoryDraw();
     fireEvent.press(screen.getByText("6K"));
 
     expect(
@@ -99,8 +150,8 @@ describe("PrizeDistributionSelector", () => {
         checked: true,
       }),
     ).toBeTruthy();
-    expect(screen.getByText("$195 USD")).toBeTruthy();
-    expect(screen.getByText("$1,200 USD")).toBeTruthy();
+    expect(screen.getByLabelText("R1 payout, $195 USD gross")).toBeTruthy();
+    expect(screen.getByLabelText("Win payout, $1,200 USD gross")).toBeTruthy();
   });
 
   it("clears an incompatible World tier when a Challenger draw is chosen", () => {
@@ -109,15 +160,16 @@ describe("PrizeDistributionSelector", () => {
       ...createDefaultTournamentDraft(),
       prize_tier_id: "world_bronze",
       prize_draw_template_id: "draw_32_entries_24",
-      prize_player_total: 47_500,
+      prize_player_total: 57_000,
       prize_rounds: {
-        r1: 831.25,
-        r2: 1_306.25,
+        ...createDefaultTournamentDraft().prize_rounds,
+        r1: 997.5,
+        r2: 1_567.5,
         r3: 0,
-        qf: 2_137.5,
-        sf: 3_562.5,
-        f: 5_700,
-        w: 9_025,
+        qf: 2_565,
+        sf: 4_275,
+        f: 6_840,
+        w: 10_830,
       },
     };
     const screen = render(
@@ -126,13 +178,19 @@ describe("PrizeDistributionSelector", () => {
 
     fireEvent.press(screen.getByText("Challenger"));
     fireEvent.press(screen.getByText("16 draw · 16 entries"));
+    expect(onUpdate).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        prize_draw_template_id: "draw_16_entries_16",
+      }),
+    );
+    confirmTerritoryDraw();
 
     expect(onUpdate).toHaveBeenCalledWith({
       prize_distribution_mode: "generated",
       prize_tier_id: null,
       prize_player_total: 0,
       prize_draw_template_id: "draw_16_entries_16",
-      prize_rounds: { r1: 0, r2: 0, r3: 0, qf: 0, sf: 0, f: 0, w: 0 },
+      prize_rounds: createDefaultTournamentDraft().prize_rounds,
     });
   });
 
@@ -147,6 +205,21 @@ describe("PrizeDistributionSelector", () => {
     ).toBeDisabled();
   });
 
+  it.each([9, 12, 15, 18])(
+    "does not offer the territory-only draw for Challenger %s",
+    (level) => {
+      const screen = renderPrizeEditor();
+
+      fireEvent.press(screen.getByText("Challenger"));
+      fireEvent.press(screen.getByText(`${level}K`));
+
+      expect(screen.queryByText("16 draw · 16 entries")).toBeNull();
+      expect(
+        screen.getByRole("radio", { name: /32 draw · 24 entries/ }),
+      ).toBeTruthy();
+    },
+  );
+
   it("preserves a saved payout snapshot until a PSA selection changes", () => {
     const defaultDraft = createDefaultTournamentDraft();
     const screen = renderPrizeEditor({
@@ -155,14 +228,14 @@ describe("PrizeDistributionSelector", () => {
     });
 
     expect(screen.getByText("Saved payout schedule")).toBeTruthy();
-    expect(screen.getByText("$500 USD")).toBeTruthy();
+    expect(screen.getByLabelText("QF payout, $500 USD gross")).toBeTruthy();
     expect(screen.queryByLabelText("QF (USD)")).toBeNull();
 
     fireEvent.press(screen.getByText("Bronze"));
 
     expect(screen.getByText("PSA generated")).toBeTruthy();
-    expect(screen.getByText("$2,137.5 USD")).toBeTruthy();
-    expect(screen.queryByText("$500 USD")).toBeNull();
+    expect(screen.getByLabelText("QF payout, $2,565 USD gross")).toBeTruthy();
+    expect(screen.queryByLabelText("QF payout, $500 USD gross")).toBeNull();
   });
 
   it("shows every positive round in a manual snapshot with selector metadata", () => {
@@ -176,8 +249,8 @@ describe("PrizeDistributionSelector", () => {
 
     expect(screen.getByText("Saved payout schedule")).toBeTruthy();
     expect(screen.getByText("R3")).toBeTruthy();
-    expect(screen.getByText("$700 USD")).toBeTruthy();
-    expect(screen.getByText("$500 USD")).toBeTruthy();
+    expect(screen.getByLabelText("R3 payout, $700 USD gross")).toBeTruthy();
+    expect(screen.getByLabelText("QF payout, $500 USD gross")).toBeTruthy();
     expect(screen.queryByText("4 players paid")).toBeNull();
   });
 
@@ -187,14 +260,14 @@ describe("PrizeDistributionSelector", () => {
       prize_distribution_mode: "generated",
       prize_tier_id: "world_bronze",
       prize_draw_template_id: "draw_32_entries_24",
-      prize_player_total: 47_500,
+      prize_player_total: 57_000,
       prize_rounds: { ...defaultDraft.prize_rounds, r3: 700, qf: 500 },
     });
 
     expect(screen.getByText("PSA generated")).toBeTruthy();
     expect(screen.queryByText("R3")).toBeNull();
     expect(screen.queryByText("$700 USD")).toBeNull();
-    expect(screen.getByText("$500 USD")).toBeTruthy();
+    expect(screen.getByLabelText("QF payout, $500 USD gross")).toBeTruthy();
     expect(screen.getByText("4 players paid")).toBeTruthy();
   });
 
@@ -237,21 +310,23 @@ describe("PrizeDistributionSelector", () => {
         name: "Malaysia Open",
         location: "Kuala Lumpur",
         country: "Malaysia",
+        country_code: "MY",
         prize_distribution_mode: prizeDistributionMode,
         prize_tier_id: "world_bronze",
         prize_draw_template_id: "draw_32_entries_24",
-        prize_player_total: 47_500,
+        prize_player_total: 57_000,
         prize_rounds: {
-          r1: 831.25,
-          r2: 1_306.25,
+          ...createDefaultTournamentDraft().prize_rounds,
+          r1: 997.5,
+          r2: 1_567.5,
           r3: 0,
-          qf: 2_137.5,
-          sf: 3_562.5,
-          f: 5_700,
-          w: 9_025,
+          qf: 2_565,
+          sf: 4_275,
+          f: 6_840,
+          w: 10_830,
         },
       };
-      const screen = render(
+      const screen = renderWithClient(
         <ProjectionEditorSheet
           editor="details"
           draft={draft}
@@ -274,7 +349,7 @@ describe("PrizeDistributionSelector", () => {
           prize_tier_id: null,
           prize_draw_template_id: null,
           prize_player_total: 0,
-          prize_rounds: { r1: 0, r2: 0, r3: 0, qf: 0, sf: 0, f: 0, w: 0 },
+          prize_rounds: createDefaultTournamentDraft().prize_rounds,
         }),
       );
     },
@@ -287,20 +362,22 @@ describe("PrizeDistributionSelector", () => {
       name: "Malaysia Open",
       location: "Kuala Lumpur",
       country: "Malaysia",
+      country_code: "MY",
       prize_tier_id: "world_bronze",
       prize_draw_template_id: "draw_32_entries_24",
-      prize_player_total: 47_500,
+      prize_player_total: 57_000,
       prize_rounds: {
-        r1: 831.25,
-        r2: 1_306.25,
+        ...createDefaultTournamentDraft().prize_rounds,
+        r1: 997.5,
+        r2: 1_567.5,
         r3: 0,
-        qf: 2_137.5,
-        sf: 3_562.5,
-        f: 5_700,
-        w: 9_025,
+        qf: 2_565,
+        sf: 4_275,
+        f: 6_840,
+        w: 10_830,
       },
     };
-    const screen = render(
+    const screen = renderWithClient(
       <ProjectionEditorSheet
         editor="details"
         draft={draft}
@@ -324,7 +401,7 @@ describe("PrizeDistributionSelector", () => {
         currency: "USD",
         prize_tier_id: "world_bronze",
         prize_draw_template_id: "draw_32_entries_24",
-        prize_player_total: 47_500,
+        prize_player_total: 57_000,
         prize_rounds: draft.prize_rounds,
       }),
     );
@@ -338,12 +415,13 @@ describe("PrizeDistributionSelector", () => {
       name: "Malaysia Open",
       location: "Kuala Lumpur",
       country: "Malaysia",
+      country_code: "MY",
       prize_rounds: {
         ...defaultDraft.prize_rounds,
         qf: 500,
       },
     };
-    const screen = render(
+    const screen = renderWithClient(
       <ProjectionEditorSheet
         editor="details"
         draft={draft}
@@ -368,7 +446,7 @@ describe("PrizeDistributionSelector", () => {
     );
   });
 
-  it("allows Tour Finals to record that its payout schedule is unavailable", () => {
+  it("generates the Tour Finals placement schedule", () => {
     const screen = renderPrizeEditor();
 
     fireEvent.press(screen.getByText("Tour Finals"));
@@ -376,45 +454,77 @@ describe("PrizeDistributionSelector", () => {
     expect(
       screen.getByRole("radio", { name: /Tour Finals/, checked: true }),
     ).toBeTruthy();
-    expect(screen.getByText("Payout schedule unavailable")).toBeTruthy();
-    expect(screen.getByText("Schedule unavailable")).toBeTruthy();
+    expect(screen.getByText("7th–8th")).toBeTruthy();
     expect(
-      screen.getByText(
-        "PSA does not publish a round payout schedule for this tier.",
-      ),
+      screen.getByLabelText("7th–8th payout, $16,625 USD gross"),
     ).toBeTruthy();
+    expect(screen.getByLabelText("Win payout, $99,750 USD gross")).toBeTruthy();
   });
 
   it("shows gross prize messaging without manual withholding controls", () => {
     const screen = renderPrizeEditor();
 
-    expect(screen.getByText("Gross prize projection")).toBeTruthy();
+    expect(screen.getByText("Gross prize only")).toBeTruthy();
     expect(
       screen.getByText(
-        "Withholding is not included because no verified rate is available.",
+        "No estimated withholding rate is known for this tournament.",
       ),
     ).toBeTruthy();
     expect(screen.queryByText("15%")).toBeNull();
     expect(screen.queryByText("Custom")).toBeNull();
-    expect(screen.queryByLabelText("Prize tax withholding %")).toBeNull();
+    expect(screen.queryByLabelText(/Estimated withholding/)).toBeNull();
   });
 
   it("renders a supplied withholding rate as read-only tournament data", () => {
-    const screen = renderPrizeEditor({ prize_tax_rate: 30 });
+    const screen = renderPrizeEditor({
+      country: "United States",
+      country_code: "US",
+      prize_tax_rate: 30,
+    });
 
-    expect(screen.getByText("Withholding included")).toBeTruthy();
+    expect(screen.getByText("Estimated withholding included")).toBeTruthy();
     expect(
       screen.getByText(
-        "This projection includes the tournament's 30% withholding rate.",
+        "This projection uses a 30% estimated withholding rate.",
       ),
     ).toBeTruthy();
-    expect(screen.queryByLabelText("Prize tax withholding %")).toBeNull();
+    expect(screen.queryByLabelText(/Estimated withholding/)).toBeNull();
+  });
+
+  it("renders the server-provided after-withholding payout beside gross", () => {
+    const draft = createDefaultTournamentDraft();
+    const screen = renderPrizeEditor(
+      {
+        country: "United States",
+        country_code: "US",
+        prize_tax_rate: 30,
+        prize_distribution_mode: "generated",
+        prize_tier_id: "world_gold",
+        prize_draw_template_id: "draw_32_entries_24",
+        prize_player_total: 114_000,
+        prize_rounds: { ...draft.prize_rounds, w: 21_660 },
+      },
+      {
+        total_expenses: 0,
+        total_income_base: 0,
+        scenarios: [],
+        break_even_round: "w",
+        estimated_withholding_rate: 30,
+        prize_rounds_after_estimated_withholding: { w: 15_162 },
+      },
+    );
+
+    expect(
+      screen.getByLabelText(
+        "Win payout, $21,660 USD gross, $15,162 USD after estimated withholding",
+      ),
+    ).toBeTruthy();
   });
 });
 
 describe("ProjectionEditorSheet", () => {
   it("dismisses the keyboard on drag without interactive frame tracking", () => {
-    const screen = render(
+    const screen = renderWithClient(
       <ProjectionEditorSheet
         editor="prize"
         draft={createDefaultTournamentDraft()}

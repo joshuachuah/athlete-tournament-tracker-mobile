@@ -1,12 +1,18 @@
 import { Switch, Text, View } from "react-native";
 
 import type { ProjectionEditor } from "@/components/tournament/impact-ledger";
+import { CountrySelector } from "@/components/tournament/country-selector";
 import { PrizeDistributionSelector } from "@/components/tournament/prize-distribution-selector";
 import { Button } from "@/components/ui/button";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Input } from "@/components/ui/input";
 import { MoneyInput } from "@/components/ui/money-input";
+import { NullablePercentageInput } from "@/components/ui/nullable-percentage-input";
 import { colors, spacing } from "@/constants/theme";
+import {
+  estimatedWithholdingAfterCountryChange,
+  getCountryByCode,
+} from "@/lib/countries";
 import type { TournamentDraft } from "@/lib/tournament-draft";
 import {
   getDrawTemplate,
@@ -15,7 +21,7 @@ import {
   prizeRoundKeys,
 } from "@/lib/prize-distributions";
 import { formatMoney, roundLabels } from "@/lib/utils";
-import type { SubsidyCovers } from "@/types";
+import type { PnLResult, SubsidyCovers } from "@/types";
 
 const coverOptions: Array<{ value: SubsidyCovers; label: string }> = [
   { value: "flights", label: "Flights" },
@@ -30,20 +36,28 @@ const coverOptions: Array<{ value: SubsidyCovers; label: string }> = [
  * rows and keep their existing payout snapshot until a PSA choice changes.
  */
 function PrizeRoundRow({
+  afterEstimatedWithholding,
   currency,
   label,
   players,
+  rateKnown,
   value,
 }: {
+  afterEstimatedWithholding?: number;
   currency: string;
   label: string;
   players?: number;
+  rateKnown: boolean;
   value: number;
 }) {
   return (
     <View
       accessible
-      accessibilityLabel={`${label} payout, ${formatMoney(value, currency)}`}
+      accessibilityLabel={`${label} payout, ${formatMoney(value, currency)} gross${
+        rateKnown && afterEstimatedWithholding !== undefined
+          ? `, ${formatMoney(afterEstimatedWithholding, currency)} after estimated withholding`
+          : ""
+      }`}
       style={{
         minHeight: 56,
         flexDirection: "row",
@@ -65,9 +79,18 @@ function PrizeRoundRow({
           </Text>
         ) : null}
       </View>
-      <Text style={{ color: colors.foreground, fontWeight: "800" }}>
-        {formatMoney(value, currency)}
-      </Text>
+      <View style={{ alignItems: "flex-end", gap: spacing.xs }}>
+        <Text style={{ color: colors.foreground, fontWeight: "800" }}>
+          {formatMoney(value, currency)} gross
+        </Text>
+        {rateKnown ? (
+          <Text style={{ color: colors.accent, fontSize: 12, fontWeight: "800" }}>
+            {afterEstimatedWithholding === undefined
+              ? "Calculating estimate..."
+              : `${formatMoney(afterEstimatedWithholding, currency)} after estimated withholding`}
+          </Text>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -75,6 +98,7 @@ function PrizeRoundRow({
 type EditorFieldsProps = {
   errors: Record<string, string>;
   onUpdate: (changes: Partial<TournamentDraft>) => void;
+  prizePreview?: PnLResult;
   workingDraft: TournamentDraft;
 };
 
@@ -100,12 +124,24 @@ function DetailsEditorFields({
         error={errors.location}
         autoCapitalize="words"
       />
-      <Input
-        label="Country"
-        value={workingDraft.country}
-        onChangeText={(country) => onUpdate({ country })}
-        error={errors.country}
-        autoCapitalize="words"
+      <CountrySelector
+        code={workingDraft.country_code}
+        name={workingDraft.country}
+        error={errors.country_code ?? errors.country}
+        onSelect={(country_code) => {
+          const selectedCountry = getCountryByCode(country_code);
+          if (!selectedCountry) return;
+
+          onUpdate({
+            country: selectedCountry.name,
+            country_code,
+            prize_tax_rate: estimatedWithholdingAfterCountryChange(
+              workingDraft.country_code,
+              country_code,
+              workingDraft.prize_tax_rate,
+            ),
+          });
+        }}
       />
       <Input
         label="Currency"
@@ -138,7 +174,12 @@ function DetailsEditorFields({
   );
 }
 
-function PrizeEditorFields({ errors, onUpdate, workingDraft }: EditorFieldsProps) {
+function PrizeEditorFields({
+  errors,
+  onUpdate,
+  prizePreview,
+  workingDraft,
+}: EditorFieldsProps) {
   const selectedTier = workingDraft.prize_tier_id
     ? getPrizeTier(workingDraft.prize_tier_id)
     : null;
@@ -153,17 +194,12 @@ function PrizeEditorFields({ errors, onUpdate, workingDraft }: EditorFieldsProps
       workingDraft.prize_rounds[round] > 0 &&
       (!generated || selectedTemplate?.percentages[round] !== undefined),
   );
-  const scheduleUnavailable = selectedTier?.manualOnly === true;
-  const scheduleHeading = scheduleUnavailable
-    ? "Schedule unavailable"
-    : rounds.length > 0
+  const scheduleHeading = rounds.length > 0
       ? generated
         ? "PSA generated"
         : "Saved payout schedule"
       : "No payout schedule";
-  const emptyScheduleMessage = scheduleUnavailable
-    ? "PSA does not publish a round payout schedule for this tier."
-    : workingDraft.currency.toUpperCase() !== prizeDistributionCurrency
+  const emptyScheduleMessage = workingDraft.currency.toUpperCase() !== prizeDistributionCurrency
       ? "Official USD payout outcomes are unavailable for this tournament currency."
       : workingDraft.prize_distribution_mode === "manual"
         ? "No payout schedule was supplied with this tournament."
@@ -223,8 +259,12 @@ function PrizeEditorFields({ errors, onUpdate, workingDraft }: EditorFieldsProps
               <PrizeRoundRow
                 key={round}
                 label={roundLabels[round]}
+                afterEstimatedWithholding={
+                  prizePreview?.prize_rounds_after_estimated_withholding?.[round]
+                }
                 currency={workingDraft.currency}
                 players={generated ? selectedTemplate?.players[round] : undefined}
+                rateKnown={workingDraft.prize_tax_rate !== null}
                 value={workingDraft.prize_rounds[round]}
               />
             ))}
@@ -241,20 +281,20 @@ function PrizeEditorFields({ errors, onUpdate, workingDraft }: EditorFieldsProps
           paddingLeft: spacing.md,
           borderLeftWidth: 3,
           borderLeftColor:
-            workingDraft.prize_tax_rate > 0 ? colors.accent : colors.warning,
+            workingDraft.prize_tax_rate !== null ? colors.accent : colors.warning,
         }}
       >
         <Text style={{ color: colors.foreground, fontWeight: "800" }}>
-          {workingDraft.prize_tax_rate > 0
-            ? "Withholding included"
-            : "Gross prize projection"}
+          {workingDraft.prize_tax_rate !== null
+            ? "Estimated withholding included"
+            : "Gross prize only"}
         </Text>
         <Text
           style={{ color: colors.mutedForeground, fontSize: 12, lineHeight: 18 }}
         >
-          {workingDraft.prize_tax_rate > 0
-            ? `This projection includes the tournament's ${workingDraft.prize_tax_rate}% withholding rate.`
-            : "Withholding is not included because no verified rate is available."}
+          {workingDraft.prize_tax_rate !== null
+            ? `This projection uses a ${workingDraft.prize_tax_rate}% estimated withholding rate.`
+            : "No estimated withholding rate is known for this tournament."}
         </Text>
         {errors.prize_tax_rate ? (
           <Text style={{ color: colors.loss, fontSize: 12 }}>
@@ -262,6 +302,30 @@ function PrizeEditorFields({ errors, onUpdate, workingDraft }: EditorFieldsProps
           </Text>
         ) : null}
       </View>
+      {workingDraft.country_code === "US" ? (
+        <View style={{ gap: spacing.xs }}>
+          <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>
+            Estimated withholding
+          </Text>
+          <Text style={{ color: colors.foreground, fontSize: 24, fontWeight: "900" }}>
+            30%
+          </Text>
+          <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>
+            United States · Fixed rate
+          </Text>
+        </View>
+      ) : workingDraft.country_code ? (
+        <NullablePercentageInput
+          error={errors.prize_tax_rate}
+          label={`Estimated withholding in ${workingDraft.country}`}
+          onChangeValue={(prize_tax_rate) => onUpdate({ prize_tax_rate })}
+          value={workingDraft.prize_tax_rate}
+        />
+      ) : (
+        <Text style={{ color: colors.warning, lineHeight: 20 }}>
+          Choose the tournament country before adding estimated withholding.
+        </Text>
+      )}
     </>
   );
 }
@@ -390,6 +454,7 @@ export function ProjectionEditorFields({
   errors,
   onUpdate,
   onUpdateAccommodation,
+  prizePreview,
   workingDraft,
 }: {
   editor: ProjectionEditor;
@@ -399,6 +464,7 @@ export function ProjectionEditorFields({
     accommodation_nightly?: number;
     accommodation_nights?: number;
   }) => void;
+  prizePreview?: PnLResult;
   workingDraft: TournamentDraft;
 }) {
   if (editor === "details") {
@@ -406,6 +472,7 @@ export function ProjectionEditorFields({
       <DetailsEditorFields
         errors={errors}
         onUpdate={onUpdate}
+        prizePreview={prizePreview}
         workingDraft={workingDraft}
       />
     );
@@ -416,6 +483,7 @@ export function ProjectionEditorFields({
       <PrizeEditorFields
         errors={errors}
         onUpdate={onUpdate}
+        prizePreview={prizePreview}
         workingDraft={workingDraft}
       />
     );

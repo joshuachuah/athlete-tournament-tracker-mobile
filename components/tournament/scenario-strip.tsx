@@ -4,10 +4,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-nati
 import { colors, radii, spacing } from "@/constants/theme";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { api } from "@/lib/api";
-import {
-  getPrizeTier,
-  prizeDistributionCurrency,
-} from "@/lib/prize-distributions";
+import { prizeDistributionCurrency } from "@/lib/prize-distributions";
 import {
   detailsSchema,
   prizesSchema,
@@ -76,19 +73,11 @@ export function ScenarioStrip({
 }) {
   const draftReady = canPreview(draft);
   const previewReady = identityResolved && draftReady;
-  const selectedTier = draft.prize_tier_id
-    ? getPrizeTier(draft.prize_tier_id)
-    : null;
   const hasPrizeRounds = Object.values(draft.prize_rounds).some(
     (amount) => amount > 0,
   );
   const emptyProjectionCopy =
-    selectedTier?.manualOnly === true
-      ? {
-          title: "Outcomes unavailable",
-          body: "PSA does not publish a round payout schedule for this tier.",
-        }
-      : draft.currency.toUpperCase() !== prizeDistributionCurrency
+    draft.currency.toUpperCase() !== prizeDistributionCurrency
         ? {
             title: "Outcomes unavailable",
             body: "Official USD payout outcomes are unavailable for this tournament currency.",

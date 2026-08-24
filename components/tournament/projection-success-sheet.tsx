@@ -27,6 +27,10 @@ export function ProjectionSuccessSheet({
   const realistic = getScenario(tournament, "realistic");
   const title = mode === "edit" ? "Projection updated" : "Projection saved";
   const resultVerb = mode === "edit" ? "updated" : "saved";
+  const withholdingSummary =
+    tournament.prize_tax_rate === null
+      ? "Prize outcomes remain gross because estimated withholding is unknown."
+      : "This projection now reflects the tournament's current estimated withholding.";
 
   return (
     <Modal
@@ -73,7 +77,7 @@ export function ProjectionSuccessSheet({
                 {title}
               </Text>
               <Text style={{ color: colors.mutedForeground, lineHeight: 20 }}>
-                This projection now reflects the tournament's current tax settings.
+                {withholdingSummary}
               </Text>
             </View>
             <Pressable
