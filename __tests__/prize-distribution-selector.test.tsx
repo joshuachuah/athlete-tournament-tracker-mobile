@@ -116,6 +116,11 @@ describe("PrizeDistributionSelector", () => {
     fireEvent.press(screen.getByText("Bronze"));
 
     expect(screen.getAllByText("Estimate unavailable").length).toBeGreaterThan(0);
+    expect(
+      screen.getByLabelText(
+        "Win payout, $10,830 USD gross, estimated withholding unavailable",
+      ),
+    ).toBeTruthy();
     expect(screen.queryByText("Calculating estimate...")).toBeNull();
   });
 
@@ -125,6 +130,11 @@ describe("PrizeDistributionSelector", () => {
     fireEvent.press(screen.getByText("Bronze"));
 
     expect(screen.getAllByText("Calculating estimate...").length).toBeGreaterThan(0);
+    expect(
+      screen.getByLabelText(
+        "Win payout, $10,830 USD gross, estimated withholding calculating",
+      ),
+    ).toBeTruthy();
     expect(screen.queryByText("Estimate unavailable")).toBeNull();
   });
 

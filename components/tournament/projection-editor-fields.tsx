@@ -56,9 +56,13 @@ function PrizeRoundRow({
     <View
       accessible
       accessibilityLabel={`${label} payout, ${formatMoney(value, currency)} gross${
-        rateKnown && afterEstimatedWithholding !== undefined
-          ? `, ${formatMoney(afterEstimatedWithholding, currency)} after estimated withholding`
-          : ""
+        !rateKnown
+          ? ""
+          : afterEstimatedWithholding !== undefined
+            ? `, ${formatMoney(afterEstimatedWithholding, currency)} after estimated withholding`
+            : estimateLoading
+              ? ", estimated withholding calculating"
+              : ", estimated withholding unavailable"
       }`}
       style={{
         minHeight: 56,
