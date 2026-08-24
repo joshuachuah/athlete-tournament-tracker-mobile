@@ -90,7 +90,11 @@ it("keeps unknown withholding outcomes explicitly gross", () => {
   const screen = render(
     <ProjectionSuccessSheet
       mode="create"
-      tournament={{ ...saved, prize_tax_rate: null }}
+      tournament={{
+        ...saved,
+        prize_tax_rate: 30,
+        pnl: { ...saved.pnl, estimated_withholding_rate: null },
+      }}
       onView={jest.fn()}
       onDismiss={jest.fn()}
     />,
@@ -112,7 +116,11 @@ it("keeps confirmed zero distinct from unknown withholding", () => {
   const screen = render(
     <ProjectionSuccessSheet
       mode="create"
-      tournament={{ ...saved, prize_tax_rate: 0 }}
+      tournament={{
+        ...saved,
+        prize_tax_rate: null,
+        pnl: { ...saved.pnl, estimated_withholding_rate: 0 },
+      }}
       onView={jest.fn()}
       onDismiss={jest.fn()}
     />,

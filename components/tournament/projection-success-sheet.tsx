@@ -27,8 +27,12 @@ export function ProjectionSuccessSheet({
   const realistic = getScenario(tournament, "realistic");
   const title = mode === "edit" ? "Projection updated" : "Projection saved";
   const resultVerb = mode === "edit" ? "updated" : "saved";
+  const appliedEstimatedWithholdingRate =
+    tournament.pnl.estimated_withholding_rate === undefined
+      ? tournament.prize_tax_rate
+      : tournament.pnl.estimated_withholding_rate;
   const withholdingSummary =
-    tournament.prize_tax_rate === null
+    appliedEstimatedWithholdingRate === null
       ? "Prize outcomes remain gross because estimated withholding is unknown."
       : "This projection now reflects the tournament's current estimated withholding.";
 
