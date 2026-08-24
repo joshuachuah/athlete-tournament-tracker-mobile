@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Text } from "react-native";
 
 import { Input } from "@/components/ui/input";
@@ -16,10 +16,6 @@ export function NullablePercentageInput({
   value: number | null;
 }) {
   const [text, setText] = useState(value === null ? "" : String(value));
-
-  useEffect(() => {
-    setText(value === null ? "" : String(value));
-  }, [value]);
 
   return (
     <>
