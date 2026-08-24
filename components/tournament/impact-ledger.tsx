@@ -207,18 +207,21 @@ export function ImpactLedger({
     estimatedWithholdingRate === undefined
       ? draft.prize_tax_rate
       : estimatedWithholdingRate;
+  const configuredPrizeRounds = prizeRoundKeys.filter(
+    (round) => draft.prize_rounds[round] > 0,
+  );
   const displaysAfterEstimatedWithholding =
     appliedEstimatedWithholdingRate !== null &&
     prizeRoundsAfterEstimatedWithholding !== null &&
-    prizeRoundsAfterEstimatedWithholding !== undefined;
+    prizeRoundsAfterEstimatedWithholding !== undefined &&
+    configuredPrizeRounds.every(
+      (round) => prizeRoundsAfterEstimatedWithholding[round] !== undefined,
+    );
   const displayedPrizes =
     displaysAfterEstimatedWithholding
-      ? prizeRoundKeys
-          .filter((round) => draft.prize_rounds[round] > 0)
-          .flatMap((round) => {
-            const value = prizeRoundsAfterEstimatedWithholding[round];
-            return value === undefined ? [] : [value];
-          })
+      ? configuredPrizeRounds.map(
+          (round) => prizeRoundsAfterEstimatedWithholding[round] ?? 0,
+        )
       : prizes;
   const lowestPrize =
     displayedPrizes.length > 0 ? Math.min(...displayedPrizes) : 0;
@@ -226,8 +229,11 @@ export function ImpactLedger({
     displayedPrizes.length > 0 ? Math.max(...displayedPrizes) : 0;
   const travel = draft.flight_cost + draft.accommodation_total;
   const assumptions = optionalAssumptions(draft);
-  const detailSummary = draft.location.trim()
-    ? `${[draft.location.trim(), draft.country.trim()].filter(Boolean).join(", ")}${parseDateOnly(draft.start_date) ? ` · ${formatDate(draft.start_date)}` : ""}`
+  const locationSummary = [draft.location.trim(), draft.country.trim()]
+    .filter(Boolean)
+    .join(", ");
+  const detailSummary = locationSummary
+    ? `${locationSummary}${parseDateOnly(draft.start_date) ? ` · ${formatDate(draft.start_date)}` : ""}`
     : "Location, dates, currency, and entry fee";
   const prizeSummary =
     displayedPrizes.length > 0

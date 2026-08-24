@@ -929,6 +929,36 @@ describe("TournamentProjectionBuilder", () => {
     );
   });
 
+  it("keeps the complete gross range when adjusted payouts are partial", async () => {
+    mockPreview.mockResolvedValue({
+      total_expenses: 0,
+      total_income_base: 0,
+      scenarios: [],
+      break_even_round: null,
+      estimated_withholding_rate: 20,
+      prize_rounds_after_estimated_withholding: { w: 800 },
+    });
+    const draft = {
+      ...validDraft,
+      prize_rounds: { ...validDraft.prize_rounds, w: 1_000 },
+    };
+    const { screen } = renderBuilder(draft);
+
+    await advance(350);
+
+    expect(screen.getByText("2 gross estimates")).toBeTruthy();
+    expect(screen.getByText("+$500 USD–+$1,000 USD")).toBeTruthy();
+  });
+
+  it("shows the selected country before a location is entered", () => {
+    const { screen } = renderBuilder({ ...validDraft, location: "" });
+
+    expect(screen.getByText(/^United States ·/)).toBeTruthy();
+    expect(
+      screen.queryByText("Location, dates, currency, and entry fee"),
+    ).toBeNull();
+  });
+
   it("allows a known tournament with no supplied payout schedule", () => {
     const initialDraft = tournamentDraftFromKnown({
       name: "Known Open",
