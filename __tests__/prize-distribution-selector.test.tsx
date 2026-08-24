@@ -13,10 +13,12 @@ import {
 import type { PnLResult } from "@/types";
 
 function PrizeEditorHarness({
+  homeCurrency,
   initialDraft,
   prizePreview,
   prizePreviewLoading,
 }: {
+  homeCurrency?: string;
   initialDraft: TournamentDraft;
   prizePreview?: PnLResult;
   prizePreviewLoading?: boolean;
@@ -27,6 +29,7 @@ function PrizeEditorHarness({
     <ProjectionEditorFields
       editor="prize"
       errors={{}}
+      homeCurrency={homeCurrency}
       prizePreview={prizePreview}
       prizePreviewLoading={prizePreviewLoading}
       workingDraft={draft}
@@ -42,10 +45,12 @@ function renderPrizeEditor(
   overrides: Partial<TournamentDraft> = {},
   prizePreview?: PnLResult,
   prizePreviewLoading?: boolean,
+  homeCurrency?: string,
 ) {
   const draft = { ...createDefaultTournamentDraft(), ...overrides };
   return render(
     <PrizeEditorHarness
+      homeCurrency={homeCurrency}
       initialDraft={draft}
       prizePreview={prizePreview}
       prizePreviewLoading={prizePreviewLoading}
@@ -598,6 +603,36 @@ describe("PrizeDistributionSelector", () => {
     expect(
       screen.getByText(
         "This projection uses a 30% estimated withholding rate.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("labels server payout amounts with the home currency", () => {
+    const draft = createDefaultTournamentDraft();
+    const screen = renderPrizeEditor(
+      {
+        currency: "EUR",
+        country: "France",
+        country_code: "FR",
+        prize_tax_rate: 20,
+        prize_distribution_mode: "manual",
+        prize_rounds: { ...draft.prize_rounds, w: 500 },
+      },
+      {
+        total_expenses: 0,
+        total_income_base: 0,
+        scenarios: [],
+        break_even_round: "w",
+        estimated_withholding_rate: 20,
+        prize_rounds_after_estimated_withholding: { w: 350 },
+      },
+      false,
+      "USD",
+    );
+
+    expect(
+      screen.getByLabelText(
+        "Win payout, €500 EUR gross, $350 USD after estimated withholding",
       ),
     ).toBeTruthy();
   });

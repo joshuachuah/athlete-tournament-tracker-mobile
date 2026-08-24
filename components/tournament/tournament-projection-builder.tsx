@@ -393,6 +393,7 @@ export function TournamentProjectionBuilder({
               estimatedWithholdingRate={
                 builderPreview?.estimated_withholding_rate
               }
+              homeCurrency={homeCurrency}
               onAddAssumption={() =>
                 updateBuilderState({ assumptionPickerOpen: true })
               }

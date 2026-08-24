@@ -894,7 +894,14 @@ describe("TournamentProjectionBuilder", () => {
       estimated_withholding_rate: 20,
       prize_rounds_after_estimated_withholding: { qf: 350 },
     });
-    const { screen } = renderBuilder(validDraft);
+    const { screen } = renderBuilder({
+      ...validDraft,
+      country: "France",
+      country_code: "FR",
+      currency: "EUR",
+      prize_tax_rate: 20,
+      prize_distribution_mode: "manual",
+    });
 
     await advance(350);
 
@@ -906,6 +913,7 @@ describe("TournamentProjectionBuilder", () => {
       ).toBeTruthy(),
     );
     expect(screen.getByText("Up to +$350 USD")).toBeTruthy();
+    expect(screen.queryByText("Up to +€350 EUR")).toBeNull();
   });
 
   it("falls back to the draft rate for a legacy payout preview", async () => {
