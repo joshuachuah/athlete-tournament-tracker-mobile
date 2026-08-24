@@ -64,7 +64,7 @@ const tournamentSchema = z.looseObject({
   name: z.string(),
   location: z.string(),
   country: z.string(),
-  country_code: countryCodeSchema.nullable(),
+  country_code: countryCodeSchema.nullable().optional().default(null),
   currency: z.string(),
   start_date: z.string(),
   end_date: z.string(),
@@ -91,7 +91,7 @@ const scenarioResultSchema = z.looseObject({
   round: roundSchema,
   prize_money: z.number(),
   prize_money_after_tax: z.number(),
-  prize_money_after_estimated_withholding: z.number(),
+  prize_money_after_estimated_withholding: z.number().optional(),
   net_result: z.number(),
   profitable: z.boolean(),
 });
@@ -126,8 +126,10 @@ export const pnlResultSchema = z.looseObject({
       }
     }),
   break_even_round: roundSchema.nullable(),
-  estimated_withholding_rate: prizeTaxRateSchema,
-  prize_rounds_after_estimated_withholding: prizeRoundsSchema.nullable(),
+  estimated_withholding_rate: prizeTaxRateSchema.optional(),
+  prize_rounds_after_estimated_withholding: prizeRoundsSchema
+    .nullable()
+    .optional(),
 });
 
 export function pnlResultSchemaForPrizeRounds(

@@ -84,6 +84,16 @@ describe("ScenarioCard", () => {
     expect(screen.queryByText(/estimated withholding rate/)).toBeNull();
   });
 
+  it("falls back to the legacy after-tax amount during API rollout", () => {
+    const {
+      prize_money_after_estimated_withholding: _newWithholdingAmount,
+      ...legacyScenario
+    } = scenario;
+    const screen = renderScenarioCard(legacyScenario, 30);
+
+    expect(screen.getByText(formatMoney(700, "USD"))).toBeTruthy();
+  });
+
   it("shares one rate request across tax-bearing scenario amounts", async () => {
     convert.mockResolvedValue({ converted: 0.5, rate: 0.5 });
 
