@@ -138,7 +138,7 @@ pnpm typecheck
 pnpm test
 ```
 
-The non-Expo checks should leave the lockfile unchanged and pass. `expo install --check` currently exits 1 for the tracked Expo SDK patch drift in `expo`, `expo-local-authentication`, and `jest-expo`, so it blocks the CI `verify` job until those intentionally separate upgrades are made.
+Success means the lockfile stays unchanged, Expo reports compatible dependencies, advisory and lint checks pass, TypeScript exits cleanly, and the complete Jest suite passes.
 
 ## Project documentation
 
