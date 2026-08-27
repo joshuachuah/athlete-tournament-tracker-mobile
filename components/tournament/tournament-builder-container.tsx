@@ -8,6 +8,7 @@ import { ErrorState, LoadingState } from "@/components/ui/state";
 import { useAuth } from "@/context/auth";
 import { useTournamentDraft } from "@/context/tournament-draft";
 import { api } from "@/lib/api";
+import { errorMessage } from "@/lib/errors";
 import { queryClient } from "@/lib/query-client";
 import {
   completeTournamentSaveData,
@@ -95,7 +96,10 @@ export function TournamentBuilderContainer({
     },
     onError: (error, variables) => {
       if (isCurrentUser(variables.userId)) {
-        setSubmitError({ userId: variables.userId, message: error.message });
+        setSubmitError({
+          userId: variables.userId,
+          message: errorMessage(error, "Couldn't save this tournament."),
+        });
       }
     },
   });
@@ -109,7 +113,10 @@ export function TournamentBuilderContainer({
   if (editTournamentIsError) {
     return (
       <ErrorState
-        message={editTournamentError.message}
+        message={errorMessage(
+          editTournamentError,
+          "Couldn't load this tournament.",
+        )}
         onRetry={() => refetchEditTournament()}
       />
     );

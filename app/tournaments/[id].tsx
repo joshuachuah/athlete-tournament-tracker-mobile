@@ -13,6 +13,7 @@ import { ScenarioCard } from "@/components/tournament/scenario-card";
 import { colors, spacing } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
 import { api } from "@/lib/api";
+import { errorMessage } from "@/lib/errors";
 import { queryClient } from "@/lib/query-client";
 import {
   formatDate,
@@ -124,14 +125,17 @@ function TournamentDetailContent() {
       {isLoading ? <LoadingState label="Loading tournament" /> : null}
       {isError ? (
         <ErrorState
-          message={(error as Error).message}
+          message={errorMessage(error, "Couldn't load this tournament.")}
           onRetry={() => refetch()}
         />
       ) : null}
       {deleteMutation.isError &&
       deleteMutation.variables?.userId === session.user.id ? (
         <ErrorState
-          message={deleteMutation.error.message}
+          message={errorMessage(
+            deleteMutation.error,
+            "Couldn't delete this tournament.",
+          )}
           onRetry={confirmDelete}
         />
       ) : null}

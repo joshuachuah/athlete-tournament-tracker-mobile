@@ -111,12 +111,17 @@ function onboardingDraftStorageKey(userId: string): string {
 }
 
 export function getOnboardingDraft(userId: string): OnboardingDraft | null {
-  const result = onboardingDraftSchema.safeParse(
-    draftStorage.get(onboardingDraftStorageKey(userId)),
-  );
+  const key = onboardingDraftStorageKey(userId);
+  const stored = draftStorage.get(key);
+
+  if (stored === null) {
+    return null;
+  }
+
+  const result = onboardingDraftSchema.safeParse(stored);
 
   if (!result.success) {
-    draftStorage.clear(onboardingDraftStorageKey(userId));
+    draftStorage.clear(key);
     return null;
   }
 
@@ -136,4 +141,8 @@ export function saveOnboardingDraft(
 
 export function clearOnboardingDraft(userId: string): void {
   draftStorage.clear(onboardingDraftStorageKey(userId));
+}
+
+export function onboardingDraftClearVersion(userId: string): number {
+  return draftStorage.clearVersion(onboardingDraftStorageKey(userId));
 }

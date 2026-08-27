@@ -16,6 +16,7 @@ import type { Session } from "@supabase/supabase-js";
 import { api } from "@/lib/api";
 import { createAppleAuthRequest } from "@/lib/apple-auth";
 import { isExpectedAuthCallback, oauthRedirectUri } from "@/lib/auth-redirect";
+import { errorMessage as safeErrorMessage } from "@/lib/errors";
 import { clearOnboardingDraft } from "@/lib/onboarding";
 import { queryClient } from "@/lib/query-client";
 import { hasSupabaseConfig, supabase } from "@/lib/supabase";
@@ -79,15 +80,7 @@ const GOOGLE_OAUTH_SESSION_ERROR =
   "Google sign-in couldn't be completed. Please try again.";
 
 function profileLoadErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message.trim()) {
-    return error.message;
-  }
-
-  if (typeof error === "string" && error.trim()) {
-    return error;
-  }
-
-  return PROFILE_LOAD_FALLBACK_MESSAGE;
+  return safeErrorMessage(error, PROFILE_LOAD_FALLBACK_MESSAGE);
 }
 
 function cacheProfile(userId: string, profile: AthleteProfile | null): void {
@@ -465,7 +458,9 @@ function useProfileBootstrap(
     return () => {
       active = false;
       mounted.current = false;
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- version refs are invalidation counters, not rendered nodes
       ++identityVersion.current;
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- version refs are invalidation counters, not rendered nodes
       ++profileLoadVersion.current;
       subscription?.data.subscription.unsubscribe();
     };

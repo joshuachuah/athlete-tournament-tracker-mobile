@@ -1,7 +1,7 @@
 import { Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 
-import { colors, spacing } from "@/constants/theme";
+import { colors } from "@/constants/theme";
 import { api } from "@/lib/api";
 import { formatMoney, roundCurrencyAmount } from "@/lib/utils";
 

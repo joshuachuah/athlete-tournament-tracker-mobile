@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
 import { colors, spacing } from "@/constants/theme";
 import { PROFILE_LOAD_FALLBACK_MESSAGE, useAuth } from "@/context/auth";
+import { errorMessage } from "@/lib/errors";
 
 export function ProfileLoadError() {
   const { profileLoadError, refreshProfile, signOut } = useAuth();
@@ -24,7 +25,7 @@ export function ProfileLoadError() {
     try {
       await signOut();
     } catch (error) {
-      setSignOutError((error as Error).message);
+      setSignOutError(errorMessage(error, "Sign out failed. Please try again."));
       setSigningOut(false);
     }
   }

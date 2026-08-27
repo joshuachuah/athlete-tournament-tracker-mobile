@@ -128,7 +128,7 @@ function prizeEstimates(draft: TournamentDraft) {
 }
 
 function optionalAssumptions(draft: TournamentDraft) {
-  const rows: Array<LedgerRowProps & { key: AssumptionEditor }> = [];
+  const rows: (LedgerRowProps & { key: AssumptionEditor })[] = [];
 
   if (draft.daily_spending_cap > 0) {
     rows.push({

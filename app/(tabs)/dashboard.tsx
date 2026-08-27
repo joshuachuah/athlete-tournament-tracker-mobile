@@ -9,6 +9,7 @@ import { TournamentCard } from "@/components/dashboard/tournament-card";
 import { colors, radii, spacing } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
 import { api } from "@/lib/api";
+import { errorMessage } from "@/lib/errors";
 import { buildDashboardStats } from "@/lib/dashboard";
 import { formatMoney } from "@/lib/utils";
 
@@ -110,7 +111,7 @@ export default function DashboardScreen() {
       ) : null}
       {isError ? (
         <ErrorState
-          message={(error as Error).message}
+          message={errorMessage(error, "Couldn't load your tournaments.")}
           onRetry={() => refetch()}
         />
       ) : null}

@@ -16,11 +16,11 @@ import type { TournamentDraft } from "@/lib/tournament-draft";
 import type { AssumptionEditor } from "@/components/tournament/impact-ledger";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
-const assumptions: Array<{
+const assumptions: {
   editor: AssumptionEditor;
   title: string;
   description: string;
-}> = [
+}[] = [
   {
     editor: "daily-spending",
     title: "Daily spending cap",

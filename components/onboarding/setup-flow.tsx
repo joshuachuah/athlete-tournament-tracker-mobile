@@ -4,13 +4,11 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleCheck,
-  CircleDollarSign,
   LogOut,
   Mail,
-  MapPin,
   Trash2,
 } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -26,11 +24,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { SelectionSheet } from "@/components/onboarding/selection-sheet";
 import { colors, radii, spacing } from "@/constants/theme";
+import { usePersistedDraft } from "@/hooks/use-persisted-draft";
+import { errorMessage } from "@/lib/errors";
 import {
   countryOptions,
   currencyLabel,
   currencyOptions,
   getOnboardingDraft,
+  onboardingDraftClearVersion,
   OTHER_OPTION,
   type OnboardingDraft,
   saveOnboardingDraft,
@@ -68,16 +69,7 @@ function selectionFeedback() {
   }
 }
 
-export function SetupFlow({
-  email,
-  initialName,
-  saving,
-  serverError,
-  userId,
-  onComplete,
-  onDeleteAccount,
-  onSignOut,
-}: {
+type SetupFlowProps = {
   email: string;
   initialName: string;
   saving: boolean;
@@ -86,15 +78,36 @@ export function SetupFlow({
   onComplete: (values: SetupProfileValues) => Promise<void>;
   onDeleteAccount: () => void;
   onSignOut: () => Promise<void>;
-}) {
+};
+
+/** Remounts user-scoped state before a different account can persist it. */
+export function SetupFlow(props: SetupFlowProps) {
+  return <SetupFlowContent key={props.userId} {...props} />;
+}
+
+function SetupFlowContent({
+  email,
+  initialName,
+  saving,
+  serverError,
+  userId,
+  onComplete,
+  onDeleteAccount,
+  onSignOut,
+}: SetupFlowProps) {
   const [draft, setDraft] = useState(() => initialDraft(userId, initialName));
   const [sheet, setSheet] = useState<SheetType>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
+  const draftClearVersion = useRef(onboardingDraftClearVersion(userId));
 
-  useEffect(() => {
-    saveOnboardingDraft(userId, draft);
-  }, [draft, userId]);
+  function persistDraft(nextDraft: OnboardingDraft) {
+    if (onboardingDraftClearVersion(userId) === draftClearVersion.current) {
+      saveOnboardingDraft(userId, nextDraft);
+    }
+  }
+
+  const flushPendingDraft = usePersistedDraft(draft, persistDraft, userId);
 
   function updateDraft(values: Partial<OnboardingDraft>) {
     setDraft((current) => ({ ...current, ...values }));
@@ -192,6 +205,7 @@ export function SetupFlow({
       return;
     }
 
+    flushPendingDraft();
     await onComplete({
       name: draft.name.trim(),
       home_country: draft.country.trim(),
@@ -210,7 +224,9 @@ export function SetupFlow({
     try {
       await onSignOut();
     } catch (error) {
-      setValidationError((error as Error).message);
+      setValidationError(
+        errorMessage(error, "Sign out failed. Please try again."),
+      );
       setSigningOut(false);
     }
   }

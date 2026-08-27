@@ -3,6 +3,7 @@ import {
   type PropsWithChildren,
   use,
   useEffect,
+  useRef,
   useState,
 } from "react";
 
@@ -18,6 +19,7 @@ import {
   persistedTournamentDraft,
   type TournamentDraft,
 } from "@/lib/tournament-draft";
+import { usePersistedDraft } from "@/hooks/use-persisted-draft";
 
 type TournamentDraftContextValue = {
   draft: TournamentDraft;
@@ -35,6 +37,9 @@ export function TournamentDraftProvider({
   userId,
 }: PropsWithChildren<{ userId?: string }>) {
   const draftKey = userId ? tournamentDraftStorageKey(userId) : null;
+  const draftClearVersion = useRef(
+    draftKey ? draftStorage.clearVersion(draftKey) : 0,
+  );
   const [draft, setDraftState] = useState<TournamentDraft>(() => {
     const stored = draftKey ? draftStorage.get(draftKey) : null;
     return stored ? normalizeTournamentDraft(stored) : createDefaultTournamentDraft();
@@ -44,11 +49,16 @@ export function TournamentDraftProvider({
     clearLegacyTournamentDraft();
   }, []);
 
-  useEffect(() => {
-    if (draftKey) {
-      draftStorage.set(draftKey, persistedTournamentDraft(draft));
+  function persistDraft(nextDraft: TournamentDraft) {
+    if (
+      draftKey &&
+      draftStorage.clearVersion(draftKey) === draftClearVersion.current
+    ) {
+      draftStorage.set(draftKey, persistedTournamentDraft(nextDraft));
     }
-  }, [draft, draftKey]);
+  }
+
+  usePersistedDraft(draft, persistDraft, draftKey);
 
   function setDraft(nextDraft: TournamentDraft) {
     setDraftState(deriveDraftDates(nextDraft));
@@ -61,6 +71,7 @@ export function TournamentDraftProvider({
   function resetDraft() {
     if (draftKey) {
       draftStorage.clear(draftKey);
+      draftClearVersion.current = draftStorage.clearVersion(draftKey);
     }
     setDraftState(createDefaultTournamentDraft());
   }
