@@ -28,11 +28,11 @@ function createQueryClient() {
 }
 
 function renderMoneyPairs(
-  pairs: Array<{
+  pairs: {
     amount: number;
     fromCurrency: string;
     toCurrency: string;
-  }>,
+  }[],
 ) {
   const queryClient = createQueryClient();
   const screen = render(

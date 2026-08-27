@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { colors, radii, spacing } from "@/constants/theme";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { api } from "@/lib/api";
+import { errorMessage } from "@/lib/errors";
 import {
   createDefaultTournamentDraft,
   tournamentDraftFromKnown,
@@ -61,7 +62,7 @@ function resultDescription(tournament: KnownTournament) {
 }
 
 function knownTournamentDetails(tournament: KnownTournament) {
-  const details: Array<{ label: string; value: string }> = [];
+  const details: { label: string; value: string }[] = [];
   const location = [tournament.location, tournament.country].filter(Boolean).join(", ");
   const startDate = validDate(tournament.start_date);
   const endDate = validDate(tournament.end_date);
@@ -299,7 +300,7 @@ export function TournamentIdentitySearch({
           })}
         >
           <Text style={{ color: colors.accent, fontWeight: "800" }}>
-            I can't find my tournament
+            {"I can't find my tournament"}
           </Text>
         </Pressable>
       </View>
@@ -325,7 +326,7 @@ export function TournamentIdentitySearch({
           }}
         >
           <Text style={{ color: colors.loss, lineHeight: 20 }}>
-            {error.message || "Tournament search is unavailable."}
+            {errorMessage(error, "Tournament search is unavailable.")}
           </Text>
           <Pressable
             accessibilityRole="button"

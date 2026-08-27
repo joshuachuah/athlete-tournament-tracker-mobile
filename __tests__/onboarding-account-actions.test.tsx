@@ -9,7 +9,7 @@ import type { ReactNode } from "react";
 import { router } from "expo-router";
 
 import OnboardingScreen from "@/app/onboarding";
-import { getOnboardingDraft } from "@/lib/onboarding";
+import { clearOnboardingDraft, getOnboardingDraft } from "@/lib/onboarding";
 
 const mockDeleteAccount = jest.fn();
 let mockProfile: { id: string } | null = null;
@@ -183,6 +183,16 @@ describe("profileless onboarding", () => {
     expect(resumed.getByText("2 of 4")).toBeTruthy();
   });
 
+  it("does not recreate a setup draft cleared during sign-out", () => {
+    const screen = render(<OnboardingScreen />);
+
+    fireEvent.press(screen.getByText("Continue"));
+    clearOnboardingDraft("new-athlete");
+    screen.unmount();
+
+    expect(getOnboardingDraft("new-athlete")).toBeNull();
+  });
+
   it("lets a newly authenticated user delete without creating a profile", async () => {
     const screen = render(<OnboardingScreen />);
 
@@ -218,7 +228,9 @@ describe("profileless onboarding", () => {
     mockSignOut.mockRejectedValue(new Error("Sign-out service unavailable"));
     const screen = render(<OnboardingScreen />);
 
-    expect(getOnboardingDraft("new-athlete")?.step).toBe(1);
+    await waitFor(() => {
+      expect(getOnboardingDraft("new-athlete")?.step).toBe(1);
+    });
 
     fireEvent.press(screen.getByText("Not your account? Sign out"));
 
@@ -226,6 +238,8 @@ describe("profileless onboarding", () => {
       await screen.findByText("Sign-out service unavailable"),
     ).toBeTruthy();
     expect(router.replace).not.toHaveBeenCalled();
-    expect(getOnboardingDraft("new-athlete")?.step).toBe(1);
+    await waitFor(() => {
+      expect(getOnboardingDraft("new-athlete")?.step).toBe(1);
+    });
   });
 });

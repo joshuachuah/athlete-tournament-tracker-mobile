@@ -23,6 +23,16 @@ let mockAuthStateCallback:
   | ((event: string, session: Session | null) => void)
   | undefined;
 
+function emitAuthState(
+  ...args: Parameters<NonNullable<typeof mockAuthStateCallback>>
+) {
+  if (!mockAuthStateCallback) {
+    throw new Error("AuthProvider did not subscribe to onAuthStateChange");
+  }
+
+  return mockAuthStateCallback(...args);
+}
+
 jest.mock("expo-apple-authentication", () => ({
   AppleAuthenticationScope: {
     EMAIL: 0,
@@ -871,6 +881,27 @@ describe("AuthProvider profile isolation", () => {
     expect(profileStorage.get()).toBeNull();
   });
 
+  it("hides server details when the initial profile load fails", async () => {
+    mockGetSession.mockResolvedValue({
+      data: { session: session(firstProfile.email, firstUserId) },
+      error: null,
+    });
+    getProfile.mockRejectedValue(
+      Object.assign(new Error("Traceback: database details"), {
+        name: "ApiError",
+        status: 503,
+      }),
+    );
+
+    const { screen } = renderAuthProvider();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("profile-load-error").props.children).toBe(
+        "Something went wrong on our side. Please try again.",
+      );
+    });
+  });
+
   it("ignores a failed profile request superseded by a new identity", async () => {
     const firstLoad = deferred<AthleteProfile | null>();
     const secondLoad = deferred<AthleteProfile | null>();
@@ -889,7 +920,7 @@ describe("AuthProvider profile isolation", () => {
     });
 
     act(() => {
-      mockAuthStateCallback?.(
+      emitAuthState(
         "SIGNED_IN",
         session(secondProfile.email, secondUserId),
       );
@@ -954,7 +985,7 @@ describe("AuthProvider profile isolation", () => {
     });
 
     act(() => {
-      mockAuthStateCallback?.(
+      emitAuthState(
         "SIGNED_IN",
         session(secondProfile.email, secondUserId),
       );
@@ -1010,7 +1041,7 @@ describe("AuthProvider profile isolation", () => {
     );
 
     act(() => {
-      mockAuthStateCallback?.(
+      emitAuthState(
         "SIGNED_IN",
         session(secondProfile.email, secondUserId),
       );
@@ -1036,7 +1067,7 @@ describe("AuthProvider profile isolation", () => {
     queryClient.setQueryData(["tournament", "private"], { id: "private" });
 
     act(() => {
-      mockAuthStateCallback?.("SIGNED_OUT", null);
+      emitAuthState("SIGNED_OUT", null);
     });
 
     expect(queryClient.getQueryData(["tournament", "private"])).toBeUndefined();
@@ -1066,7 +1097,7 @@ describe("AuthProvider profile isolation", () => {
     });
 
     act(() => {
-      mockAuthStateCallback?.(
+      emitAuthState(
         "SIGNED_IN",
         session(firstProfile.email, secondUserId),
       );
@@ -1117,7 +1148,7 @@ describe("AuthProvider profile isolation", () => {
     });
 
     act(() => {
-      mockAuthStateCallback?.(
+      emitAuthState(
         "SIGNED_IN",
         session(secondProfile.email, secondUserId),
       );
@@ -1146,7 +1177,7 @@ describe("AuthProvider profile isolation", () => {
     const { screen } = renderAuthProvider();
 
     act(() => {
-      mockAuthStateCallback?.(
+      emitAuthState(
         "SIGNED_IN",
         session(secondProfile.email, secondUserId),
       );
@@ -1204,7 +1235,7 @@ describe("AuthProvider profile isolation", () => {
         home_currency: savedProfile.home_currency,
         sport: savedProfile.sport,
       });
-      mockAuthStateCallback?.(
+      emitAuthState(
         "TOKEN_REFRESHED",
         session(firstProfile.email, firstUserId, "refreshed-token"),
       );
@@ -1373,7 +1404,7 @@ describe("AuthProvider profile isolation", () => {
     let refreshPromise!: Promise<void>;
     act(() => {
       refreshPromise = authRef.current!.refreshProfile();
-      mockAuthStateCallback?.(
+      emitAuthState(
         "SIGNED_IN",
         session(secondProfile.email, secondUserId),
       );
@@ -1426,7 +1457,7 @@ describe("AuthProvider profile isolation", () => {
         home_currency: firstProfile.home_currency,
         sport: firstProfile.sport,
       });
-      mockAuthStateCallback?.(
+      emitAuthState(
         "SIGNED_IN",
         session(secondProfile.email, secondUserId),
       );
@@ -1476,7 +1507,7 @@ describe("AuthProvider profile isolation", () => {
     });
 
     act(() => {
-      mockAuthStateCallback?.(
+      emitAuthState(
         "SIGNED_IN",
         session(secondProfile.email, secondUserId),
       );

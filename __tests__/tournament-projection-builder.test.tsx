@@ -201,6 +201,17 @@ afterEach(() => {
 });
 
 describe("TournamentProjectionBuilder", () => {
+  it("does not recreate a draft cleared during sign-out", () => {
+    const key = tournamentDraftStorageKey("account-1");
+    const { screen } = renderBuilder(validDraft);
+
+    draftStorage.clear(key);
+    screen.unmount();
+    act(() => jest.runAllTimers());
+
+    expect(draftStorage.get(key)).toBeNull();
+  });
+
   it("keeps the inline action clear of the iOS native tab bar", () => {
     const { screen } = renderBuilder(validDraft);
 
@@ -433,9 +444,11 @@ describe("TournamentProjectionBuilder", () => {
       expect(screen.getByPlaceholderText("Search by tournament name")).toBeTruthy(),
     );
     expect(screen.queryByText("Continue draft")).toBeNull();
-    expect(draftStorage.get(currentUserKey)).toEqual(
-      expect.objectContaining({ draft: expect.objectContaining({ name: "" }) }),
-    );
+    await waitFor(() => {
+      expect(draftStorage.get(currentUserKey)).toEqual(
+        expect.objectContaining({ draft: expect.objectContaining({ name: "" }) }),
+      );
+    });
     expect(draftStorage.get(otherUserKey)).toEqual(
       expect.objectContaining({
         draft: expect.objectContaining({ name: "Other User Open" }),

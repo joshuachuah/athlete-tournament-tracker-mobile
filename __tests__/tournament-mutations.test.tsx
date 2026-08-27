@@ -266,7 +266,7 @@ async function startDelete() {
   fireEvent.press(screen.getByText("Delete"));
 
   const buttons = (Alert.alert as jest.Mock).mock.calls[0]?.[2] as
-    | Array<{ text?: string; onPress?: () => void }>
+    | { text?: string; onPress?: () => void }[]
     | undefined;
   const confirm = buttons?.find((button) => button.text === "Delete");
   act(() => confirm?.onPress?.());

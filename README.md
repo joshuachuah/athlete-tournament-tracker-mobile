@@ -132,8 +132,10 @@ Run the same correctness stack as CI from a clean checkout:
 ```sh
 pnpm install --frozen-lockfile
 pnpm exec expo install --check
+pnpm check:dependency-advisories
+pnpm lint
 pnpm typecheck
-pnpm test --runInBand
+pnpm test
 ```
 
 Success means the lockfile stays unchanged, Expo reports compatible dependencies, TypeScript exits cleanly, and the complete Jest suite passes.
@@ -141,7 +143,7 @@ Success means the lockfile stays unchanged, Expo reports compatible dependencies
 ## Project documentation
 
 - [`MOBILE_APP_SPEC.md`](./MOBILE_APP_SPEC.md) records the product and architecture history.
-- [`docs/production-readiness.md`](./docs/production-readiness.md) records operational decisions, external verification gaps, and accepted release risks.
+- Release-readiness notes (Supabase allow-list verification, signed-build callback checks, accepted risks) are kept outside this repository. Ask a maintainer.
 - The numbered implementation plan index is maintained as a local planning artifact and is intentionally not published in this repository. Ask a maintainer for the current index before executing or revising a numbered plan.
 
-Keep this README's commands current when scripts or runtime versions change. Detailed release operations belong in the production-readiness documentation rather than here.
+Keep this README's commands current when scripts or runtime versions change.

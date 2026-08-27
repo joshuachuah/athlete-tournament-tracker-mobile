@@ -24,6 +24,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { colors, radii, spacing } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
+import { errorMessage } from "@/lib/errors";
 import { authenticatePrivateFinances } from "@/lib/private-finance-auth";
 import { formatMoney } from "@/lib/utils";
 import type { AthleteProfile } from "@/types";
@@ -392,7 +393,10 @@ function PrivateFinancesContent() {
         return;
       }
       updateViewState({
-        saveError: (profileError as Error).message,
+        saveError: errorMessage(
+          profileError,
+          "Couldn't save your private finances.",
+        ),
         saving: false,
       });
     }

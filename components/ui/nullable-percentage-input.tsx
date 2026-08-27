@@ -36,7 +36,7 @@ export function NullablePercentageInput({
         value={text}
       />
       <Text style={{ color: colors.mutedForeground, fontSize: 12, lineHeight: 18 }}>
-        Enter the tournament's local rate. Leave blank to show gross payouts only.
+        {"Enter the tournament's local rate. Leave blank to show gross payouts only."}
       </Text>
     </>
   );

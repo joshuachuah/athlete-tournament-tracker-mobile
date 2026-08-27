@@ -94,18 +94,6 @@ export type TournamentDraftPrefill = {
   duration_days?: TournamentDraftPrefillParam;
 };
 
-const prizeRoundKeys = [
-  "r1",
-  "r2",
-  "r3",
-  "qf",
-  "sf",
-  "p7_8",
-  "p5_6",
-  "p3_4",
-  "f",
-  "w",
-] as const;
 const apiDateTimePattern =
   /^(\d{4}-\d{2}-\d{2})T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?$/;
 

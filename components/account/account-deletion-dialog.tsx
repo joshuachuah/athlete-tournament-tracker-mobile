@@ -14,6 +14,7 @@ import {
 
 import { colors, radii, spacing } from "@/constants/theme";
 import { ACCOUNT_DELETION_CONFIRMATION } from "@/lib/api";
+import { errorMessage } from "@/lib/errors";
 
 type AccountDeletionDialogProps = {
   onClose: () => void;
@@ -47,7 +48,7 @@ export function AccountDeletionDialog({
       await onDelete();
       onClose();
     } catch (deleteError) {
-      setError((deleteError as Error).message);
+      setError(errorMessage(deleteError, "Couldn't delete your account."));
       setDeleting(false);
     }
   }

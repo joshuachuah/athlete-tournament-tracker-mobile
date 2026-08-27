@@ -2,6 +2,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-nati
 
 import { colors, radii, spacing } from "@/constants/theme";
 import { useTournamentPreview } from "@/hooks/use-tournament-preview";
+import { errorMessage } from "@/lib/errors";
 import { prizeDistributionCurrency } from "@/lib/prize-distributions";
 import {
   detailsSchema,
@@ -174,7 +175,8 @@ export function ScenarioStrip({
             Live preview unavailable
           </Text>
           <Text style={{ color: colors.warning, lineHeight: 20 }}>
-            {error.message}. You can keep editing without losing your draft.
+            {errorMessage(error, "Live preview is unavailable.")} You can keep
+            editing without losing your draft.
           </Text>
           <Pressable
             accessibilityRole="button"

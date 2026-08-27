@@ -8,6 +8,7 @@ import {
   type SetupProfileValues,
 } from "@/components/onboarding/setup-flow";
 import { useAuth } from "@/context/auth";
+import { errorMessage } from "@/lib/errors";
 import { clearOnboardingDraft } from "@/lib/onboarding";
 
 export default function OnboardingScreen() {
@@ -53,7 +54,7 @@ function OnboardingContent() {
       clearOnboardingDraft(authenticatedUserId);
       router.replace("/(tabs)/dashboard");
     } catch (profileError) {
-      setError((profileError as Error).message);
+      setError(errorMessage(profileError, "Couldn't save your profile."));
       setSaving(false);
     }
   }

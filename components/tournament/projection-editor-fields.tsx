@@ -16,14 +16,13 @@ import {
 import type { TournamentDraft } from "@/lib/tournament-draft";
 import {
   getDrawTemplate,
-  getPrizeTier,
   prizeDistributionCurrency,
   prizeRoundKeys,
 } from "@/lib/prize-distributions";
 import { formatMoney, roundLabels } from "@/lib/utils";
 import type { PnLResult, SubsidyCovers } from "@/types";
 
-const coverOptions: Array<{ value: SubsidyCovers; label: string }> = [
+const coverOptions: { value: SubsidyCovers; label: string }[] = [
   { value: "flights", label: "Flights" },
   { value: "accommodation", label: "Accommodation" },
   { value: "full_expenses", label: "Full expenses" },
@@ -272,9 +271,6 @@ function PrizeEditorFields({
   prizePreviewLoading = false,
   workingDraft,
 }: EditorFieldsProps) {
-  const selectedTier = workingDraft.prize_tier_id
-    ? getPrizeTier(workingDraft.prize_tier_id)
-    : null;
   const selectedTemplate = workingDraft.prize_draw_template_id
     ? getDrawTemplate(workingDraft.prize_draw_template_id)
     : null;

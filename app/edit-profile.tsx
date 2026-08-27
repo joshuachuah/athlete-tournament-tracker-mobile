@@ -9,6 +9,7 @@ import {
 } from "@/components/profile-form";
 import { colors, spacing } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
+import { errorMessage } from "@/lib/errors";
 
 export default function EditProfileScreen() {
   return (
@@ -35,7 +36,7 @@ function EditProfileContent() {
       await saveProfile(values);
       router.back();
     } catch (saveError) {
-      setError((saveError as Error).message);
+      setError(errorMessage(saveError, "Couldn't save your profile."));
       setSaving(false);
     }
   }

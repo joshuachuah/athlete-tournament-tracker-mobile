@@ -14,6 +14,7 @@ import { ProtectedScreen } from "@/components/auth/protected-screen";
 import { Button } from "@/components/ui/button";
 import { colors, spacing } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
+import { errorMessage } from "@/lib/errors";
 
 export default function AccountControlsScreen() {
   return (
@@ -50,7 +51,9 @@ function AccountControlsContent() {
       router.replace("/login");
     } catch (signOutError) {
       signingOutRef.current = false;
-      setSessionError((signOutError as Error).message);
+      setSessionError(
+        errorMessage(signOutError, "Sign out failed. Please try again."),
+      );
       setSigningOut(false);
     }
   }

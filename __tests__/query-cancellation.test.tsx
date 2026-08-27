@@ -15,8 +15,6 @@ const mockUseLocalSearchParams = jest.fn();
 const mockResetDraft = jest.fn();
 
 jest.mock("expo-router", () => {
-  const React = jest.requireActual("react");
-
   return {
     Link: ({ children }: { children: ReactElement }) => children,
     Redirect: () => null,
@@ -130,7 +128,7 @@ describe("TanStack query cancellation", () => {
     jest.useFakeTimers();
     const firstRequest = deferred<never[]>();
     const secondRequest = deferred<
-      Array<{ id: string; name: string; location: string }>
+      { id: string; name: string; location: string }[]
     >();
     mockSearch
       .mockReturnValueOnce(firstRequest.promise)
