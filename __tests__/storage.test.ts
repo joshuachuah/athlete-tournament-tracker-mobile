@@ -8,6 +8,16 @@ import {
 } from "@/lib/storage";
 import type { AthleteProfile } from "@/types";
 
+function readProfileCacheAfterModuleReload(): string | null {
+  let readProfileCache: () => string | null = () => "module did not reload";
+
+  jest.isolateModules(() => {
+    ({ readProfileCache } = jest.requireActual("@/lib/profile-cache"));
+  });
+
+  return readProfileCache();
+}
+
 jest.mock("expo-sqlite/localStorage/install", () => {
   const values = new Map<string, string>();
 
@@ -156,5 +166,41 @@ describe("profile storage", () => {
     expect(localStorage.getItem("athlete-tracker.profile")).toBeNull();
     expect(storedProfile).toContain('"savings_balance"');
     expect(storedProfile?.length).toBeLessThanOrEqual(2_048);
+  });
+
+  it("continues without a cache when protected data cannot be read", () => {
+    jest.spyOn(SecureStore, "getItem").mockImplementationOnce(() => {
+      throw new Error("Protected data is unavailable");
+    });
+
+    expect(profileStorage.getForUser("user-1")).toBeNull();
+  });
+
+  it("does not expose an old profile after a replacement write fails", () => {
+    profileStorage.set("user-1", profile);
+    const setItem = jest.spyOn(SecureStore, "setItem").mockImplementationOnce(() => {
+      throw new Error("Value exceeds the Keychain limit");
+    });
+
+    expect(() =>
+      profileStorage.set("user-1", { ...profile, name: "Updated Athlete" }),
+    ).not.toThrow();
+    setItem.mockRestore();
+
+    expect(profileStorage.getForUser("user-1")).toBeNull();
+    expect(readProfileCacheAfterModuleReload()).toBeNull();
+  });
+
+  it("does not expose an old profile after its tombstone write fails", () => {
+    profileStorage.set("user-1", profile);
+    const setItem = jest.spyOn(SecureStore, "setItem").mockImplementationOnce(() => {
+      throw new Error("Protected data is unavailable");
+    });
+
+    expect(() => profileStorage.clear()).not.toThrow();
+    setItem.mockRestore();
+
+    expect(profileStorage.getForUser("user-1")).toBeNull();
+    expect(readProfileCacheAfterModuleReload()).toBeNull();
   });
 });
