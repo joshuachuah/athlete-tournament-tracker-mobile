@@ -1,13 +1,15 @@
 import "expo-sqlite/localStorage/install";
 
-import * as SecureStore from "expo-secure-store";
-
 import { z } from "zod";
 
 import { athleteProfileSchema } from "@/lib/api-schemas";
+import {
+  clearProfileCache,
+  readProfileCache,
+  writeProfileCache,
+} from "@/lib/profile-cache";
 import type { AthleteProfile } from "@/types";
 
-const profileKey = "athlete-tracker.profile";
 const legacyPlaintextProfileKey = "athlete-tracker:profile";
 const legacyTournamentDraftKey = "athlete-tracker:tournament-draft";
 const draftClearVersions = new Map<string, number>();
@@ -39,12 +41,8 @@ function setJson<T>(key: string, value: T): void {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
-const secureOptions = {
-  keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-};
-
-function getSecureJson(key: string): unknown | null {
-  const raw = SecureStore.getItem(key, secureOptions);
+function getCachedProfileJson(): unknown | null {
+  const raw = readProfileCache();
 
   if (!raw) {
     return null;
@@ -53,19 +51,13 @@ function getSecureJson(key: string): unknown | null {
   try {
     return JSON.parse(raw) as unknown;
   } catch {
-    SecureStore.setItem(key, "", secureOptions);
+    clearProfileCache();
     return null;
   }
 }
 
-function setSecureJson<T>(key: string, value: T): void {
-  SecureStore.setItem(key, JSON.stringify(value), secureOptions);
-}
-
-function clearSecure(key: string): void {
-  // SecureStore has no synchronous delete. A synchronous tombstone prevents a
-  // late async deletion from racing with a fresh profile write.
-  SecureStore.setItem(key, "", secureOptions);
+function setCachedProfileJson<T>(value: T): void {
+  writeProfileCache(JSON.stringify(value));
 }
 
 /**
@@ -76,33 +68,33 @@ function clearSecure(key: string): void {
 export const profileStorage = {
   get: () => {
     localStorage.removeItem(legacyPlaintextProfileKey);
-    const result = storedProfileSchema.safeParse(getSecureJson(profileKey));
+    const result = storedProfileSchema.safeParse(getCachedProfileJson());
 
     if (result.success) {
       return result.data.profile;
     }
 
-    clearSecure(profileKey);
+    clearProfileCache();
     return null;
   },
   getForUser: (userId: string) => {
     localStorage.removeItem(legacyPlaintextProfileKey);
-    const result = storedProfileSchema.safeParse(getSecureJson(profileKey));
+    const result = storedProfileSchema.safeParse(getCachedProfileJson());
 
     if (result.success && result.data.userId === userId) {
       return result.data.profile;
     }
 
-    clearSecure(profileKey);
+    clearProfileCache();
     return null;
   },
   set: (userId: string, profile: AthleteProfile) => {
     localStorage.removeItem(legacyPlaintextProfileKey);
-    setSecureJson<StoredProfile>(profileKey, { version: 2, userId, profile });
+    setCachedProfileJson<StoredProfile>({ version: 2, userId, profile });
   },
   clear: () => {
     localStorage.removeItem(legacyPlaintextProfileKey);
-    clearSecure(profileKey);
+    clearProfileCache();
   },
 };
 
