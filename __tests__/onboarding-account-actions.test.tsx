@@ -9,13 +9,14 @@ import type { ReactNode } from "react";
 import { router } from "expo-router";
 
 import OnboardingScreen from "@/app/onboarding";
+import { SetupFlow } from "@/components/onboarding/setup-flow";
 import { clearOnboardingDraft, getOnboardingDraft } from "@/lib/onboarding";
 
 const mockDeleteAccount = jest.fn();
 let mockProfile: { id: string } | null = null;
 const mockSaveProfile = jest.fn();
 const mockSignOut = jest.fn();
-const mockSession = {
+let mockSession = {
   access_token: "token",
   user: {
     id: "new-athlete",
@@ -74,6 +75,14 @@ describe("profileless onboarding", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     localStorage.clear();
+    mockSession = {
+      access_token: "token",
+      user: {
+        id: "new-athlete",
+        email: "athlete@example.com",
+        user_metadata: { full_name: "Taylor Kim" },
+      },
+    };
     mockProfile = null;
     mockDeleteAccount.mockResolvedValue(undefined);
     mockSaveProfile.mockResolvedValue(undefined);
@@ -193,6 +202,48 @@ describe("profileless onboarding", () => {
     expect(getOnboardingDraft("new-athlete")).toBeNull();
   });
 
+  it.each([false, true])(
+    "does not carry a setup draft into a different account (advance clear version: %s)",
+    (advanceClearVersion) => {
+      if (advanceClearVersion) {
+        clearOnboardingDraft("other-athlete");
+      }
+
+      const props = {
+        initialName: "Taylor Kim",
+        onComplete: jest.fn().mockResolvedValue(undefined),
+        onDeleteAccount: jest.fn(),
+        onSignOut: jest.fn().mockResolvedValue(undefined),
+        saving: false,
+        serverError: null,
+      };
+      const screen = render(
+        <SetupFlow
+          {...props}
+          email="athlete@example.com"
+          userId="new-athlete"
+        />,
+      );
+
+      fireEvent.press(screen.getByText("Continue"));
+      screen.rerender(
+        <SetupFlow
+          {...props}
+          email="other@example.com"
+          userId="other-athlete"
+        />,
+      );
+
+      expect(screen.getByText("Let’s start with you")).toBeTruthy();
+      expect(screen.getByText("other@example.com")).toBeTruthy();
+      expect(getOnboardingDraft("new-athlete")?.step).toBe(2);
+
+      screen.unmount();
+
+      expect(getOnboardingDraft("other-athlete")?.step).toBe(1);
+    },
+  );
+
   it("lets a newly authenticated user delete without creating a profile", async () => {
     const screen = render(<OnboardingScreen />);
 
@@ -241,5 +292,16 @@ describe("profileless onboarding", () => {
     await waitFor(() => {
       expect(getOnboardingDraft("new-athlete")?.step).toBe(1);
     });
+  });
+
+  it("uses sign-out copy when sign-out rejects without a message", async () => {
+    mockSignOut.mockRejectedValue(undefined);
+    const screen = render(<OnboardingScreen />);
+
+    fireEvent.press(screen.getByText("Not your account? Sign out"));
+
+    expect(
+      await screen.findByText("Sign out failed. Please try again."),
+    ).toBeTruthy();
   });
 });

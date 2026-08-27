@@ -22,10 +22,24 @@ describe("errorMessage", () => {
     expect(errorMessage(new ApiError(rawMessage, 500), fallback)).not.toContain(rawMessage);
   });
 
-  it("keeps user-facing 4xx API copy", () => {
-    expect(errorMessage(new ApiError("Prize rounds must be non-negative", 422, "VALIDATION"), fallback)).toBe(
-      "Prize rounds must be non-negative",
-    );
+  it("keeps explicitly user-facing validation copy", () => {
+    expect(
+      errorMessage(
+        new ApiError(
+          "Prize rounds must be non-negative",
+          422,
+          "VALIDATION",
+        ),
+        fallback,
+      ),
+    ).toBe("Prize rounds must be non-negative");
+  });
+
+  it.each([
+    [new ApiError("Database constraint contains secret@example.com", 422)],
+    [new ApiError("Bearer token abc123 is invalid", 401, "UNKNOWN")],
+  ])("hides unclassified 4xx API copy", (error) => {
+    expect(errorMessage(error, fallback)).toBe(fallback);
   });
 
   it.each([

@@ -69,16 +69,7 @@ function selectionFeedback() {
   }
 }
 
-export function SetupFlow({
-  email,
-  initialName,
-  saving,
-  serverError,
-  userId,
-  onComplete,
-  onDeleteAccount,
-  onSignOut,
-}: {
+type SetupFlowProps = {
   email: string;
   initialName: string;
   saving: boolean;
@@ -87,7 +78,23 @@ export function SetupFlow({
   onComplete: (values: SetupProfileValues) => Promise<void>;
   onDeleteAccount: () => void;
   onSignOut: () => Promise<void>;
-}) {
+};
+
+/** Remounts user-scoped state before a different account can persist it. */
+export function SetupFlow(props: SetupFlowProps) {
+  return <SetupFlowContent key={props.userId} {...props} />;
+}
+
+function SetupFlowContent({
+  email,
+  initialName,
+  saving,
+  serverError,
+  userId,
+  onComplete,
+  onDeleteAccount,
+  onSignOut,
+}: SetupFlowProps) {
   const [draft, setDraft] = useState(() => initialDraft(userId, initialName));
   const [sheet, setSheet] = useState<SheetType>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -217,7 +224,9 @@ export function SetupFlow({
     try {
       await onSignOut();
     } catch (error) {
-      setValidationError(errorMessage(error, "Couldn't save your profile."));
+      setValidationError(
+        errorMessage(error, "Sign out failed. Please try again."),
+      );
       setSigningOut(false);
     }
   }

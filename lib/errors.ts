@@ -21,7 +21,11 @@ export function errorMessage(error: unknown, fallback: string): string {
       return SERVER_COPY;
     }
 
-    return error.message.trim() || fallback;
+    if (error.code === "VALIDATION") {
+      return error.message.trim() || fallback;
+    }
+
+    return fallback;
   }
 
   if (error instanceof Error && error.message.trim()) {
