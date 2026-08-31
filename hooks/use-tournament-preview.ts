@@ -63,8 +63,13 @@ export function useTournamentPreview({
     }
   }, [enabled, previewOwner, query.data, query.isPlaceholderData]);
 
+  const queryDataForOwner =
+    query.isPlaceholderData &&
+    lastSuccessfulPreview.current?.owner !== previewOwner
+      ? undefined
+      : query.data;
   const lastData = enabled
-    ? (query.data ??
+    ? (queryDataForOwner ??
       (lastSuccessfulPreview.current?.owner === previewOwner
         ? lastSuccessfulPreview.current.data
         : undefined))

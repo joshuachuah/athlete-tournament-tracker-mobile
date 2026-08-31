@@ -157,4 +157,47 @@ describe("useTournamentPreview", () => {
     expect(result.current.isError).toBe(false);
     expect(mockPreview).toHaveBeenCalledTimes(1);
   });
+
+  it("does not relabel a previous preview when home currency changes", async () => {
+    let resolveUpdatedPreview: ((value: PreviewResult) => void) | undefined;
+    mockPreview
+      .mockResolvedValueOnce(previewResult(10))
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveUpdatedPreview = resolve;
+          }),
+      );
+    const draft = previewDraft();
+    const { result, rerender } = renderHook(
+      ({ homeCurrency }: { homeCurrency: string }) =>
+        useTournamentPreview({
+          authenticatedUserId: "account-1",
+          draft,
+          enabled: true,
+          homeCurrency,
+          profileId: "athlete-1",
+        }),
+      { initialProps: { homeCurrency: "USD" }, wrapper: createWrapper() },
+    );
+
+    await waitFor(() =>
+      expect(result.current.lastData?.estimated_withholding_rate).toBe(10),
+    );
+
+    rerender({ homeCurrency: "MYR" });
+
+    expect(result.current.isLoadingPreview).toBe(true);
+    expect(result.current.data).toBeUndefined();
+    expect(result.current.lastData).toBeUndefined();
+
+    await act(async () => {
+      resolveUpdatedPreview?.(previewResult(20));
+      await Promise.resolve();
+    });
+
+    await waitFor(() =>
+      expect(result.current.lastData?.estimated_withholding_rate).toBe(20),
+    );
+  });
 });
