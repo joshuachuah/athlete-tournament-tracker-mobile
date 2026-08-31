@@ -197,56 +197,22 @@ describe("TournamentDetailScreen deletion", () => {
     screen.unmount();
   });
 
-  it("shows the server expense total before outcome scenarios", async () => {
+  it("shows the expense breakdown before the outcome card", async () => {
     const detail = tournament("expense-first");
     detail.pnl.scenarios = [losingScenario];
     const { screen } = renderDetail(detail);
 
     await waitFor(() => {
-      expect(
-        screen.getByText("Each net result subtracts total expenses."),
-      ).toBeTruthy();
-      expect(
-        screen.getByLabelText(
-          "Total expenses subtracted from every scenario: $825 USD",
-        ),
-      ).toBeTruthy();
+      expect(screen.getByText("after $825 USD costs")).toBeTruthy();
     });
 
     const renderedText = screen.UNSAFE_getAllByType(Text).map(
       (element) => element.props.children,
     );
     expect(renderedText.indexOf("Expense breakdown")).toBeLessThan(
-      renderedText.indexOf("Scenarios"),
+      renderedText.indexOf("Outcome scenarios"),
     );
     screen.unmount();
-  });
-
-  it("labels saved scenarios with the server-applied withholding rate", async () => {
-    const detail = tournament("applied-rate");
-    detail.prize_tax_rate = 30;
-    detail.pnl = {
-      ...detail.pnl,
-      estimated_withholding_rate: 20,
-      scenarios: [
-        {
-          ...losingScenario,
-          prize_money_after_estimated_withholding: 240,
-        },
-      ],
-    };
-    const { screen } = renderDetail(detail);
-
-    expect(
-      await screen.findByText(
-        "Net uses a 20% estimated withholding rate on prize money.",
-      ),
-    ).toBeTruthy();
-    expect(
-      screen.queryByText(
-        "Net uses a 30% estimated withholding rate on prize money.",
-      ),
-    ).toBeNull();
   });
 
   it("shows the final result, preserves the original projection, and locks projection edits", async () => {
@@ -282,8 +248,10 @@ describe("TournamentDetailScreen deletion", () => {
     const { screen } = renderDetail(detail);
 
     expect(await screen.findAllByText("Final loss")).toHaveLength(2);
-    expect(screen.getByText("-$450 USD")).toBeTruthy();
-    expect(screen.getByText("QF")).toBeTruthy();
+    expect(screen.getByText("−$450")).toBeTruthy();
+    expect(screen.getAllByText("Out in QF")).toHaveLength(2);
+    expect(screen.getByText("Final outcome")).toBeTruthy();
+    expect(screen.getByText(/^Completed /)).toBeTruthy();
     expect(screen.getByText("Original projection")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Edit result" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Edit projection" })).toBeNull();

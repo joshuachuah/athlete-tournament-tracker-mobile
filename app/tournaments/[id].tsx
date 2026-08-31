@@ -10,7 +10,7 @@ import { Card } from "@/components/ui/card";
 import { ErrorState, LoadingState } from "@/components/ui/state";
 import { ExpenseBreakdown } from "@/components/tournament/expense-breakdown";
 import { MoneyPair } from "@/components/tournament/money-pair";
-import { ScenarioCard } from "@/components/tournament/scenario-card";
+import { OutcomeCard } from "@/components/tournament/outcome-card";
 import { TournamentResultSheet } from "@/components/tournament/tournament-result-sheet";
 import { colors, spacing } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
@@ -19,14 +19,10 @@ import { errorMessage } from "@/lib/errors";
 import { queryClient } from "@/lib/query-client";
 import {
   formatDate,
-  formatMoney,
   getScenario,
   roundLabels,
   scenarioLabel,
 } from "@/lib/utils";
-import type { Scenario } from "@/types";
-
-const scenarioOrder: Scenario[] = ["worst", "realistic", "best"];
 
 type DeleteTournamentVariables = {
   tournamentId: string;
@@ -196,41 +192,14 @@ function TournamentDetailContent() {
           </View>
 
           {data.actual_pnl && data.result && finalLabel ? (
-            <Card>
-              <Text
-                style={{ color: colors.mutedForeground, fontSize: 13, fontWeight: "700" }}
-                selectable
-              >
-                {finalLabel}
-              </Text>
-              <Text
-                style={{
-                  color:
-                    data.actual_pnl.net_result > 0
-                      ? colors.profit
-                      : data.actual_pnl.net_result < 0
-                        ? colors.loss
-                        : colors.foreground,
-                  fontSize: 32,
-                  fontWeight: "900",
-                  fontVariant: ["tabular-nums"],
-                }}
-                selectable
-              >
-                {formatMoney(
-                  data.actual_pnl.net_result,
-                  data.actual_pnl.home_currency,
-                )}
-              </Text>
-              <Text style={{ color: colors.foreground, fontWeight: "800" }} selectable>
-                {data.result.achieved_round === "w"
-                  ? "Champion"
-                  : roundLabels[data.result.achieved_round]}
-              </Text>
-              <Text style={{ color: colors.mutedForeground, lineHeight: 20 }} selectable>
-                Income {formatMoney(data.actual_pnl.total_income, data.actual_pnl.home_currency)} · Expenses {formatMoney(data.actual_pnl.total_expenses, data.actual_pnl.home_currency)}
-              </Text>
-            </Card>
+            <OutcomeCard
+              status={{ kind: "saved" }}
+              body={{
+                kind: "completed",
+                result: data.result,
+                actualPnl: data.actual_pnl,
+              }}
+            />
           ) : null}
 
           {data.actual_pnl ? (
@@ -275,56 +244,25 @@ function TournamentDetailContent() {
 
           <ExpenseBreakdown tournament={data} />
 
-          {data.pnl.scenarios.length === 0 ? (
-            <Card>
-              <Text style={{ color: colors.mutedForeground }} selectable>
-                Projection unavailable
-              </Text>
-            </Card>
-          ) : (
-            <View style={{ gap: spacing.md }}>
-              <Text
-                style={{ color: colors.foreground, fontSize: 22, fontWeight: "800" }}
-                selectable
-              >
-                Scenarios
-              </Text>
-              <View style={{ gap: spacing.xs }}>
-                <Text style={{ color: colors.mutedForeground }} selectable>
-                  Each net result subtracts total expenses.
-                </Text>
-                <Text
-                  accessibilityLabel={`Total expenses subtracted from every scenario: ${formatMoney(data.pnl.total_expenses, data.home_currency)}`}
-                  style={{
-                    color: colors.foreground,
-                    fontSize: 18,
-                    fontWeight: "800",
-                    fontVariant: ["tabular-nums"],
-                  }}
-                  selectable
-                >
-                  {formatMoney(data.pnl.total_expenses, data.home_currency)} total
-                  expenses
-                </Text>
-              </View>
-              {scenarioOrder.map((scenario) => {
-                const result = getScenario(data, scenario);
-                return result ? (
-                  <ScenarioCard
-                    key={scenario}
-                    result={result}
-                    homeCurrency={data.home_currency}
-                    tournamentCurrency={data.currency}
-                    prizeTaxRate={
-                      data.pnl.estimated_withholding_rate === undefined
-                        ? data.prize_tax_rate
-                        : data.pnl.estimated_withholding_rate
-                    }
-                  />
-                ) : null;
-              })}
-            </View>
-          )}
+          <OutcomeCard
+            status={{ kind: "saved" }}
+            body={
+              data.pnl.scenarios.length === 0
+                ? {
+                    kind: "message",
+                    children: (
+                      <Text style={{ color: colors.mutedForeground }} selectable>
+                        Projection unavailable
+                      </Text>
+                    ),
+                  }
+                : {
+                    kind: "projection",
+                    pnl: data.pnl,
+                    homeCurrency: data.home_currency,
+                  }
+            }
+          />
 
           <Card>
             <Text

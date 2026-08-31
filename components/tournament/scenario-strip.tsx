@@ -1,5 +1,6 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
+import { OutcomeCard } from "@/components/tournament/outcome-card";
 import { colors, radii, spacing } from "@/constants/theme";
 import { useTournamentPreview } from "@/hooks/use-tournament-preview";
 import { errorMessage } from "@/lib/errors";
@@ -12,49 +13,15 @@ import {
   travelSchema,
   type TournamentDraft,
 } from "@/lib/tournament-draft";
-import { formatMoneyParts, roundLabels, scenarioLabel } from "@/lib/utils";
-import type { Scenario } from "@/types";
-
-const scenarios: Scenario[] = ["worst", "realistic", "best"];
-
-const styles = StyleSheet.create({
-  projectionHero: {
-    overflow: "hidden",
-    gap: spacing.lg,
-    padding: spacing.lg,
-    borderRadius: radii.md,
-    borderCurve: "continuous",
-    backgroundColor: colors.brand,
-    boxShadow:
-      "0 2px 5px rgba(16, 23, 18, 0.10), 0 22px 42px -24px rgba(23, 63, 49, 0.70)",
-  },
-  scenarioCard: {
-    minHeight: 126,
-    flex: 1,
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-    borderWidth: 1,
-    borderRadius: radii.md,
-    borderCurve: "continuous",
-  },
-});
 
 function canPreview(draft: TournamentDraft) {
-  return [detailsSchema, prizesSchema, travelSchema, subsidySchema, spendingSchema].every(
-    (schema) => schema.safeParse(draft).success,
-  );
-}
-
-function netPresentation(net: number, currency: string) {
-  const parts = formatMoneyParts(Math.abs(net), currency);
-  const sign = net > 0 ? "+" : net < 0 ? "−" : "";
-
-  return {
-    label: net === 0 ? "Break even" : net > 0 ? "Projected gain" : "Projected loss",
-    amount: `${sign}${parts.amount}`,
-    code: parts.code,
-  };
+  return [
+    detailsSchema,
+    prizesSchema,
+    travelSchema,
+    subsidySchema,
+    spendingSchema,
+  ].every((schema) => schema.safeParse(draft).success);
 }
 
 export function ScenarioStrip({
@@ -72,20 +39,17 @@ export function ScenarioStrip({
 }) {
   const draftReady = canPreview(draft);
   const previewReady = identityResolved && draftReady;
-  const hasPrizeRounds = Object.values(draft.prize_rounds).some(
-    (amount) => amount > 0,
-  );
   const emptyProjectionCopy =
     draft.currency.toUpperCase() !== prizeDistributionCurrency
+      ? {
+          title: "Outcomes unavailable",
+          body: "Official USD payout outcomes are unavailable for this tournament currency.",
+        }
+      : draft.prize_distribution_mode === "manual"
         ? {
-            title: "Outcomes unavailable",
-            body: "Official USD payout outcomes are unavailable for this tournament currency.",
+            title: "No outcomes yet",
+            body: "No payout schedule was supplied with this tournament.",
           }
-        : draft.prize_distribution_mode === "manual"
-          ? {
-              title: "No outcomes yet",
-              body: "No payout schedule was supplied with this tournament.",
-            }
         : {
             title: "No outcomes yet",
             body: "Choose a supported PSA tier and draw to see worst, middle, and best outcomes.",
@@ -95,6 +59,7 @@ export function ScenarioStrip({
     error,
     isError,
     isLoadingPreview: loading,
+    lastData,
     refetch,
   } = useTournamentPreview({
     authenticatedUserId,
@@ -104,211 +69,198 @@ export function ScenarioStrip({
     profileId,
   });
 
-  return (
-    <View style={styles.projectionHero}>
-      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: spacing.md }}>
-        <View style={{ flex: 1, gap: spacing.xs }}>
-          <Text
-            style={{
-              color: colors.brandMutedForeground,
-              fontSize: 13,
-              fontWeight: "700",
-            }}
-          >
-            Live projection
-          </Text>
-          <Text style={{ color: colors.brandForeground, fontSize: 24, fontWeight: "900" }}>
-            Outcome scenarios
-          </Text>
-          {hasPrizeRounds ? (
-            <Text style={{ color: colors.brandMutedForeground, lineHeight: 20 }}>
-              Based on your earliest, middle, and latest entered prize rounds.
+  if (!previewReady) {
+    return (
+      <OutcomeCard
+        status={{ kind: "live" }}
+        body={{
+          kind: "message",
+          children: (
+            <Text style={{ color: colors.mutedForeground, lineHeight: 20 }}>
+              {identityResolved
+                ? "Complete the required tournament details to start a live preview."
+                : "Choose the searched tournament or create it before previewing outcomes."}
             </Text>
-          ) : null}
-        </View>
-        {loading ? (
-          <ActivityIndicator color={colors.brandForeground} size="small" />
-        ) : null}
-      </View>
+          ),
+        }}
+      />
+    );
+  }
 
-      {!previewReady ? (
-        <View
-          accessibilityLiveRegion="polite"
-          style={{
-            padding: spacing.lg,
-            borderRadius: radii.md,
-            backgroundColor: "rgba(255, 255, 255, 0.08)",
-          }}
-        >
-          <Text style={{ color: colors.brandMutedForeground, lineHeight: 20 }}>
-            {identityResolved
-              ? "Complete the required tournament details to start a live preview."
-              : "Choose the searched tournament or create it before previewing outcomes."}
-          </Text>
-        </View>
-      ) : loading ? (
-        <View
-          accessibilityLiveRegion="polite"
-          style={{
-            minHeight: 116,
-            alignItems: "center",
-            justifyContent: "center",
-            gap: spacing.sm,
-            borderRadius: radii.md,
-            backgroundColor: "rgba(255, 255, 255, 0.08)",
-          }}
-        >
-          <Text style={{ color: colors.brandMutedForeground }}>
-            Updating projection…
-          </Text>
-        </View>
-      ) : isError ? (
-        <View
-          accessibilityLiveRegion="polite"
-          style={{
-            gap: spacing.sm,
-            padding: spacing.lg,
-            borderRadius: radii.md,
-            backgroundColor: colors.warningSoft,
-          }}
-        >
-          <Text style={{ color: colors.warning, fontWeight: "800" }}>
-            Live preview unavailable
-          </Text>
-          <Text style={{ color: colors.warning, lineHeight: 20 }}>
-            {errorMessage(error, "Live preview is unavailable.")} You can keep
-            editing without losing your draft.
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            hitSlop={8}
-            onPress={() => refetch()}
-            style={{ minHeight: 44, justifyContent: "center", alignSelf: "flex-start" }}
-          >
-            <Text style={{ color: colors.warning, fontWeight: "900" }}>Try preview again</Text>
-          </Pressable>
-        </View>
-      ) : data?.scenarios.length === 0 ? (
-        <View
-          accessibilityLiveRegion="polite"
-          style={{
-            padding: spacing.lg,
-            borderRadius: radii.md,
-            backgroundColor: "rgba(255, 255, 255, 0.08)",
-          }}
-        >
-          <Text style={{ color: colors.brandForeground, fontWeight: "800" }}>
-            {emptyProjectionCopy.title}
-          </Text>
-          <Text
+  if (loading && lastData) {
+    return (
+      <OutcomeCard
+        status={{ kind: "updating" }}
+        body={{
+          kind: "projection",
+          pnl: lastData,
+          homeCurrency,
+          faded: true,
+        }}
+      />
+    );
+  }
+
+  if (loading) {
+    return (
+      <OutcomeCard
+        status={{ kind: "live" }}
+        body={{
+          kind: "message",
+          minHeight: 116,
+          children: (
+            <View
+              style={{
+                flex: 1,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Text style={{ color: colors.mutedForeground }}>
+                Updating projection…
+              </Text>
+            </View>
+          ),
+        }}
+      />
+    );
+  }
+
+  if (isError && lastData) {
+    return (
+      <OutcomeCard
+        status={{ kind: "unavailable" }}
+        body={{
+          kind: "projection",
+          pnl: lastData,
+          homeCurrency,
+          faded: true,
+        }}
+        footer={
+          <View
             style={{
-              color: colors.brandMutedForeground,
-              lineHeight: 20,
-              marginTop: spacing.xs,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: spacing.md,
             }}
           >
-            {emptyProjectionCopy.body}
-          </Text>
-        </View>
-      ) : data ? (
-        <View
-          accessibilityLabel="Worst, middle, and best projected outcomes"
-          style={{ flexDirection: "row", gap: spacing.sm }}
-        >
-          {scenarios.map((scenario) => {
-            const result = data.scenarios.find((item) => item.scenario === scenario);
+            <Text
+              style={{
+                flex: 1,
+                color: colors.warning,
+                fontSize: 14,
+                fontWeight: "700",
+              }}
+            >
+              Showing the last result.
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={() => refetch()}
+              style={{ minHeight: 44, justifyContent: "center" }}
+            >
+              <Text style={{ color: colors.warning, fontWeight: "900" }}>
+                Try again
+              </Text>
+            </Pressable>
+          </View>
+        }
+      />
+    );
+  }
 
-            if (!result) return null;
-            const net = netPresentation(result.net_result, homeCurrency);
-            const featured = scenario === "realistic";
-
-            return (
-              <View
-                key={scenario}
-                accessible
-                accessibilityLabel={`${scenarioLabel(scenario)} scenario. Outcome ${roundLabels[result.round]}. ${net.label} ${net.amount} ${net.code}.`}
-                style={[
-                  styles.scenarioCard,
-                  {
-                    borderColor: featured
-                      ? "rgba(255, 255, 255, 0.42)"
-                      : "rgba(255, 255, 255, 0.14)",
-                    backgroundColor: featured
-                      ? "rgba(255, 255, 255, 0.16)"
-                      : "rgba(255, 255, 255, 0.06)",
-                  },
-                ]}
+  if (isError) {
+    return (
+      <OutcomeCard
+        status={{ kind: "live" }}
+        body={{
+          kind: "message",
+          children: (
+            <View
+              style={{
+                gap: spacing.sm,
+                margin: -spacing.lg,
+                padding: spacing.lg,
+                borderRadius: radii.sm,
+                backgroundColor: colors.warningSoft,
+              }}
+            >
+              <Text style={{ color: colors.warning, fontWeight: "800" }}>
+                Live preview unavailable
+              </Text>
+              <Text style={{ color: colors.warning, lineHeight: 20 }}>
+                {errorMessage(error, "Live preview is unavailable.")} You can
+                keep editing without losing your draft.
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                hitSlop={8}
+                onPress={() => refetch()}
+                style={{
+                  minHeight: 44,
+                  alignSelf: "flex-start",
+                  justifyContent: "center",
+                }}
               >
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    color: colors.brandMutedForeground,
-                    fontSize: 12,
-                    fontWeight: "800",
-                  }}
-                >
-                  {scenarioLabel(scenario)}
+                <Text style={{ color: colors.warning, fontWeight: "900" }}>
+                  Try preview again
                 </Text>
-                <View style={{ gap: 2 }}>
-                  <Text style={{ color: colors.brandMutedForeground, fontSize: 12 }}>
-                    Outcome
-                  </Text>
-                  <Text
-                    style={{
-                      color: colors.brandForeground,
-                      fontSize: 18,
-                      fontWeight: "900",
-                    }}
-                  >
-                    {roundLabels[result.round]}
-                  </Text>
-                </View>
-                <View style={{ gap: 2 }}>
-                  <Text style={{ color: colors.brandMutedForeground, fontSize: 12 }}>
-                    {net.label}
-                  </Text>
-                  <Text
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.75}
-                    numberOfLines={1}
-                    style={{
-                      color: colors.brandForeground,
-                      fontSize: 16,
-                      lineHeight: 20,
-                      fontWeight: "900",
-                      fontVariant: ["tabular-nums"],
-                    }}
-                  >
-                    {net.amount}
-                  </Text>
-                  <Text
-                    style={{
-                      color: colors.brandMutedForeground,
-                      fontSize: 12,
-                      fontWeight: "700",
-                      letterSpacing: 0.4,
-                    }}
-                  >
-                    {net.code}
-                  </Text>
-                </View>
-              </View>
-            );
-          })}
-        </View>
-      ) : (
-        <View
-          style={{
-            padding: spacing.lg,
-            borderRadius: radii.md,
-            backgroundColor: "rgba(255, 255, 255, 0.08)",
-          }}
-        >
-          <Text style={{ color: colors.brandMutedForeground }}>
+              </Pressable>
+            </View>
+          ),
+        }}
+      />
+    );
+  }
+
+  if (data?.scenarios.length === 0) {
+    return (
+      <OutcomeCard
+        status={{ kind: "live" }}
+        body={{
+          kind: "message",
+          children: (
+            <View>
+              <Text style={{ color: colors.foreground, fontWeight: "800" }}>
+                {emptyProjectionCopy.title}
+              </Text>
+              <Text
+                style={{
+                  marginTop: spacing.xs,
+                  color: colors.mutedForeground,
+                  lineHeight: 20,
+                }}
+              >
+                {emptyProjectionCopy.body}
+              </Text>
+            </View>
+          ),
+        }}
+      />
+    );
+  }
+
+  if (data) {
+    return (
+      <OutcomeCard
+        status={{ kind: "live" }}
+        body={{ kind: "projection", pnl: data, homeCurrency }}
+      />
+    );
+  }
+
+  return (
+    <OutcomeCard
+      status={{ kind: "live" }}
+      body={{
+        kind: "message",
+        children: (
+          <Text style={{ color: colors.mutedForeground }}>
             Preview is ready when your edits settle.
           </Text>
-        </View>
-      )}
-    </View>
+        ),
+      }}
+    />
   );
 }

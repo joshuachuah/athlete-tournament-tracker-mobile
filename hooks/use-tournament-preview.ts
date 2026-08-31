@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { api } from "@/lib/api";
@@ -37,14 +38,45 @@ export function useTournamentPreview({
         authenticatedUserId,
       }),
     enabled: enabled && Boolean(debouncedPayload) && !waitingForDebounce,
+    placeholderData: keepPreviousData,
     retry: false,
   });
 
   const isLoadingPreview = waitingForDebounce || query.isFetching;
+  const previewOwner = `${authenticatedUserId}:${profileId}:${homeCurrency.toUpperCase()}`;
+  const lastSuccessfulPreview = useRef<
+    | {
+        data: NonNullable<typeof query.data>;
+        owner: string;
+      }
+    | undefined
+  >(undefined);
+
+  useEffect(() => {
+    if (!enabled) {
+      lastSuccessfulPreview.current = undefined;
+      return;
+    }
+
+    if (query.data && !query.isPlaceholderData) {
+      lastSuccessfulPreview.current = { data: query.data, owner: previewOwner };
+    }
+  }, [enabled, previewOwner, query.data, query.isPlaceholderData]);
+
+  const lastData = enabled
+    ? (query.data ??
+      (lastSuccessfulPreview.current?.owner === previewOwner
+        ? lastSuccessfulPreview.current.data
+        : undefined))
+    : undefined;
 
   return {
     ...query,
     data: !enabled || isLoadingPreview ? undefined : query.data,
+    // Keep the previous result available for the outcome card while a new
+    // preview loads. `data` stays hidden so other preview labels never use a
+    // stale withholding rate against edited inputs.
+    lastData,
     isLoadingPreview,
   };
 }

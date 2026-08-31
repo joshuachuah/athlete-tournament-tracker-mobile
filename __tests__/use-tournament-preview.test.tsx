@@ -97,6 +97,7 @@ describe("useTournamentPreview", () => {
 
     expect(result.current.isLoadingPreview).toBe(true);
     expect(result.current.data).toBeUndefined();
+    expect(result.current.lastData?.estimated_withholding_rate).toBe(10);
 
     await act(async () => {
       await jest.advanceTimersByTimeAsync(350);
@@ -104,6 +105,7 @@ describe("useTournamentPreview", () => {
 
     expect(result.current.isLoadingPreview).toBe(true);
     expect(result.current.data).toBeUndefined();
+    expect(result.current.lastData?.estimated_withholding_rate).toBe(10);
     await waitFor(() => expect(mockPreview).toHaveBeenCalledTimes(2));
     expect(mockPreview.mock.calls[1]?.[1]).toEqual(
       expect.objectContaining({
@@ -144,6 +146,7 @@ describe("useTournamentPreview", () => {
     rerender({ enabled: false });
 
     expect(result.current.data).toBeUndefined();
+    expect(result.current.lastData).toBeUndefined();
     expect(result.current.isError).toBe(false);
 
     await act(async () => {
