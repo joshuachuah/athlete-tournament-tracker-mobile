@@ -261,6 +261,40 @@ describe("TournamentResultSheet", () => {
     });
   });
 
+  it("uses the same debounced input for the preview payload and cache key", async () => {
+    jest.useFakeTimers();
+    const { screen } = renderSheet();
+
+    await waitFor(() => expect(mockPreviewResult).toHaveBeenCalledTimes(1));
+    fireEvent.changeText(screen.getByLabelText("Prize received (USD)"), "650");
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(100);
+    });
+    fireEvent.changeText(screen.getByLabelText("Prize received (USD)"), "700");
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(350);
+    });
+
+    expect(mockPreviewResult).toHaveBeenCalledTimes(2);
+    for (const [, previewInput] of mockPreviewResult.mock.calls) {
+      expect(
+        queryClient.getQueryCache().find({
+          queryKey: [
+            "tournament-result-preview",
+            "user-1",
+            tournament.id,
+            JSON.stringify(previewInput),
+          ],
+          exact: true,
+        }),
+      ).toBeDefined();
+    }
+
+    await act(async () => {
+      await jest.runOnlyPendingTimersAsync();
+    });
+  });
+
   it("edits without replacing the confirmed prize and can remove the saved result", async () => {
     const completed = {
       ...tournament,

@@ -245,8 +245,8 @@ export function TournamentResultSheet({
   const reducedMotion = useReducedMotion();
   const insets = useSafeAreaInsets();
   const serializedInput = JSON.stringify(input);
-  const debouncedSerializedInput = useDebouncedValue(serializedInput, 350);
   const debouncedResultInput = useDebouncedValue(input, 350);
+  const debouncedSerializedInput = JSON.stringify(debouncedResultInput);
   const waitingForDebounce = serializedInput !== debouncedSerializedInput;
   const rounds = availableRounds();
 
