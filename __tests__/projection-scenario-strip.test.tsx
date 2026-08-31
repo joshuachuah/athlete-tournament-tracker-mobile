@@ -1,4 +1,4 @@
-import { act, render, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { PropsWithChildren } from "react";
 
@@ -27,6 +27,38 @@ const draft = {
     f: 600,
     w: 700,
   },
+};
+
+const previewWithOutcomes = {
+  total_expenses: 200,
+  total_income_base: 0,
+  break_even_round: "r2" as const,
+  scenarios: [
+    {
+      scenario: "worst" as const,
+      round: "r1" as const,
+      prize_money: 100,
+      prize_money_after_tax: 100,
+      net_result: -100,
+      profitable: false,
+    },
+    {
+      scenario: "realistic" as const,
+      round: "r2" as const,
+      prize_money: 200,
+      prize_money_after_tax: 200,
+      net_result: 0,
+      profitable: true,
+    },
+    {
+      scenario: "best" as const,
+      round: "w" as const,
+      prize_money: 700,
+      prize_money_after_tax: 700,
+      net_result: 500,
+      profitable: true,
+    },
+  ],
 };
 
 function renderStrip(currentDraft = draft) {
@@ -61,16 +93,7 @@ beforeEach(() => {
 afterEach(() => jest.useRealTimers());
 
 it("renders a server-provided non-QF middle case and treats zero net as break-even", async () => {
-  mockPreview.mockResolvedValue({
-    total_expenses: 200,
-    total_income_base: 0,
-    break_even_round: "r2",
-    scenarios: [
-      { scenario: "worst", round: "r1", prize_money: 100, prize_money_after_tax: 100, net_result: -100, profitable: false },
-      { scenario: "realistic", round: "r2", prize_money: 200, prize_money_after_tax: 200, net_result: 0, profitable: true },
-      { scenario: "best", round: "w", prize_money: 700, prize_money_after_tax: 700, net_result: 500, profitable: true },
-    ],
-  });
+  mockPreview.mockResolvedValue(previewWithOutcomes);
   const screen = renderStrip({
     ...draft,
     prize_rounds: {
@@ -83,18 +106,88 @@ it("renders a server-provided non-QF middle case and treats zero net as break-ev
   });
   await settlePreview();
 
-  await waitFor(() => expect(screen.getByText("R2")).toBeTruthy());
+  await waitFor(() => expect(screen.getByText("Out in R2")).toBeTruthy());
   expect(screen.queryByText("QF")).toBeNull();
   expect(screen.getByText("Middle case")).toBeTruthy();
-  expect(
-    screen.getByText("Based on your earliest, middle, and latest entered prize rounds."),
-  ).toBeTruthy();
   expect(screen.getByText("Win")).toBeTruthy();
-  expect(screen.getByText("Break even")).toBeTruthy();
   expect(screen.getByText("$0")).toBeTruthy();
   expect(
-    screen.getByLabelText(/scenario\. Outcome \w+\. Break even \$0 USD\.$/),
+    screen.getByLabelText(/scenario\. Out in \w+\. Break even \$0 USD\.$/),
   ).toBeTruthy();
+  expect(screen.getByText("Breaks even at R2")).toBeTruthy();
+});
+
+it("keeps the last result on screen while a changed draft refetches", async () => {
+  let resolveUpdatedPreview:
+    | ((value: typeof previewWithOutcomes) => void)
+    | undefined;
+  mockPreview
+    .mockResolvedValueOnce(previewWithOutcomes)
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveUpdatedPreview = resolve;
+        }),
+    );
+  const screen = renderStrip();
+  await settlePreview();
+  await waitFor(() => expect(screen.getByText("+$500")).toBeTruthy());
+
+  screen.rerender(
+    <ScenarioStrip
+      authenticatedUserId="account-1"
+      draft={{ ...draft, entry_fee: 25 }}
+      homeCurrency="USD"
+      identityResolved
+      profileId="athlete-1"
+    />,
+  );
+
+  expect(screen.getByText("Updating")).toBeTruthy();
+  expect(screen.getByText("+$500")).toBeTruthy();
+
+  await settlePreview();
+  await act(async () => {
+    resolveUpdatedPreview?.({
+      ...previewWithOutcomes,
+      scenarios: previewWithOutcomes.scenarios.map((scenario) =>
+        scenario.scenario === "best"
+          ? { ...scenario, net_result: 450 }
+          : scenario,
+      ),
+    });
+    await Promise.resolve();
+  });
+
+  await waitFor(() => expect(screen.getByText("+$450")).toBeTruthy());
+  expect(screen.queryByText("Updating")).toBeNull();
+});
+
+it("keeps the last result when a refetch fails", async () => {
+  mockPreview
+    .mockResolvedValueOnce(previewWithOutcomes)
+    .mockRejectedValueOnce(new Error("Preview offline"))
+    .mockResolvedValueOnce(previewWithOutcomes);
+  const screen = renderStrip();
+  await settlePreview();
+  await waitFor(() => expect(screen.getByText("+$500")).toBeTruthy());
+
+  screen.rerender(
+    <ScenarioStrip
+      authenticatedUserId="account-1"
+      draft={{ ...draft, entry_fee: 25 }}
+      homeCurrency="USD"
+      identityResolved
+      profileId="athlete-1"
+    />,
+  );
+  await settlePreview();
+
+  await waitFor(() => expect(screen.getByText("Unavailable")).toBeTruthy());
+  expect(screen.getByText("Showing the last result.")).toBeTruthy();
+  expect(screen.getByText("+$500")).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: "Try again" }));
+  await waitFor(() => expect(mockPreview).toHaveBeenCalledTimes(3));
 });
 
 it("shows the explicit empty and unavailable states without blocking edits", async () => {
