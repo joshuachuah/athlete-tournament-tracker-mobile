@@ -43,6 +43,7 @@ it("renders category amounts without calculating FX in the client", () => {
   expect(screen.getByText("Food")).toBeTruthy();
   expect(screen.getByText("Local transport")).toBeTruthy();
   expect(screen.getByText("Other daily spending")).toBeTruthy();
+  expect(screen.getByText("Category amounts in EUR")).toBeTruthy();
 
   expect(screen.getByText("€150 EUR")).toBeTruthy();
   expect(screen.getByText("€120 EUR")).toBeTruthy();

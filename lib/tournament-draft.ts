@@ -771,11 +771,10 @@ export function toTournamentPayload(
     accommodation_total: normalized.accommodation_total,
     food_total: normalized.food_total,
     local_transport_total: normalized.local_transport_total,
-    // Existing records keep their unsplit amount until the athlete explicitly
-    // replaces it. New projections never write to this legacy field.
-    daily_spending_cap: normalized.editId
-      ? normalized.daily_spending_cap
-      : 0,
+    // New drafts default this legacy field to zero. Preserving the normalized
+    // value prevents resumed pre-v5 drafts from losing unsplit spending on
+    // their first save, before they have an editId.
+    daily_spending_cap: normalized.daily_spending_cap,
     coaching_cost: normalized.coaching_cost,
     misc_cost: normalized.misc_cost,
     subsidy_by: normalized.subsidy_enabled ? normalized.subsidy_by.trim() : null,

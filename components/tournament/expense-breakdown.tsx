@@ -37,6 +37,9 @@ export function ExpenseBreakdown({ tournament }: { tournament: TournamentWithPnL
       >
         Expense breakdown
       </Text>
+      <Text style={{ color: colors.mutedForeground, fontSize: 13 }} selectable>
+        Category amounts in {tournament.currency.toUpperCase()}
+      </Text>
       {displayedRows.map(([label, key]) => {
         const rawAmount = tournament[key] ?? 0;
         const amount =

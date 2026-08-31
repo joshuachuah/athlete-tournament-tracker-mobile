@@ -245,8 +245,9 @@ export function TournamentResultSheet({
   const reducedMotion = useReducedMotion();
   const insets = useSafeAreaInsets();
   const serializedInput = JSON.stringify(input);
-  const debouncedInput = useDebouncedValue(serializedInput, 350);
-  const waitingForDebounce = serializedInput !== debouncedInput;
+  const debouncedSerializedInput = useDebouncedValue(serializedInput, 350);
+  const debouncedResultInput = useDebouncedValue(input, 350);
+  const waitingForDebounce = serializedInput !== debouncedSerializedInput;
   const rounds = availableRounds();
 
   const {
@@ -260,15 +261,15 @@ export function TournamentResultSheet({
       "tournament-result-preview",
       authenticatedUserId,
       tournament.id,
-      debouncedInput,
+      debouncedSerializedInput,
     ],
     queryFn: ({ signal }) =>
       api.tournaments.previewResult(
         tournament.id,
-        JSON.parse(debouncedInput) as TournamentResultInput,
+        debouncedResultInput,
         { signal, authenticatedUserId },
       ),
-    enabled: Boolean(debouncedInput) && !waitingForDebounce,
+    enabled: !waitingForDebounce,
     retry: false,
   });
 

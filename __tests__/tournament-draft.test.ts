@@ -990,12 +990,31 @@ describe("toTournamentPayload", () => {
         food_total: 60,
         local_transport_total: 37.5,
         accommodation_total: 160,
-        daily_spending_cap: 0,
+        daily_spending_cap: 99,
       }),
     );
     expect(payload).not.toHaveProperty("expense_input_mode");
     expect(payload).not.toHaveProperty("food_daily");
     expect(payload).not.toHaveProperty("local_transport_daily");
+  });
+
+  it("preserves legacy spending when a migrated draft is saved for the first time", () => {
+    const {
+      expense_input_mode: _expenseInputMode,
+      food_daily: _foodDaily,
+      food_total: _foodTotal,
+      local_transport_daily: _localTransportDaily,
+      local_transport_total: _localTransportTotal,
+      ...version4Draft
+    } = defaultTournamentDraft;
+    const migrated = normalizeTournamentDraft({
+      version: 4,
+      draft: { ...version4Draft, daily_spending_cap: 45 },
+    });
+
+    expect(toTournamentPayload(migrated, "athlete-1")).toEqual(
+      expect.objectContaining({ daily_spending_cap: 45 }),
+    );
   });
 
   it("sends entered tournament totals without multiplying them", () => {
