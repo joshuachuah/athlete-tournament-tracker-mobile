@@ -53,9 +53,14 @@ export type TournamentDraft = {
   prize_draw_template_id: DrawTemplateId | null;
   prize_player_total: number;
   flight_cost: number;
+  expense_input_mode: "daily" | "total";
   accommodation_nightly: number;
   accommodation_nights: number;
   accommodation_total: number;
+  food_daily: number;
+  food_total: number;
+  local_transport_daily: number;
+  local_transport_total: number;
   daily_spending_cap: number;
   coaching_cost: number;
   misc_cost: number;
@@ -151,9 +156,14 @@ export function createDefaultTournamentDraft(
     prize_draw_template_id: null,
     prize_player_total: 0,
     flight_cost: 0,
+    expense_input_mode: "daily",
     accommodation_nightly: 0,
     accommodation_nights: 0,
     accommodation_total: 0,
+    food_daily: 0,
+    food_total: 0,
+    local_transport_daily: 0,
+    local_transport_total: 0,
     daily_spending_cap: 0,
     coaching_cost: 0,
     misc_cost: 0,
@@ -218,6 +228,7 @@ export const prizesSchema = z.object({
 
 export const travelSchema = z.object({
   flight_cost: money,
+  expense_input_mode: z.enum(["daily", "total"]),
   accommodation_nightly: money,
   accommodation_nights: z.coerce
     .number()
@@ -240,6 +251,11 @@ export const subsidySchema = z.object({
 });
 
 export const spendingSchema = z.object({
+  expense_input_mode: z.enum(["daily", "total"]),
+  food_daily: money,
+  food_total: money,
+  local_transport_daily: money,
+  local_transport_total: money,
   daily_spending_cap: money,
   coaching_cost: money,
   misc_cost: money,
@@ -259,6 +275,56 @@ export function deriveAccommodationNightly(
   currency: string,
 ): number {
   return nights > 0 ? roundCurrencyAmount(total / nights, currency) : total;
+}
+
+export function calculateDailyExpenseTotal(
+  dailyAmount: number,
+  durationDays: number,
+  currency: string,
+): number {
+  return roundCurrencyAmount(dailyAmount * durationDays, currency);
+}
+
+export function deriveDailyExpenseAmount(
+  total: number,
+  durationDays: number,
+  currency: string,
+): number {
+  return durationDays > 0
+    ? roundCurrencyAmount(total / durationDays, currency)
+    : total;
+}
+
+export function expenseInputModeChanges(
+  draft: TournamentDraft,
+  expense_input_mode: TournamentDraft["expense_input_mode"],
+): Partial<TournamentDraft> {
+  if (expense_input_mode === draft.expense_input_mode) {
+    return {};
+  }
+
+  if (expense_input_mode === "total") {
+    return { expense_input_mode };
+  }
+
+  return {
+    expense_input_mode,
+    accommodation_nightly: deriveAccommodationNightly(
+      draft.accommodation_total,
+      draft.accommodation_nights,
+      draft.currency,
+    ),
+    food_daily: deriveDailyExpenseAmount(
+      draft.food_total,
+      draft.duration_days,
+      draft.currency,
+    ),
+    local_transport_daily: deriveDailyExpenseAmount(
+      draft.local_transport_total,
+      draft.duration_days,
+      draft.currency,
+    ),
+  };
 }
 
 // Abandoned edits must restart from the server record so a stale editId cannot
@@ -328,14 +394,25 @@ const legacyPersistedSelectorDraftSchema = persistedTournamentDraftV1Schema.exte
     .nullable(),
   prize_player_total: finiteNonNegativeNumber,
 });
-const persistedTournamentDraftSchema = legacyPersistedSelectorDraftSchema.extend({
+const persistedTournamentDraftV4Schema = legacyPersistedSelectorDraftSchema.extend({
   country_code: countryCodeSchema.nullable(),
   prize_rounds: persistedPrizeRoundsSchema,
   prize_tax_rate: finiteNonNegativeNumber.max(100).nullable(),
 });
+const persistedTournamentDraftSchema = persistedTournamentDraftV4Schema.extend({
+  expense_input_mode: z.enum(["daily", "total"]),
+  food_daily: finiteNonNegativeNumber,
+  food_total: finiteNonNegativeNumber,
+  local_transport_daily: finiteNonNegativeNumber,
+  local_transport_total: finiteNonNegativeNumber,
+});
 const storedTournamentDraftSchema = z.strictObject({
-  version: z.literal(4),
+  version: z.literal(5),
   draft: persistedTournamentDraftSchema,
+});
+const storedTournamentDraftV4Schema = z.strictObject({
+  version: z.literal(4),
+  draft: persistedTournamentDraftV4Schema,
 });
 const storedTournamentDraftV3Schema = z.strictObject({
   version: z.literal(3),
@@ -354,7 +431,7 @@ const legacyTournamentDraftSchema = persistedTournamentDraftV1Schema.extend({
 }).partial();
 
 export function persistedTournamentDraft(draft: TournamentDraft) {
-  return { version: 4 as const, draft };
+  return { version: 5 as const, draft: deriveDraftDates(draft) };
 }
 
 function prizeSelectorMigration(
@@ -383,6 +460,7 @@ function migrateLegacySelectorDraft(
   const prizeRounds = { ...emptyPrizeRounds(), ...draft.prize_rounds };
 
   return {
+    ...createDefaultTournamentDraft(),
     ...draft,
     country_code: null,
     ...prizeSelectorMigration(prizeRounds),
@@ -399,7 +477,20 @@ export function normalizeTournamentDraft(stored: unknown): TournamentDraft {
   const current = storedTournamentDraftSchema.safeParse(stored);
 
   if (current.success) {
-    const draft = current.data.draft;
+    const draft = deriveDraftDates(current.data.draft);
+    return draft.country_code === "US" && draft.prize_tax_rate !== 30
+      ? { ...draft, prize_tax_rate: 30 }
+      : draft;
+  }
+
+  const version4 = storedTournamentDraftV4Schema.safeParse(stored);
+
+  if (version4.success) {
+    const draft = {
+      ...defaults,
+      ...version4.data.draft,
+      expense_input_mode: "total" as const,
+    };
     return draft.country_code === "US" && draft.prize_tax_rate !== 30
       ? { ...draft, prize_tax_rate: 30 }
       : draft;
@@ -567,6 +658,8 @@ export function tournamentDraftFromKnown(
 
 export function tournamentToDraft(tournament: TournamentWithPnL): TournamentDraft {
   const accommodationNights = Math.max(0, tournament.duration_days - 1);
+  const foodTotal = tournament.food_total ?? 0;
+  const localTransportTotal = tournament.local_transport_total ?? 0;
   const defaults = createDefaultTournamentDraft();
   const savedCountryCode =
     tournament.country_code && isCountryCode(tournament.country_code)
@@ -598,6 +691,7 @@ export function tournamentToDraft(tournament: TournamentWithPnL): TournamentDraf
     prize_draw_template_id: null,
     prize_player_total: 0,
     flight_cost: tournament.flight_cost,
+    expense_input_mode: "total",
     accommodation_total: tournament.accommodation_total,
     accommodation_nightly: deriveAccommodationNightly(
       tournament.accommodation_total,
@@ -605,6 +699,18 @@ export function tournamentToDraft(tournament: TournamentWithPnL): TournamentDraf
       tournament.currency,
     ),
     accommodation_nights: accommodationNights,
+    food_daily: deriveDailyExpenseAmount(
+      foodTotal,
+      tournament.duration_days,
+      tournament.currency,
+    ),
+    food_total: foodTotal,
+    local_transport_daily: deriveDailyExpenseAmount(
+      localTransportTotal,
+      tournament.duration_days,
+      tournament.currency,
+    ),
+    local_transport_total: localTransportTotal,
     daily_spending_cap: tournament.daily_spending_cap,
     coaching_cost: tournament.coaching_cost,
     misc_cost: tournament.misc_cost,
@@ -617,10 +723,31 @@ export function tournamentToDraft(tournament: TournamentWithPnL): TournamentDraf
 }
 
 export function deriveDraftDates(draft: TournamentDraft): TournamentDraft {
-  return {
+  const durationDays = calculateDurationDays(draft.start_date, draft.end_date);
+  const durationChanged = durationDays !== draft.duration_days;
+  const next = {
     ...draft,
-    duration_days: calculateDurationDays(draft.start_date, draft.end_date),
+    duration_days: durationDays,
   };
+
+  // Switching between daily and total input is a presentation choice, so it
+  // must not alter the canonical totals. Date edits are the one exception:
+  // daily estimates intentionally scale with the new tournament duration.
+  return draft.expense_input_mode === "daily" && durationChanged
+    ? {
+        ...next,
+        food_total: calculateDailyExpenseTotal(
+          draft.food_daily,
+          durationDays,
+          draft.currency,
+        ),
+        local_transport_total: calculateDailyExpenseTotal(
+          draft.local_transport_daily,
+          durationDays,
+          draft.currency,
+        ),
+      }
+    : next;
 }
 
 export function toTournamentPayload(
@@ -642,6 +769,11 @@ export function toTournamentPayload(
     entry_fee: normalized.entry_fee,
     flight_cost: normalized.flight_cost,
     accommodation_total: normalized.accommodation_total,
+    food_total: normalized.food_total,
+    local_transport_total: normalized.local_transport_total,
+    // New drafts default this legacy field to zero. Preserving the normalized
+    // value prevents resumed pre-v5 drafts from losing unsplit spending on
+    // their first save, before they have an editId.
     daily_spending_cap: normalized.daily_spending_cap,
     coaching_cost: normalized.coaching_cost,
     misc_cost: normalized.misc_cost,

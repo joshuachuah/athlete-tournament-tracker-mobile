@@ -480,6 +480,40 @@ describe("TournamentProjectionBuilder", () => {
     expect(editScreen.queryByText("Continue draft")).toBeNull();
   });
 
+  it("blocks direct edit routes after a result is recorded", async () => {
+    mockGetTournament.mockResolvedValue({
+      ...savedTournament,
+      result: {
+        id: "result-1",
+        tournament_id: savedTournament.id,
+        user_id: savedTournament.user_id,
+        achieved_round: "qf",
+        prize_received_total: 500,
+        subsidy_received_total: 0,
+        sponsorship_received_total: 40,
+        entry_fee_total: 100,
+        flight_total: 200,
+        accommodation_total: 300,
+        food_total: 0,
+        local_transport_total: 0,
+        coaching_total: 50,
+        misc_total: 25,
+        completed_at: "2026-01-03T10:00:00Z",
+        created_at: "2026-01-03T10:00:00Z",
+        updated_at: "2026-01-03T10:00:00Z",
+      },
+    });
+    const screen = renderWithClient(
+      <TournamentDraftProvider userId="account-1">
+        <TournamentBuilderContainer editId={savedTournament.id} />
+      </TournamentDraftProvider>,
+    );
+
+    expect(await screen.findByText("Projection locked")).toBeTruthy();
+    expect(screen.getByText("View tournament result")).toBeTruthy();
+    expect(screen.queryByText("Save changes")).toBeNull();
+  });
+
   it("shows search loading and retryable error states inline", async () => {
     mockSearch.mockRejectedValue(new Error("Tournament search offline"));
     const { screen } = renderBuilder(defaultDraft);
@@ -542,6 +576,103 @@ describe("TournamentProjectionBuilder", () => {
 
     expect(screen.getByText("+$400 USD")).toBeTruthy();
     expect(screen.getByText("Funding allocated to this tournament")).toBeTruthy();
+  });
+
+  it("normalizes daily food and transport estimates before submission", () => {
+    const { onSubmit, screen } = renderBuilder(validDraft);
+
+    fireEvent.press(screen.getByText("Add optional assumption"));
+    fireEvent.changeText(screen.getByLabelText("Search assumptions"), "food");
+    fireEvent.press(screen.getByText("Food and local transport"));
+    fireEvent.changeText(screen.getByLabelText("Food per day (USD)"), "20");
+    fireEvent.changeText(
+      screen.getByLabelText("Local transport per day (USD)"),
+      "10",
+    );
+
+    expect(screen.getByText("Food total: $60 USD")).toBeTruthy();
+    expect(screen.getByText("Local transport total: $30 USD")).toBeTruthy();
+
+    fireEvent.press(screen.getByText("Apply food and local transport"));
+    expect(screen.getByText("−$90 USD")).toBeTruthy();
+    fireEvent.press(screen.getByText("Create projection"));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        expense_input_mode: "daily",
+        food_daily: 20,
+        food_total: 60,
+        local_transport_daily: 10,
+        local_transport_total: 30,
+      }),
+    );
+  });
+
+  it("accepts tournament totals without treating them as daily amounts", () => {
+    const { onSubmit, screen } = renderBuilder(validDraft);
+
+    fireEvent.press(screen.getByText("Add optional assumption"));
+    fireEvent.press(screen.getByText("Food and local transport"));
+    fireEvent.press(screen.getByText("Tournament totals"));
+    fireEvent.changeText(screen.getByLabelText("Food total (USD)"), "120");
+    fireEvent.changeText(
+      screen.getByLabelText("Local transport total (USD)"),
+      "60",
+    );
+    fireEvent.press(screen.getByText("Apply food and local transport"));
+    fireEvent.press(screen.getByText("Create projection"));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        expense_input_mode: "total",
+        food_total: 120,
+        local_transport_total: 60,
+      }),
+    );
+  });
+
+  it("refreshes focused expense text when switching input modes", () => {
+    const { screen } = renderBuilder(validDraft);
+
+    fireEvent.press(screen.getByText("Add optional assumption"));
+    fireEvent.press(screen.getByText("Food and local transport"));
+    fireEvent.press(screen.getByText("Tournament totals"));
+
+    const transportTotal = screen.getByLabelText(
+      "Local transport total (USD)",
+    );
+    fireEvent(transportTotal, "focus");
+    fireEvent.changeText(transportTotal, "60");
+    fireEvent.press(screen.getByText("Daily estimate"));
+
+    expect(
+      screen.getByLabelText("Local transport per day (USD)").props.value,
+    ).toBe("20");
+    expect(screen.getByText("Local transport total: $60 USD")).toBeTruthy();
+  });
+
+  it("labels an older unsplit amount without classifying it", () => {
+    const initialDraft = tournamentToDraft(savedTournament);
+    const { screen } = renderBuilder(initialDraft);
+
+    expect(screen.getByText("Other daily spending")).toBeTruthy();
+    expect(
+      screen.getByText("Unsplit amount from an older projection"),
+    ).toBeTruthy();
+  });
+
+  it("shows categorized and older daily spending as separate amounts", () => {
+    const initialDraft = {
+      ...tournamentToDraft(savedTournament),
+      food_total: 100,
+      local_transport_total: 40,
+    };
+    const { screen } = renderBuilder(initialDraft);
+
+    expect(screen.getByText("Food and local transport")).toBeTruthy();
+    expect(screen.getByText("−$140 USD")).toBeTruthy();
+    expect(screen.getByText("Other daily spending")).toBeTruthy();
+    expect(screen.getByText("−$80 USD / day")).toBeTruthy();
   });
 
   it("uses the adaptive CTA to open and validate the first invalid editor", () => {
@@ -921,7 +1052,7 @@ describe("TournamentProjectionBuilder", () => {
     await waitFor(() =>
       expect(
         screen.getByText(
-          "1 estimate after estimated withholding · 20% rate",
+          "1 estimate after 20% est. withholding",
         ),
       ).toBeTruthy(),
     );
@@ -943,7 +1074,7 @@ describe("TournamentProjectionBuilder", () => {
     await waitFor(() =>
       expect(
         screen.getByText(
-          "1 estimate after estimated withholding · 30% rate",
+          "1 estimate after 30% est. withholding",
         ),
       ).toBeTruthy(),
     );
@@ -967,7 +1098,7 @@ describe("TournamentProjectionBuilder", () => {
     await advance(350);
 
     expect(screen.getByText("2 gross estimates")).toBeTruthy();
-    expect(screen.getByText("+$500 USD–+$1,000 USD")).toBeTruthy();
+    expect(screen.getByText("+$500 to $1,000 USD")).toBeTruthy();
   });
 
   it("shows the selected country before a location is entered", () => {

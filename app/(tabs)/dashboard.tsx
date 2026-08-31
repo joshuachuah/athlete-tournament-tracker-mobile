@@ -38,38 +38,38 @@ export default function DashboardScreen() {
   const hasBlockingError = isError && !hasTournamentData;
   const stats = buildDashboardStats(tournaments, profile);
   const currentYear = new Date().getFullYear();
+  const hasActuals = stats.actualCount > 0;
   const hasProjections = stats.projectedCount > 0;
-  const hasIncompleteCoverage = hasProjections && stats.unavailableCount > 0;
   const isEmpty = stats.tournamentCount === 0;
-  const netTone = !hasProjections
+  const actualTone = !hasActuals
     ? "neutral"
-    : stats.netResult > 0
+    : stats.actualNet > 0
       ? "profit"
-      : stats.netResult < 0
+      : stats.actualNet < 0
         ? "loss"
         : "neutral";
-  const netStatus = !hasProjections
+  const actualStatus = !hasActuals
     ? isEmpty
       ? "No result yet"
-      : "Needs projection"
-    : stats.netResult > 0
+      : "No completed events"
+    : stats.actualNet > 0
       ? "Profit"
-      : stats.netResult < 0
+      : stats.actualNet < 0
         ? "Loss"
         : "Break-even";
-  const netValue = hasProjections
-    ? formatMoney(stats.netResult, profile.home_currency)
+  const actualValue = hasActuals
+    ? formatMoney(stats.actualNet, profile.home_currency)
     : "—";
   const netStatusBackgroundColor =
-    netTone === "profit"
+    actualTone === "profit"
       ? colors.profitSoft
-      : netTone === "loss"
+      : actualTone === "loss"
         ? colors.lossSoft
         : colors.surfaceMuted;
   const netStatusColor =
-    netTone === "profit"
+    actualTone === "profit"
       ? colors.profit
-      : netTone === "loss"
+      : actualTone === "loss"
         ? colors.loss
         : colors.foreground;
 
@@ -120,7 +120,7 @@ export default function DashboardScreen() {
         <>
           <Card
             accessible
-            accessibilityLabel={`Net result. ${netStatus}${hasProjections ? `, ${netValue}` : ""}. ${stats.tournamentCount} events. Projected coverage ${stats.projectedCount} of ${stats.tournamentCount}.`}
+            accessibilityLabel={`Actual net. ${actualStatus}${hasActuals ? `, ${actualValue}` : ""}. ${stats.actualCount} completed of ${stats.tournamentCount} events. Projected net ${hasProjections ? formatMoney(stats.projectedNet, profile.home_currency) : "unavailable"}.`}
             style={{
               gap: spacing.lg,
               padding: spacing.lg,
@@ -139,7 +139,7 @@ export default function DashboardScreen() {
                 }}
                 selectable
               >
-                Net result
+                Actual net
               </Text>
               <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
                 <Text
@@ -156,7 +156,7 @@ export default function DashboardScreen() {
                   adjustsFontSizeToFit
                   selectable
                 >
-                  {netValue}
+                  {actualValue}
                 </Text>
                 <View
                   style={{
@@ -175,18 +175,10 @@ export default function DashboardScreen() {
                     }}
                     selectable
                   >
-                    {netStatus}
+                    {actualStatus}
                   </Text>
                 </View>
               </View>
-              {hasIncompleteCoverage ? (
-                <Text
-                  style={{ color: colors.brandMutedForeground, fontSize: 12 }}
-                  selectable
-                >
-                  Partial result from projected events
-                </Text>
-              ) : null}
             </View>
 
             <View
@@ -202,7 +194,7 @@ export default function DashboardScreen() {
                   style={{ color: colors.brandMutedForeground, fontSize: 12 }}
                   selectable
                 >
-                  Events
+                  Completed
                 </Text>
                 <Text
                   style={{
@@ -213,7 +205,7 @@ export default function DashboardScreen() {
                   }}
                   selectable
                 >
-                  {stats.tournamentCount}
+                  {stats.actualCount} of {stats.tournamentCount}
                 </Text>
               </View>
               <View
@@ -229,7 +221,7 @@ export default function DashboardScreen() {
                   style={{ color: colors.brandMutedForeground, fontSize: 12 }}
                   selectable
                 >
-                  Projected coverage
+                  Projected net
                 </Text>
                 <Text
                   style={{
@@ -240,7 +232,18 @@ export default function DashboardScreen() {
                   }}
                   selectable
                 >
-                  {stats.projectedCount} of {stats.tournamentCount}
+                  {hasProjections
+                    ? formatMoney(stats.projectedNet, profile.home_currency)
+                    : "—"}
+                </Text>
+                <Text
+                  style={{ color: colors.brandMutedForeground, fontSize: 12 }}
+                  selectable
+                >
+                  {stats.projectedCount} projected
+                  {stats.unavailableCount > 0
+                    ? ` · ${stats.unavailableCount} need projection`
+                    : ""}
                 </Text>
               </View>
             </View>
@@ -253,8 +256,8 @@ export default function DashboardScreen() {
               }}
               selectable
             >
-              Earned {formatMoney(stats.ytdEarnings, profile.home_currency)} · Spent{" "}
-              {formatMoney(stats.ytdExpenses, profile.home_currency)}
+              Actual earned {formatMoney(stats.actualEarnings, profile.home_currency)} · Actual spent{" "}
+              {formatMoney(stats.actualExpenses, profile.home_currency)}
             </Text>
           </Card>
 

@@ -8,24 +8,29 @@ import { formatDate, formatMoney, getScenario } from "@/lib/utils";
 
 export function TournamentCard({ tournament }: { tournament: TournamentWithPnL }) {
   const realistic = getScenario(tournament, "realistic");
+  const actualNet = tournament.actual_pnl?.net_result;
+  const isFinal = actualNet !== undefined;
+  const displayedNet = actualNet ?? realistic?.net_result;
+  const displayedCurrency =
+    tournament.actual_pnl?.home_currency ?? tournament.home_currency;
   const formattedDate = formatDate(tournament.start_date);
-  const outcomeLabel = !realistic
+  const outcomeLabel = displayedNet === undefined
     ? "Needs projection"
-    : realistic.net_result > 0
-      ? `Profit · ${formatMoney(realistic.net_result, tournament.home_currency)}`
-      : realistic.net_result < 0
-        ? `Loss · ${formatMoney(realistic.net_result, tournament.home_currency)}`
-        : `Break-even · ${formatMoney(realistic.net_result, tournament.home_currency)}`;
-  const outcomeColor = !realistic
+    : displayedNet > 0
+      ? `${isFinal ? "Final profit" : "Projected profit"} · ${formatMoney(displayedNet, displayedCurrency)}`
+      : displayedNet < 0
+        ? `${isFinal ? "Final loss" : "Projected loss"} · ${formatMoney(displayedNet, displayedCurrency)}`
+        : `${isFinal ? "Final break-even" : "Projected break-even"} · ${formatMoney(displayedNet, displayedCurrency)}`;
+  const outcomeColor = displayedNet === undefined
     ? colors.foreground
-    : realistic.net_result > 0
+    : displayedNet > 0
       ? colors.profit
-      : realistic.net_result < 0
+      : displayedNet < 0
         ? colors.loss
         : colors.foreground;
-  const accessibilityOutcome = !realistic
+  const accessibilityOutcome = displayedNet === undefined
     ? "needs projection"
-    : `middle-case net ${outcomeLabel}`;
+    : outcomeLabel;
 
   return (
     <Link href={`/tournaments/${tournament.id}`} asChild>

@@ -18,7 +18,12 @@ import {
   prizeDistributionCurrency,
   prizeRoundKeys,
 } from "@/lib/prize-distributions";
-import { formatDate, formatMoney, parseDateOnly } from "@/lib/utils";
+import {
+  formatDate,
+  formatMoney,
+  formatMoneyParts,
+  parseDateOnly,
+} from "@/lib/utils";
 import type { TournamentDraft } from "@/lib/tournament-draft";
 import type { PrizeRounds } from "@/types";
 
@@ -96,24 +101,20 @@ function ImpactLedgerRow({
         >
           {summary}
         </Text>
+        {impact ? (
+          <Text
+            style={{
+              color: impactColor,
+              fontSize: 17,
+              lineHeight: 22,
+              fontWeight: "800",
+              fontVariant: ["tabular-nums"],
+            }}
+          >
+            {impact}
+          </Text>
+        ) : null}
       </View>
-      {impact ? (
-        <Text
-          adjustsFontSizeToFit
-          minimumFontScale={0.82}
-          numberOfLines={1}
-          style={{
-            maxWidth: "34%",
-            color: impactColor,
-            fontSize: 15,
-            fontWeight: "800",
-            fontVariant: ["tabular-nums"],
-            textAlign: "right",
-          }}
-        >
-          {impact}
-        </Text>
-      ) : null}
       <ChevronRight color={colors.mutedForeground} size={20} />
     </Pressable>
   );
@@ -128,14 +129,35 @@ function prizeEstimates(draft: TournamentDraft) {
 }
 
 function optionalAssumptions(draft: TournamentDraft) {
-  const rows: (LedgerRowProps & { key: AssumptionEditor })[] = [];
+  const rows: (LedgerRowProps & {
+    editor: AssumptionEditor;
+    key: string;
+  })[] = [];
+  const foodAndTransportTotal =
+    draft.food_total + draft.local_transport_total;
 
+  if (foodAndTransportTotal > 0) {
+    rows.push({
+      icon: WalletCards,
+      editor: "daily-spending",
+      key: "daily-spending",
+      title: "Food and local transport",
+      summary:
+        draft.expense_input_mode === "daily"
+          ? `${draft.duration_days}-day estimate saved as category totals`
+          : "Totals for the whole tournament",
+      impact: signedMoney(foodAndTransportTotal, draft.currency, "−"),
+      impactTone: "negative",
+      onPress: () => undefined,
+    });
+  }
   if (draft.daily_spending_cap > 0) {
     rows.push({
       icon: WalletCards,
-      key: "daily-spending",
-      title: "Daily spending cap",
-      summary: "Maximum planned spend per day",
+      editor: "daily-spending",
+      key: "legacy-daily-spending",
+      title: "Other daily spending",
+      summary: "Unsplit amount from an older projection",
       impact: `${signedMoney(draft.daily_spending_cap, draft.currency, "−")} / day`,
       impactTone: "negative",
       onPress: () => undefined,
@@ -144,6 +166,7 @@ function optionalAssumptions(draft: TournamentDraft) {
   if (draft.coaching_cost > 0) {
     rows.push({
       icon: HeartPulse,
+      editor: "coaching",
       key: "coaching",
       title: "Coaching / physio",
       summary: "Support cost for this tournament",
@@ -155,6 +178,7 @@ function optionalAssumptions(draft: TournamentDraft) {
   if (draft.misc_cost > 0) {
     rows.push({
       icon: Ellipsis,
+      editor: "misc",
       key: "misc",
       title: "Miscellaneous",
       summary: "Other tournament costs",
@@ -166,6 +190,7 @@ function optionalAssumptions(draft: TournamentDraft) {
   if (draft.sponsorship_allocated > 0) {
     rows.push({
       icon: HandCoins,
+      editor: "sponsorship",
       key: "sponsorship",
       title: "Sponsorship",
       summary: "Funding allocated to this tournament",
@@ -177,6 +202,7 @@ function optionalAssumptions(draft: TournamentDraft) {
   if (draft.subsidy_enabled) {
     rows.push({
       icon: BadgeDollarSign,
+      editor: "subsidy",
       key: "subsidy",
       title: "Subsidy",
       summary: draft.subsidy_by.trim() || "Tournament subsidy",
@@ -238,7 +264,7 @@ export function ImpactLedger({
   const prizeSummary =
     displayedPrizes.length > 0
       ? displaysAfterEstimatedWithholding
-        ? `${displayedPrizes.length} estimate${displayedPrizes.length === 1 ? "" : "s"} after estimated withholding · ${appliedEstimatedWithholdingRate}% rate`
+        ? `${displayedPrizes.length} estimate${displayedPrizes.length === 1 ? "" : "s"} after ${appliedEstimatedWithholdingRate}% est. withholding`
         : `${displayedPrizes.length} gross estimate${displayedPrizes.length === 1 ? "" : "s"}`
       : draft.currency.toUpperCase() !== prizeDistributionCurrency
           ? "Official USD outcomes unavailable"
@@ -252,10 +278,12 @@ export function ImpactLedger({
       ? formatMoney(0, draft.currency)
       : displayedPrizes.length === 1 || lowestPrize === highestPrize
         ? `Up to +${formatMoney(highestPrize, draft.currency)}`
-        : `+${formatMoney(lowestPrize, draft.currency)}–+${formatMoney(highestPrize, draft.currency)}`;
+        : `+${formatMoneyParts(lowestPrize, draft.currency).amount} to ${formatMoney(highestPrize, draft.currency)}`;
   const travelSummary =
     travel > 0
-      ? `${draft.accommodation_nights} night${draft.accommodation_nights === 1 ? "" : "s"} planned`
+      ? draft.expense_input_mode === "daily"
+        ? `${draft.accommodation_nights} night${draft.accommodation_nights === 1 ? "" : "s"} planned`
+        : "Flight and accommodation totals"
       : "Flights and accommodation";
 
   return (
@@ -337,7 +365,7 @@ export function ImpactLedger({
                   summary={row.summary}
                   impact={row.impact}
                   impactTone={row.impactTone}
-                  onPress={() => onOpenEditor(row.key)}
+                  onPress={() => onOpenEditor(row.editor)}
                 />
               </View>
             ))}

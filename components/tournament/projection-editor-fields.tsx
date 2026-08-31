@@ -15,6 +15,10 @@ import {
 } from "@/lib/countries";
 import type { TournamentDraft } from "@/lib/tournament-draft";
 import {
+  calculateDailyExpenseTotal,
+  expenseInputModeChanges,
+} from "@/lib/tournament-draft";
+import {
   getDrawTemplate,
   prizeDistributionCurrency,
   prizeRoundKeys,
@@ -432,29 +436,191 @@ function TravelEditorFields({
         error={errors.flight_cost}
         autoFocus
       />
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.md }}>
+      <ExpenseInputModePicker onUpdate={onUpdate} workingDraft={workingDraft} />
+      {workingDraft.expense_input_mode === "daily" ? (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.md }}>
+          <MoneyInput
+            label={`Accommodation per night (${workingDraft.currency})`}
+            value={workingDraft.accommodation_nightly}
+            onChangeValue={(value) =>
+              onUpdateAccommodation({ accommodation_nightly: value })
+            }
+            error={errors.accommodation_nightly}
+            style={{ minWidth: 144, flexGrow: 1 }}
+          />
+          <MoneyInput
+            label="Nights"
+            value={workingDraft.accommodation_nights}
+            onChangeValue={(value) =>
+              onUpdateAccommodation({ accommodation_nights: value })
+            }
+            error={errors.accommodation_nights}
+            style={{ minWidth: 144, flexGrow: 1 }}
+          />
+        </View>
+      ) : (
         <MoneyInput
-          label={`Nightly (${workingDraft.currency})`}
-          value={workingDraft.accommodation_nightly}
-          onChangeValue={(value) =>
-            onUpdateAccommodation({ accommodation_nightly: value })
+          label={`Accommodation total (${workingDraft.currency})`}
+          value={workingDraft.accommodation_total}
+          onChangeValue={(accommodation_total) =>
+            onUpdate({ accommodation_total })
           }
-          error={errors.accommodation_nightly}
-          style={{ minWidth: 144, flexGrow: 1 }}
+          error={errors.accommodation_total}
         />
-        <MoneyInput
-          label="Nights"
-          value={workingDraft.accommodation_nights}
-          onChangeValue={(value) =>
-            onUpdateAccommodation({ accommodation_nights: value })
-          }
-          error={errors.accommodation_nights}
-          style={{ minWidth: 144, flexGrow: 1 }}
-        />
-      </View>
+      )}
       <Text style={{ color: colors.foreground, fontSize: 18, fontWeight: "900" }}>
         Stay total: {formatMoney(workingDraft.accommodation_total, workingDraft.currency)}
       </Text>
+    </>
+  );
+}
+
+function ExpenseInputModePicker({
+  onUpdate,
+  workingDraft,
+}: Pick<EditorFieldsProps, "onUpdate" | "workingDraft">) {
+  return (
+    <View style={{ gap: spacing.sm }}>
+      <Text
+        style={{
+          color: colors.mutedForeground,
+          fontSize: 12,
+          fontWeight: "800",
+          textTransform: "uppercase",
+        }}
+      >
+        Input method
+      </Text>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}>
+        <Button
+          accessibilityState={{
+            selected: workingDraft.expense_input_mode === "daily",
+          }}
+          label="Daily estimate"
+          onPress={() =>
+            onUpdate(expenseInputModeChanges(workingDraft, "daily"))
+          }
+          variant={
+            workingDraft.expense_input_mode === "daily"
+              ? "primary"
+              : "secondary"
+          }
+        />
+        <Button
+          accessibilityState={{
+            selected: workingDraft.expense_input_mode === "total",
+          }}
+          label="Tournament totals"
+          onPress={() =>
+            onUpdate(expenseInputModeChanges(workingDraft, "total"))
+          }
+          variant={
+            workingDraft.expense_input_mode === "total"
+              ? "primary"
+              : "secondary"
+          }
+        />
+      </View>
+    </View>
+  );
+}
+
+function DailyExpenseEditorFields({
+  errors,
+  onUpdate,
+  workingDraft,
+}: EditorFieldsProps) {
+  const usesDailyEstimate = workingDraft.expense_input_mode === "daily";
+
+  return (
+    <>
+      <ExpenseInputModePicker onUpdate={onUpdate} workingDraft={workingDraft} />
+      <MoneyInput
+        key={`food-${workingDraft.expense_input_mode}`}
+        autoFocus
+        error={errors[usesDailyEstimate ? "food_daily" : "food_total"]}
+        label={`Food ${usesDailyEstimate ? "per day" : "total"} (${workingDraft.currency})`}
+        onChangeValue={(value) =>
+          onUpdate(
+            usesDailyEstimate
+              ? {
+                  food_daily: value,
+                  food_total: calculateDailyExpenseTotal(
+                    value,
+                    workingDraft.duration_days,
+                    workingDraft.currency,
+                  ),
+                }
+              : { food_total: value },
+          )
+        }
+        value={
+          usesDailyEstimate ? workingDraft.food_daily : workingDraft.food_total
+        }
+      />
+      <MoneyInput
+        key={`local-transport-${workingDraft.expense_input_mode}`}
+        error={
+          errors[
+            usesDailyEstimate
+              ? "local_transport_daily"
+              : "local_transport_total"
+          ]
+        }
+        label={`Local transport ${usesDailyEstimate ? "per day" : "total"} (${workingDraft.currency})`}
+        onChangeValue={(value) =>
+          onUpdate(
+            usesDailyEstimate
+              ? {
+                  local_transport_daily: value,
+                  local_transport_total: calculateDailyExpenseTotal(
+                    value,
+                    workingDraft.duration_days,
+                    workingDraft.currency,
+                  ),
+                }
+              : { local_transport_total: value },
+          )
+        }
+        value={
+          usesDailyEstimate
+            ? workingDraft.local_transport_daily
+            : workingDraft.local_transport_total
+        }
+      />
+      {usesDailyEstimate ? (
+        <View style={{ gap: spacing.xs }}>
+          <Text style={{ color: colors.foreground, fontSize: 18, fontWeight: "900" }}>
+            Food total: {formatMoney(workingDraft.food_total, workingDraft.currency)}
+          </Text>
+          <Text style={{ color: colors.foreground, fontSize: 18, fontWeight: "900" }}>
+            Local transport total: {formatMoney(
+              workingDraft.local_transport_total,
+              workingDraft.currency,
+            )}
+          </Text>
+          <Text style={{ color: colors.mutedForeground, lineHeight: 20 }}>
+            Based on {workingDraft.duration_days} day
+            {workingDraft.duration_days === 1 ? "" : "s"}.
+          </Text>
+        </View>
+      ) : null}
+      {workingDraft.daily_spending_cap > 0 ? (
+        <View style={{ gap: spacing.sm }}>
+          <Text style={{ color: colors.warning, lineHeight: 20 }}>
+            This older projection has an unsplit daily amount. It stays separate
+            because it cannot be classified as food or transport safely.
+          </Text>
+          <MoneyInput
+            error={errors.daily_spending_cap}
+            label={`Other daily spending (${workingDraft.currency})`}
+            onChangeValue={(daily_spending_cap) =>
+              onUpdate({ daily_spending_cap })
+            }
+            value={workingDraft.daily_spending_cap}
+          />
+        </View>
+      ) : null}
     </>
   );
 }
@@ -588,12 +754,10 @@ export function ProjectionEditorFields({
 
   if (editor === "daily-spending") {
     return (
-      <MoneyInput
-        label={`Daily spending cap (${workingDraft.currency})`}
-        value={workingDraft.daily_spending_cap}
-        onChangeValue={(daily_spending_cap) => onUpdate({ daily_spending_cap })}
-        error={errors.daily_spending_cap}
-        autoFocus
+      <DailyExpenseEditorFields
+        errors={errors}
+        onUpdate={onUpdate}
+        workingDraft={workingDraft}
       />
     );
   }

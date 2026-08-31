@@ -129,20 +129,43 @@ function dashboardTournament(
   return item;
 }
 
+function completedTournament(
+  id: string,
+  actualNet: number,
+  income: number,
+  expenses: number,
+) {
+  const item = dashboardTournament(id, 9999, 9999, 0);
+  item.actual_pnl = {
+    total_expenses: expenses,
+    total_income: income,
+    prize_received: income,
+    net_result: actualNet,
+    profitable: actualNet > 0,
+    home_currency: "USD",
+  };
+  return item;
+}
+
 describe("dashboard stats", () => {
-  it("uses server P&L scenarios for net result and runway", () => {
+  it("keeps server actuals separate from projections and uses both for runway", () => {
     const stats = buildDashboardStats(
-      [tournament("a", -500, 700, 1200), tournament("b", -1000, 400, 1400)],
+      [
+        completedTournament("a", -500, 700, 1200),
+        tournament("b", -1000, 400, 1400),
+      ],
       profile,
       new Date("2026-06-02"),
     );
 
-    expect(stats.ytdEarnings).toBe(1100);
-    expect(stats.ytdExpenses).toBe(2600);
-    expect(stats.netResult).toBe(-1500);
+    expect(stats.actualEarnings).toBe(700);
+    expect(stats.actualExpenses).toBe(1200);
+    expect(stats.actualNet).toBe(-500);
+    expect(stats.actualCount).toBe(1);
+    expect(stats.projectedNet).toBe(-1000);
     expect(stats.averageNetSpend).toBe(750);
     expect(stats.runway).toBe(4);
-    expect(stats.projectedCount).toBe(2);
+    expect(stats.projectedCount).toBe(1);
     expect(stats.unavailableCount).toBe(0);
   });
 
@@ -153,7 +176,8 @@ describe("dashboard stats", () => {
       new Date("2026-06-02"),
     );
 
-    expect(stats.netResult).toBe(0);
+    expect(stats.actualNet).toBe(0);
+    expect(stats.projectedNet).toBe(0);
     expect(stats.projectedCount).toBe(0);
     expect(stats.unavailableCount).toBe(1);
   });
@@ -168,7 +192,8 @@ describe("dashboard stats", () => {
       new Date("2026-06-02"),
     );
 
-    expect(stats.netResult).toBe(0);
+    expect(stats.actualNet).toBe(0);
+    expect(stats.projectedNet).toBe(0);
     expect(stats.projectedCount).toBe(0);
     expect(stats.unavailableCount).toBe(2);
   });
@@ -183,7 +208,8 @@ describe("dashboard stats", () => {
       new Date("2026-06-02"),
     );
 
-    expect(stats.netResult).toBe(250);
+    expect(stats.actualNet).toBe(0);
+    expect(stats.projectedNet).toBe(250);
     expect(stats.projectedCount).toBe(1);
     expect(stats.unavailableCount).toBe(1);
     expect(stats.tournamentCount).toBe(2);
@@ -196,7 +222,7 @@ describe("dashboard stats", () => {
       new Date("2026-06-02"),
     );
 
-    expect(stats.netResult).toBe(0);
+    expect(stats.projectedNet).toBe(0);
     expect(stats.projectedCount).toBe(1);
     expect(stats.unavailableCount).toBe(0);
   });
@@ -220,8 +246,7 @@ describe("dashboard stats", () => {
     );
 
     expect(stats.tournamentCount).toBe(1);
-    expect(stats.ytdEarnings).toBe(200);
-    expect(stats.netResult).toBe(200);
+    expect(stats.projectedNet).toBe(200);
   });
 
   it("includes API date-time values in the matching season", () => {
@@ -236,9 +261,7 @@ describe("dashboard stats", () => {
 
     expect(stats.tournamentCount).toBe(1);
     expect(stats.projectedCount).toBe(1);
-    expect(stats.ytdEarnings).toBe(200);
-    expect(stats.ytdExpenses).toBe(500);
-    expect(stats.netResult).toBe(-300);
+    expect(stats.projectedNet).toBe(-300);
   });
 });
 
@@ -254,9 +277,9 @@ describe("dashboard projection presentation", () => {
     };
   });
 
-  it("renders the compact header, full scorecard, and outcome-only rows", () => {
+  it("renders actual and projected season totals without combining them", () => {
     mockTournaments = [
-      dashboardTournament("profit", 500, 700, 200),
+      completedTournament("profit", 500, 700, 200),
       dashboardTournament("loss", -200, 100, 300),
     ];
 
@@ -267,17 +290,17 @@ describe("dashboard projection presentation", () => {
     expect(screen.queryByText("Welcome back")).toBeNull();
     expect(screen.queryByText(profile.name)).toBeNull();
 
-    expect(screen.getByText("$300 USD")).toBeTruthy();
+    expect(screen.getByText("$500 USD")).toBeTruthy();
     expect(screen.getByText("Profit")).toBeTruthy();
     expect(
       screen.getByLabelText(
-        "Net result. Profit, $300 USD. 2 events. Projected coverage 2 of 2.",
+        "Actual net. Profit, $500 USD. 1 completed of 2 events. Projected net -$200 USD.",
       ),
     ).toBeTruthy();
-    expect(screen.getByText("2 of 2")).toBeTruthy();
-    expect(screen.getByText("Earned $800 USD · Spent $500 USD")).toBeTruthy();
-    expect(screen.getByText("Profit · $500 USD")).toBeTruthy();
-    expect(screen.getByText("Loss · -$200 USD")).toBeTruthy();
+    expect(screen.getByText("1 of 2")).toBeTruthy();
+    expect(screen.getByText("Actual earned $700 USD · Actual spent $200 USD")).toBeTruthy();
+    expect(screen.getByText("Final profit · $500 USD")).toBeTruthy();
+    expect(screen.getByText("Projected loss · -$200 USD")).toBeTruthy();
 
     expect(screen.queryByText("Runway")).toBeNull();
     expect(screen.queryByText("Worst")).toBeNull();
@@ -293,11 +316,8 @@ describe("dashboard projection presentation", () => {
 
     const screen = render(createElement(DashboardScreen));
 
-    expect(screen.getByText("$250 USD")).toBeTruthy();
-    expect(screen.getByText("Profit")).toBeTruthy();
-    expect(screen.getByText("Profit · $250 USD")).toBeTruthy();
-    expect(screen.getByText("1 of 2")).toBeTruthy();
-    expect(screen.getByText("Partial result from projected events")).toBeTruthy();
+    expect(screen.getByText("Projected profit · $250 USD")).toBeTruthy();
+    expect(screen.getByText("0 of 2")).toBeTruthy();
     expect(screen.getByText("Needs projection")).toBeTruthy();
   });
 
@@ -310,10 +330,8 @@ describe("dashboard projection presentation", () => {
     const screen = render(createElement(DashboardScreen));
 
     expect(screen.getByText("0 of 2")).toBeTruthy();
-    expect(screen.getAllByText("Needs projection")).toHaveLength(3);
-    expect(screen.queryByText("Break-even · $0 USD")).toBeNull();
-    expect(screen.queryByText(/^Profit ·/)).toBeNull();
-    expect(screen.queryByText(/^Loss ·/)).toBeNull();
+    expect(screen.getAllByText("Needs projection")).toHaveLength(2);
+    expect(screen.queryByText("Projected break-even · $0 USD")).toBeNull();
   });
 
   it("keeps a real numeric zero visible and explicitly break-even", () => {
@@ -321,10 +339,8 @@ describe("dashboard projection presentation", () => {
 
     const screen = render(createElement(DashboardScreen));
 
-    expect(screen.getByText("$0 USD")).toBeTruthy();
-    expect(screen.getByText("Break-even")).toBeTruthy();
-    expect(screen.getByText("Break-even · $0 USD")).toBeTruthy();
-    expect(screen.getByText("1 of 1")).toBeTruthy();
+    expect(screen.getByText("Projected break-even · $0 USD")).toBeTruthy();
+    expect(screen.getByText("0 of 1")).toBeTruthy();
     expect(screen.queryByText("Needs projection")).toBeNull();
   });
 
@@ -344,7 +360,7 @@ describe("dashboard projection presentation", () => {
     const screen = render(createElement(DashboardScreen));
 
     expect(screen.getByRole("progressbar", { name: "Loading tournaments" })).toBeTruthy();
-    expect(screen.queryByText("Net result")).toBeNull();
+    expect(screen.queryByText("Actual net")).toBeNull();
     expect(screen.queryByText("No tournaments yet")).toBeNull();
   });
 
@@ -360,7 +376,7 @@ describe("dashboard projection presentation", () => {
 
     expect(screen.getByRole("alert")).toBeTruthy();
     expect(screen.getByText("Network unavailable")).toBeTruthy();
-    expect(screen.queryByText("Net result")).toBeNull();
+    expect(screen.queryByText("Actual net")).toBeNull();
     expect(screen.queryByText("No tournaments yet")).toBeNull();
 
     fireEvent.press(screen.getByRole("button", { name: "Try again" }));
@@ -377,10 +393,8 @@ describe("dashboard projection presentation", () => {
 
     const screen = render(createElement(DashboardScreen));
 
-    expect(screen.getByText("$250 USD")).toBeTruthy();
-    expect(screen.getByText("Profit")).toBeTruthy();
-    expect(screen.getByText("Profit · $250 USD")).toBeTruthy();
-    expect(screen.getByText("1 of 1")).toBeTruthy();
+    expect(screen.getByText("Projected profit · $250 USD")).toBeTruthy();
+    expect(screen.getByText("0 of 1")).toBeTruthy();
     expect(screen.getByText("Refresh failed")).toBeTruthy();
     fireEvent.press(screen.getByRole("button", { name: "Try again" }));
     expect(mockRefetch).toHaveBeenCalledTimes(1);
@@ -409,9 +423,7 @@ describe("dashboard projection presentation", () => {
     const refreshControl = screen.UNSAFE_getByType(RefreshControl);
 
     expect(refreshControl.props.refreshing).toBe(true);
-    expect(screen.getByText("$250 USD")).toBeTruthy();
-    expect(screen.getByText("Profit")).toBeTruthy();
-    expect(screen.getByText("Profit · $250 USD")).toBeTruthy();
+    expect(screen.getByText("Projected profit · $250 USD")).toBeTruthy();
     fireEvent(refreshControl, "refresh");
     expect(mockRefetch).toHaveBeenCalledTimes(1);
   });

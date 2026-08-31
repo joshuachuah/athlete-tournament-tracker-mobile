@@ -58,7 +58,7 @@ it("renders the actual returned projection and delegates view or dismiss", () =>
   expect(screen.getByText("Middle case")).toBeTruthy();
   expect(screen.getByText("R2")).toBeTruthy();
   expect(screen.queryByText("QF")).toBeNull();
-  expect(screen.getByText("−MYR 30 MYR")).toBeTruthy();
+  expect(screen.getByText("−30 MYR")).toBeTruthy();
   fireEvent.press(screen.getByText("View projection"));
   fireEvent.press(screen.getAllByLabelText("Dismiss saved projection")[0]);
 

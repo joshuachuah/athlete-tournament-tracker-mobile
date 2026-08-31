@@ -41,6 +41,20 @@ const profileResponse = {
   created_at: "2026-01-01T00:00:00Z",
 };
 
+const resultInput = {
+  achieved_round: "qf" as const,
+  prize_received_total: 300,
+  subsidy_received_total: 0,
+  sponsorship_received_total: 0,
+  entry_fee_total: 100,
+  flight_total: 200,
+  accommodation_total: 300,
+  food_total: 120,
+  local_transport_total: 80,
+  coaching_total: 0,
+  misc_total: 0,
+};
+
 beforeEach(() => {
   jest.useFakeTimers();
   fetchMock.mockReset();
@@ -587,6 +601,59 @@ describe("api client", () => {
       `${apiBase}/api/v2/tournaments/tournament-1`,
       `${apiBase}/api/v2/tournaments/tournament-1`,
     ]);
+  });
+
+  it("uses the result preview, upsert, and removal contracts", async () => {
+    const actualPnl = {
+      total_expenses: 800,
+      total_income: 300,
+      prize_received: 300,
+      net_result: -500,
+      profitable: false,
+      home_currency: "USD",
+    };
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => actualPnl,
+      } as Response)
+      .mockResolvedValue({
+        ok: true,
+        json: async () => ({ invalid: "response" }),
+      } as Response);
+    const options = { authToken: "account-token" };
+
+    await expect(
+      api.tournaments.previewResult("tournament-1", resultInput, options),
+    ).resolves.toEqual(actualPnl);
+    await expect(
+      api.tournaments.upsertResult("tournament-1", resultInput, options),
+    ).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+    await expect(
+      api.tournaments.removeResult("tournament-1", options),
+    ).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      `${apiBase}/api/v2/tournaments/tournament-1/result-preview`,
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify(resultInput),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      `${apiBase}/api/v2/tournaments/tournament-1/result`,
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify(resultInput),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      `${apiBase}/api/v2/tournaments/tournament-1/result`,
+      expect.objectContaining({ method: "DELETE" }),
+    );
   });
 
   it("refreshes tournament mutation auth for the initiating user", async () => {

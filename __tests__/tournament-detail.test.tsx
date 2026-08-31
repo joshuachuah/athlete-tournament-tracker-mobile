@@ -249,6 +249,46 @@ describe("TournamentDetailScreen deletion", () => {
     ).toBeNull();
   });
 
+  it("shows the final result, preserves the original projection, and locks projection edits", async () => {
+    const detail = tournament("completed");
+    detail.pnl.scenarios = [losingScenario];
+    detail.result = {
+      id: "result-1",
+      tournament_id: detail.id,
+      user_id: profile.id,
+      achieved_round: "qf",
+      completed_at: "2026-04-03",
+      prize_received_total: 300,
+      subsidy_received_total: 0,
+      sponsorship_received_total: 0,
+      entry_fee_total: 100,
+      flight_total: 200,
+      accommodation_total: 300,
+      food_total: 100,
+      local_transport_total: 50,
+      coaching_total: 0,
+      misc_total: 0,
+      created_at: "2026-04-03T00:00:00Z",
+      updated_at: "2026-04-03T00:00:00Z",
+    };
+    detail.actual_pnl = {
+      total_expenses: 750,
+      total_income: 300,
+      prize_received: 300,
+      net_result: -450,
+      profitable: false,
+      home_currency: "USD",
+    };
+    const { screen } = renderDetail(detail);
+
+    expect(await screen.findAllByText("Final loss")).toHaveLength(2);
+    expect(screen.getByText("-$450 USD")).toBeTruthy();
+    expect(screen.getByText("QF")).toBeTruthy();
+    expect(screen.getByText("Original projection")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Edit result" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Edit projection" })).toBeNull();
+  });
+
   it("evicts only the deleted detail before invalidating its list and routing", async () => {
     const detail = tournament("deleted");
     const { detailKey, listKey, otherDetail, screen } = renderDetail(detail);

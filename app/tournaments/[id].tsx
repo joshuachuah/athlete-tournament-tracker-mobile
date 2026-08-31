@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Alert, ScrollView, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -10,6 +11,7 @@ import { ErrorState, LoadingState } from "@/components/ui/state";
 import { ExpenseBreakdown } from "@/components/tournament/expense-breakdown";
 import { MoneyPair } from "@/components/tournament/money-pair";
 import { ScenarioCard } from "@/components/tournament/scenario-card";
+import { TournamentResultSheet } from "@/components/tournament/tournament-result-sheet";
 import { colors, spacing } from "@/constants/theme";
 import { useAuth } from "@/context/auth";
 import { api } from "@/lib/api";
@@ -44,6 +46,7 @@ function TournamentDetailContent() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { profile, session } = useAuth();
   const tournamentId = typeof id === "string" ? id : "";
+  const [resultEditorOpen, setResultEditorOpen] = useState(false);
 
   const {
     data,
@@ -98,7 +101,7 @@ function TournamentDetailContent() {
 
     Alert.alert(
       "Delete tournament",
-      "This permanently deletes the tournament and its projection.",
+      "This permanently deletes the tournament, its projection, and any recorded result.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -112,6 +115,15 @@ function TournamentDetailContent() {
 
   const realistic = data ? getScenario(data, "realistic") : undefined;
   const hasProjection = data ? data.pnl.scenarios.length > 0 : false;
+  const finalNet = data?.actual_pnl?.net_result;
+  const finalLabel =
+    finalNet === undefined
+      ? null
+      : finalNet > 0
+        ? "Final profit"
+        : finalNet < 0
+          ? "Final loss"
+          : "Final break-even";
 
   return (
     <ScrollView
@@ -162,7 +174,18 @@ function TournamentDetailContent() {
             <Text style={{ color: colors.mutedForeground }} selectable>
               {data.location}, {data.country} · {formatDate(data.start_date)}
             </Text>
-            {realistic ? (
+            {data.actual_pnl && finalLabel ? (
+              <Badge
+                label={finalLabel}
+                tone={
+                  data.actual_pnl.net_result > 0
+                    ? "profit"
+                    : data.actual_pnl.net_result < 0
+                      ? "loss"
+                      : "neutral"
+                }
+              />
+            ) : realistic ? (
               <Badge
                 label={`${scenarioLabel(realistic.scenario)} net`}
                 tone={realistic.profitable ? "profit" : "loss"}
@@ -171,6 +194,58 @@ function TournamentDetailContent() {
               <Badge label="Projection unavailable" tone="neutral" />
             )}
           </View>
+
+          {data.actual_pnl && data.result && finalLabel ? (
+            <Card>
+              <Text
+                style={{ color: colors.mutedForeground, fontSize: 13, fontWeight: "700" }}
+                selectable
+              >
+                {finalLabel}
+              </Text>
+              <Text
+                style={{
+                  color:
+                    data.actual_pnl.net_result > 0
+                      ? colors.profit
+                      : data.actual_pnl.net_result < 0
+                        ? colors.loss
+                        : colors.foreground,
+                  fontSize: 32,
+                  fontWeight: "900",
+                  fontVariant: ["tabular-nums"],
+                }}
+                selectable
+              >
+                {formatMoney(
+                  data.actual_pnl.net_result,
+                  data.actual_pnl.home_currency,
+                )}
+              </Text>
+              <Text style={{ color: colors.foreground, fontWeight: "800" }} selectable>
+                {data.result.achieved_round === "w"
+                  ? "Champion"
+                  : roundLabels[data.result.achieved_round]}
+              </Text>
+              <Text style={{ color: colors.mutedForeground, lineHeight: 20 }} selectable>
+                Income {formatMoney(data.actual_pnl.total_income, data.actual_pnl.home_currency)} · Expenses {formatMoney(data.actual_pnl.total_expenses, data.actual_pnl.home_currency)}
+              </Text>
+            </Card>
+          ) : null}
+
+          {data.actual_pnl ? (
+            <View style={{ gap: spacing.xs }}>
+              <Text
+                style={{ color: colors.foreground, fontSize: 22, fontWeight: "800" }}
+                selectable
+              >
+                Original projection
+              </Text>
+              <Text style={{ color: colors.mutedForeground, lineHeight: 20 }} selectable>
+                These are the assumptions saved before the tournament.
+              </Text>
+            </View>
+          ) : null}
 
           <Card>
             <Text
@@ -274,18 +349,25 @@ function TournamentDetailContent() {
             </View>
           </Card>
 
+          <Button
+            label={data.result ? "Edit result" : "Record result"}
+            onPress={() => setResultEditorOpen(true)}
+          />
+
           <View style={{ flexDirection: "row", gap: spacing.md }}>
-            <Button
-              label="Edit"
-              variant="secondary"
-              style={{ flex: 1 }}
-              onPress={() =>
-                router.push({
-                  pathname: "/tournaments/new/details",
-                  params: { editId: data.id },
-                })
-              }
-            />
+            {!data.result ? (
+              <Button
+                label="Edit projection"
+                variant="secondary"
+                style={{ flex: 1 }}
+                onPress={() =>
+                  router.push({
+                    pathname: "/tournaments/new/details",
+                    params: { editId: data.id },
+                  })
+                }
+              />
+            ) : null}
             <Button
               label="Delete"
               variant="danger"
@@ -294,6 +376,15 @@ function TournamentDetailContent() {
               onPress={confirmDelete}
             />
           </View>
+
+          {resultEditorOpen ? (
+            <TournamentResultSheet
+              authenticatedUserId={session.user.id}
+              onClose={() => setResultEditorOpen(false)}
+              profileId={profile.id}
+              tournament={data}
+            />
+          ) : null}
         </>
       ) : null}
     </ScrollView>
