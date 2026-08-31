@@ -38,16 +38,35 @@ function getMoneyFormatter(currency: string): Intl.NumberFormat {
   return formatter;
 }
 
-export function formatMoney(amount: number | null | undefined, currency: string): string {
+/**
+ * Splits a money value into the formatted amount and its ISO code so callers
+ * can lay the two out separately (e.g. amount at 19pt, code at 11pt below).
+ * Intl prints the ISO code instead of a symbol for most non-USD/EUR/GBP
+ * currencies ("MYR 90.63"); we drop that so the code is never shown twice.
+ * Works on the plain string because Hermes has no `formatToParts`.
+ */
+export function formatMoneyParts(
+  amount: number,
+  currency: string,
+): { amount: string; code: string } {
   const code = currency.toUpperCase();
+  const formatted = getMoneyFormatter(code).format(amount);
+  const withoutCode = formatted.includes(code)
+    ? // Only the code/number separator is whitespace, so dropping all of it is safe.
+      formatted.replace(code, "").replace(/\s/g, "")
+    : formatted;
 
+  return { amount: withoutCode, code };
+}
+
+export function formatMoney(amount: number | null | undefined, currency: string): string {
   if (amount === null || amount === undefined || Number.isNaN(amount)) {
-    return `-- ${code}`;
+    return `-- ${currency.toUpperCase()}`;
   }
 
-  const formatted = getMoneyFormatter(code).format(amount);
+  const parts = formatMoneyParts(amount, currency);
 
-  return `${formatted} ${code}`;
+  return `${parts.amount} ${parts.code}`;
 }
 
 export function formatDate(date: string | Date): string {

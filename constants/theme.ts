@@ -1,5 +1,6 @@
 export const colors = {
   transparent: "transparent",
+  backdrop: "rgba(16, 23, 18, 0.34)",
   background: "#F4F6F1",
   surface: "#FFFFFF",
   surfaceMuted: "#EDF1EB",

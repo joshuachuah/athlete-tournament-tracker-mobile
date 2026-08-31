@@ -23,8 +23,8 @@ const assumptions: {
 }[] = [
   {
     editor: "daily-spending",
-    title: "Daily spending cap",
-    description: "Food, local travel, and day-to-day spending",
+    title: "Food and local transport",
+    description: "Daily estimates or totals for the whole tournament",
   },
   {
     editor: "coaching",
@@ -51,7 +51,11 @@ const assumptions: {
 function isActive(editor: AssumptionEditor, draft: TournamentDraft) {
   switch (editor) {
     case "daily-spending":
-      return draft.daily_spending_cap > 0;
+      return (
+        draft.food_total > 0 ||
+        draft.local_transport_total > 0 ||
+        draft.daily_spending_cap > 0
+      );
     case "coaching":
       return draft.coaching_cost > 0;
     case "misc":

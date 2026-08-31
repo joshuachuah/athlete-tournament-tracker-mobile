@@ -1,6 +1,8 @@
 import {
+  actualPnlSchema,
   athleteProfileSchema,
   knownTournamentSchema,
+  tournamentResultSchema,
   tournamentWithPnLSchema,
 } from "@/lib/api-schemas";
 
@@ -18,6 +20,8 @@ const tournament = {
   entry_fee: 100,
   flight_cost: 200,
   accommodation_total: 300,
+  food_total: 120,
+  local_transport_total: 80,
   daily_spending_cap: 75,
   coaching_cost: 0,
   misc_cost: 0,
@@ -29,6 +33,8 @@ const tournament = {
   prize_tax_rate: 30,
   created_at: "2026-01-01",
   home_currency: "USD",
+  result: null,
+  actual_pnl: null,
   pnl: {
     total_income_base: 700,
     total_expenses: 1200,
@@ -76,6 +82,146 @@ describe("API response schemas", () => {
   describe("tournamentWithPnLSchema", () => {
     it("accepts a complete tournament response", () => {
       expect(tournamentWithPnLSchema.parse(tournament)).toEqual(tournament);
+    });
+
+    it("normalizes an older response without result or category totals", () => {
+      const {
+        actual_pnl: _actualPnl,
+        food_total: _foodTotal,
+        local_transport_total: _localTransportTotal,
+        result: _result,
+        ...legacyResponse
+      } = tournament;
+
+      expect(tournamentWithPnLSchema.parse(legacyResponse)).toEqual({
+        ...legacyResponse,
+        food_total: 0,
+        local_transport_total: 0,
+        result: null,
+        actual_pnl: null,
+      });
+    });
+
+    it("accepts a saved result and server-calculated actual P&L", () => {
+      const result = {
+        id: "result-1",
+        tournament_id: tournament.id,
+        user_id: tournament.user_id,
+        achieved_round: "qf",
+        completed_at: "2026-04-03T10:00:00Z",
+        prize_received_total: 300,
+        subsidy_received_total: 0,
+        sponsorship_received_total: 0,
+        entry_fee_total: 100,
+        flight_total: 200,
+        accommodation_total: 300,
+        food_total: 120,
+        local_transport_total: 80,
+        coaching_total: 0,
+        misc_total: 0,
+        created_at: "2026-04-03T10:00:00Z",
+        updated_at: "2026-04-03T10:00:00Z",
+      } as const;
+      const actualPnl = {
+        total_expenses: 800,
+        total_income: 300,
+        prize_received: 300,
+        net_result: -500,
+        profitable: false,
+        home_currency: "USD",
+      };
+
+      expect(
+        tournamentWithPnLSchema.parse({
+          ...tournament,
+          result,
+          actual_pnl: actualPnl,
+        }),
+      ).toEqual({ ...tournament, result, actual_pnl: actualPnl });
+      expect(tournamentResultSchema.parse(result)).toEqual(result);
+      expect(actualPnlSchema.parse(actualPnl)).toEqual(actualPnl);
+    });
+
+    it("accepts additive result fields but requires result and actual P&L together", () => {
+      const result = {
+        id: "result-1",
+        tournament_id: tournament.id,
+        user_id: tournament.user_id,
+        achieved_round: "qf",
+        completed_at: "2026-04-03T10:00:00Z",
+        prize_received_total: 300,
+        subsidy_received_total: 0,
+        sponsorship_received_total: 0,
+        entry_fee_total: 100,
+        flight_total: 200,
+        accommodation_total: 300,
+        food_total: 120,
+        local_transport_total: 80,
+        coaching_total: 0,
+        misc_total: 0,
+        created_at: "2026-04-03T10:00:00Z",
+        updated_at: "2026-04-03T10:00:00Z",
+        future_server_field: "preserved",
+      } as const;
+      const actualPnl = {
+        total_expenses: 800,
+        total_income: 300,
+        prize_received: 300,
+        net_result: -500,
+        profitable: false,
+        home_currency: "USD",
+      };
+
+      expect(
+        tournamentWithPnLSchema.parse({
+          ...tournament,
+          result,
+          actual_pnl: actualPnl,
+        }).result,
+      ).toEqual(result);
+      expect(
+        tournamentWithPnLSchema.safeParse({
+          ...tournament,
+          result,
+          actual_pnl: null,
+        }).success,
+      ).toBe(false);
+      expect(
+        tournamentWithPnLSchema.safeParse({
+          ...tournament,
+          result: null,
+          actual_pnl: actualPnl,
+        }).success,
+      ).toBe(false);
+    });
+
+    it.each([
+      { achieved_round: "semis" },
+      { food_total: -1 },
+      { prize_received_total: Number.POSITIVE_INFINITY },
+    ])("rejects malformed result data %#", (changes) => {
+      const result = {
+        id: "result-1",
+        tournament_id: tournament.id,
+        user_id: tournament.user_id,
+        achieved_round: "qf",
+        completed_at: "2026-04-03T10:00:00Z",
+        prize_received_total: 300,
+        subsidy_received_total: 0,
+        sponsorship_received_total: 0,
+        entry_fee_total: 100,
+        flight_total: 200,
+        accommodation_total: 300,
+        food_total: 120,
+        local_transport_total: 80,
+        coaching_total: 0,
+        misc_total: 0,
+        created_at: "2026-04-03T10:00:00Z",
+        updated_at: "2026-04-03T10:00:00Z",
+        ...changes,
+      };
+
+      expect(tournamentResultSchema.safeParse(result).success).toBe(false);
     });
 
     it("accepts no scenarios when the backend has no prize rounds to project", () => {

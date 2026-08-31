@@ -12,7 +12,7 @@ import {
   travelSchema,
   type TournamentDraft,
 } from "@/lib/tournament-draft";
-import { formatMoney, roundLabels, scenarioLabel } from "@/lib/utils";
+import { formatMoneyParts, roundLabels, scenarioLabel } from "@/lib/utils";
 import type { Scenario } from "@/types";
 
 const scenarios: Scenario[] = ["worst", "realistic", "best"];
@@ -32,7 +32,8 @@ const styles = StyleSheet.create({
     minHeight: 126,
     flex: 1,
     gap: spacing.sm,
-    padding: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
     borderWidth: 1,
     borderRadius: radii.md,
     borderCurve: "continuous",
@@ -46,13 +47,13 @@ function canPreview(draft: TournamentDraft) {
 }
 
 function netPresentation(net: number, currency: string) {
-  if (net === 0) {
-    return { label: "Break even", value: formatMoney(0, currency) };
-  }
+  const parts = formatMoneyParts(Math.abs(net), currency);
+  const sign = net > 0 ? "+" : net < 0 ? "−" : "";
 
   return {
-    label: net > 0 ? "Projected gain" : "Projected loss",
-    value: `${net > 0 ? "+" : "−"}${formatMoney(Math.abs(net), currency)}`,
+    label: net === 0 ? "Break even" : net > 0 ? "Projected gain" : "Projected loss",
+    amount: `${sign}${parts.amount}`,
+    code: parts.code,
   };
 }
 
@@ -225,7 +226,7 @@ export function ScenarioStrip({
               <View
                 key={scenario}
                 accessible
-                accessibilityLabel={`${scenarioLabel(scenario)} scenario. Outcome ${roundLabels[result.round]}. ${net.label} ${net.value}.`}
+                accessibilityLabel={`${scenarioLabel(scenario)} scenario. Outcome ${roundLabels[result.round]}. ${net.label} ${net.amount} ${net.code}.`}
                 style={[
                   styles.scenarioCard,
                   {
@@ -267,17 +268,28 @@ export function ScenarioStrip({
                     {net.label}
                   </Text>
                   <Text
-                    numberOfLines={1}
                     adjustsFontSizeToFit
-                    minimumFontScale={0.86}
+                    minimumFontScale={0.75}
+                    numberOfLines={1}
                     style={{
                       color: colors.brandForeground,
-                      fontSize: 14,
+                      fontSize: 16,
+                      lineHeight: 20,
                       fontWeight: "900",
                       fontVariant: ["tabular-nums"],
                     }}
                   >
-                    {net.value}
+                    {net.amount}
+                  </Text>
+                  <Text
+                    style={{
+                      color: colors.brandMutedForeground,
+                      fontSize: 11,
+                      fontWeight: "700",
+                      letterSpacing: 0.4,
+                    }}
+                  >
+                    {net.code}
                   </Text>
                 </View>
               </View>

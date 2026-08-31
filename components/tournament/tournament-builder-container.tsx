@@ -4,7 +4,8 @@ import { useRef, useState } from "react";
 
 import { ProjectionSuccessSheet } from "@/components/tournament/projection-success-sheet";
 import { TournamentProjectionBuilder } from "@/components/tournament/tournament-projection-builder";
-import { ErrorState, LoadingState } from "@/components/ui/state";
+import { Button } from "@/components/ui/button";
+import { EmptyState, ErrorState, LoadingState } from "@/components/ui/state";
 import { useAuth } from "@/context/auth";
 import { useTournamentDraft } from "@/context/tournament-draft";
 import { api } from "@/lib/api";
@@ -118,6 +119,21 @@ export function TournamentBuilderContainer({
           "Couldn't load this tournament.",
         )}
         onRetry={() => refetchEditTournament()}
+      />
+    );
+  }
+
+  if (editTournament?.result) {
+    return (
+      <EmptyState
+        title="Projection locked"
+        body="Remove the recorded result before changing this tournament's original projection."
+        action={
+          <Button
+            label="View tournament result"
+            onPress={() => router.replace(`/tournaments/${editTournament.id}`)}
+          />
+        }
       />
     );
   }

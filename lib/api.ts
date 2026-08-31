@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
   athleteProfileSchema,
+  actualPnlSchema,
   deleteResultSchema,
   fxConversionSchema,
   healthSchema,
@@ -10,7 +11,13 @@ import {
   tournamentWithPnLSchema,
 } from "@/lib/api-schemas";
 import { supabase } from "@/lib/supabase";
-import type { AthleteProfile, Tournament } from "@/types";
+import type {
+  ActualPnl,
+  AthleteProfile,
+  Tournament,
+  TournamentResultInput,
+  TournamentWithPnL,
+} from "@/types";
 
 export class ApiError extends Error {
   constructor(
@@ -274,6 +281,52 @@ export const api = {
         authToken: options?.authToken,
         authenticatedUserId: options?.authenticatedUserId,
       }),
+    previewResult: (
+      id: string,
+      data: TournamentResultInput,
+      options?: ApiRequestOptions,
+    ): Promise<ActualPnl> =>
+      requestParsed(
+        actualPnlSchema,
+        `${TOURNAMENT_API_BASE}/${id}/result-preview`,
+        {
+          method: "POST",
+          body: JSON.stringify(data),
+          signal: options?.signal,
+          authToken: options?.authToken,
+          authenticatedUserId: options?.authenticatedUserId,
+        },
+      ),
+    upsertResult: (
+      id: string,
+      data: TournamentResultInput,
+      options?: ApiRequestOptions,
+    ): Promise<TournamentWithPnL> =>
+      requestParsed(
+        tournamentWithPnLSchema,
+        `${TOURNAMENT_API_BASE}/${id}/result`,
+        {
+          method: "PUT",
+          body: JSON.stringify(data),
+          signal: options?.signal,
+          authToken: options?.authToken,
+          authenticatedUserId: options?.authenticatedUserId,
+        },
+      ),
+    removeResult: (
+      id: string,
+      options?: ApiRequestOptions,
+    ): Promise<TournamentWithPnL> =>
+      requestParsed(
+        tournamentWithPnLSchema,
+        `${TOURNAMENT_API_BASE}/${id}/result`,
+        {
+          method: "DELETE",
+          signal: options?.signal,
+          authToken: options?.authToken,
+          authenticatedUserId: options?.authenticatedUserId,
+        },
+      ),
     search: (
       query: string,
       sport?: string,

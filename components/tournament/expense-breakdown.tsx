@@ -1,7 +1,6 @@
 import { Text, View } from "react-native";
 
 import { Card } from "@/components/ui/card";
-import { MoneyPair } from "@/components/tournament/money-pair";
 import { colors, spacing } from "@/constants/theme";
 import type { TournamentWithPnL } from "@/types";
 import { formatMoney } from "@/lib/utils";
@@ -9,13 +8,23 @@ import { formatMoney } from "@/lib/utils";
 const rows = [
   ["Flights", "flight_cost"],
   ["Accommodation", "accommodation_total"],
-  ["Daily cap x days", "daily_spending_cap"],
+  ["Food", "food_total"],
+  ["Local transport", "local_transport_total"],
   ["Coaching / physio", "coaching_cost"],
   ["Entry fee", "entry_fee"],
   ["Misc", "misc_cost"],
 ] as const;
 
 export function ExpenseBreakdown({ tournament }: { tournament: TournamentWithPnL }) {
+  const displayedRows =
+    tournament.daily_spending_cap > 0
+      ? ([
+          ...rows.slice(0, 4),
+          ["Other daily spending", "daily_spending_cap"] as const,
+          ...rows.slice(4),
+        ] as const)
+      : rows;
+
   return (
     <Card>
       <Text
@@ -28,8 +37,8 @@ export function ExpenseBreakdown({ tournament }: { tournament: TournamentWithPnL
       >
         Expense breakdown
       </Text>
-      {rows.map(([label, key]) => {
-        const rawAmount = tournament[key];
+      {displayedRows.map(([label, key]) => {
+        const rawAmount = tournament[key] ?? 0;
         const amount =
           key === "daily_spending_cap"
             ? rawAmount * tournament.duration_days
@@ -49,11 +58,16 @@ export function ExpenseBreakdown({ tournament }: { tournament: TournamentWithPnL
             <Text style={{ color: colors.mutedForeground, flex: 1 }} selectable>
               {label}
             </Text>
-            <MoneyPair
-              amount={amount}
-              fromCurrency={tournament.currency}
-              toCurrency={tournament.home_currency}
-            />
+            <Text
+              style={{
+                color: colors.foreground,
+                fontWeight: "700",
+                fontVariant: ["tabular-nums"],
+              }}
+              selectable
+            >
+              {formatMoney(amount, tournament.currency)}
+            </Text>
           </View>
         );
       })}

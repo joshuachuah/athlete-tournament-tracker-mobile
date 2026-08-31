@@ -46,6 +46,8 @@ export type Tournament = {
   entry_fee: number;
   flight_cost: number;
   accommodation_total: number;
+  food_total?: number;
+  local_transport_total?: number;
   daily_spending_cap: number;
   coaching_cost: number;
   misc_cost: number;
@@ -79,9 +81,43 @@ export type PnLResult = {
   prize_rounds_after_estimated_withholding?: PrizeRounds | null;
 };
 
+export type TournamentResultInput = {
+  achieved_round: keyof PrizeRounds;
+  prize_received_total: number;
+  subsidy_received_total: number;
+  sponsorship_received_total: number;
+  entry_fee_total: number;
+  flight_total: number;
+  accommodation_total: number;
+  food_total: number;
+  local_transport_total: number;
+  coaching_total: number;
+  misc_total: number;
+};
+
+export type TournamentResult = TournamentResultInput & {
+  id: string;
+  tournament_id: string;
+  user_id: string;
+  completed_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ActualPnl = {
+  total_expenses: number;
+  total_income: number;
+  prize_received: number;
+  net_result: number;
+  profitable: boolean;
+  home_currency: string;
+};
+
 export type TournamentWithPnL = Tournament & {
   pnl: PnLResult;
   home_currency: string;
+  result?: TournamentResult | null;
+  actual_pnl?: ActualPnl | null;
 };
 
 export type KnownTournament = {

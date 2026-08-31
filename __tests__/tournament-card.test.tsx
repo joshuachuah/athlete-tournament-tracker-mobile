@@ -110,7 +110,7 @@ describe("TournamentCard", () => {
       <TournamentCard tournament={tournament([losingScenario])} />,
     );
 
-    expect(screen.getByText("Loss · -$300 USD")).toBeTruthy();
+    expect(screen.getByText("Projected loss · -$300 USD")).toBeTruthy();
     expect(screen.queryByText(/Break-even:/)).toBeNull();
   });
 
@@ -118,7 +118,7 @@ describe("TournamentCard", () => {
     const screen = render(
       <TournamentCard tournament={tournament([breakEvenScenario])} />,
     );
-    const label = screen.getByText("Break-even · $0 USD");
+    const label = screen.getByText("Projected break-even · $0 USD");
 
     expect(StyleSheet.flatten(label.props.style)).toEqual(
       expect.objectContaining({ color: colors.foreground }),
@@ -133,12 +133,29 @@ describe("TournamentCard", () => {
 
     expect(screen.getByText("Open Championship")).toBeTruthy();
     expect(screen.getByText("Detroit · Apr 1, 2026")).toBeTruthy();
-    expect(screen.getByText("Profit · $300 USD")).toBeTruthy();
+    expect(screen.getByText("Projected profit · $300 USD")).toBeTruthy();
 
     const link = screen.getByRole("link");
     expect(link.props.accessibilityLabel).toBe(
-      "Open Championship. Detroit, Apr 1, 2026. middle-case net Profit · $300 USD.",
+      "Open Championship. Detroit, Apr 1, 2026. Projected profit · $300 USD.",
     );
     expect(link.props.accessibilityHint).toBe("Opens tournament details");
+  });
+
+  it("prefers the server final result over the original projection", () => {
+    const completed = tournament([profitableScenario]);
+    completed.actual_pnl = {
+      total_expenses: 800,
+      total_income: 200,
+      prize_received: 200,
+      net_result: -600,
+      profitable: false,
+      home_currency: "USD",
+    };
+
+    const screen = render(<TournamentCard tournament={completed} />);
+
+    expect(screen.getByText("Final loss · -$600 USD")).toBeTruthy();
+    expect(screen.queryByText("Projected profit · $300 USD")).toBeNull();
   });
 });

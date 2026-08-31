@@ -1,12 +1,14 @@
 import { z } from "zod";
 
 import type {
+  ActualPnl,
   AthleteProfile,
   KnownTournament,
   PnLResult,
   PrizeRounds,
   ScenarioResult,
   Tournament,
+  TournamentResult,
   TournamentWithPnL,
 } from "@/types";
 import { isCountryCode } from "@/lib/countries";
@@ -75,6 +77,8 @@ const tournamentSchema = z.looseObject({
   entry_fee: z.number(),
   flight_cost: z.number(),
   accommodation_total: z.number(),
+  food_total: prizeAmountSchema.optional().default(0),
+  local_transport_total: prizeAmountSchema.optional().default(0),
   daily_spending_cap: z.number(),
   coaching_cost: z.number(),
   misc_cost: z.number(),
@@ -135,6 +139,41 @@ export const pnlResultSchema = z.looseObject({
     .optional(),
 });
 
+const resultMoneySchema = z.number().finite().nonnegative();
+
+export const tournamentResultInputSchema = z.strictObject({
+  achieved_round: roundSchema,
+  prize_received_total: resultMoneySchema,
+  subsidy_received_total: resultMoneySchema,
+  sponsorship_received_total: resultMoneySchema,
+  entry_fee_total: resultMoneySchema,
+  flight_total: resultMoneySchema,
+  accommodation_total: resultMoneySchema,
+  food_total: resultMoneySchema,
+  local_transport_total: resultMoneySchema,
+  coaching_total: resultMoneySchema,
+  misc_total: resultMoneySchema,
+});
+
+export const tournamentResultSchema = z.looseObject({
+  ...tournamentResultInputSchema.shape,
+  id: z.string(),
+  tournament_id: z.string(),
+  user_id: z.string(),
+  completed_at: z.string(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+
+export const actualPnlSchema = z.looseObject({
+  total_expenses: resultMoneySchema,
+  total_income: resultMoneySchema,
+  prize_received: resultMoneySchema,
+  net_result: z.number().finite(),
+  profitable: z.boolean(),
+  home_currency: z.string(),
+});
+
 export function pnlResultSchemaForPrizeRounds(
   prizeRounds: PrizeRounds | undefined,
 ) {
@@ -153,8 +192,18 @@ export const tournamentWithPnLSchema = tournamentSchema
   .extend({
     pnl: pnlResultSchema,
     home_currency: z.string(),
+    result: tournamentResultSchema.nullable().optional().default(null),
+    actual_pnl: actualPnlSchema.nullable().optional().default(null),
   })
   .superRefine((tournament, context) => {
+    if ((tournament.result === null) !== (tournament.actual_pnl === null)) {
+      context.addIssue({
+        code: "custom",
+        path: [tournament.result === null ? "actual_pnl" : "result"],
+        message: "Expected result and actual_pnl to be present together.",
+      });
+    }
+
     if (
       hasPositivePrizeRounds(tournament.prize_rounds) &&
       tournament.pnl.scenarios.length === 0
@@ -222,6 +271,12 @@ const _assertTournamentWithPnL: AssertAssignable<
   typeof tournamentWithPnLSchema,
   TournamentWithPnL
 > = true;
+const _assertTournamentResult: AssertAssignable<
+  typeof tournamentResultSchema,
+  TournamentResult
+> = true;
+const _assertActualPnl: AssertAssignable<typeof actualPnlSchema, ActualPnl> =
+  true;
 const _assertKnownTournament: AssertAssignable<
   typeof knownTournamentSchema,
   KnownTournament
@@ -234,5 +289,7 @@ void [
   _assertScenarioResult,
   _assertPnLResult,
   _assertTournamentWithPnL,
+  _assertTournamentResult,
+  _assertActualPnl,
   _assertKnownTournament,
 ];

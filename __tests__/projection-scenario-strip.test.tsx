@@ -91,7 +91,10 @@ it("renders a server-provided non-QF middle case and treats zero net as break-ev
   ).toBeTruthy();
   expect(screen.getByText("Win")).toBeTruthy();
   expect(screen.getByText("Break even")).toBeTruthy();
-  expect(screen.getByText("$0 USD")).toBeTruthy();
+  expect(screen.getByText("$0")).toBeTruthy();
+  expect(
+    screen.getByLabelText(/scenario\. Outcome \w+\. Break even \$0 USD\.$/),
+  ).toBeTruthy();
 });
 
 it("shows the explicit empty and unavailable states without blocking edits", async () => {
@@ -210,7 +213,8 @@ it("previews cross-currency outcomes in the athlete's home currency", async () =
   const screen = renderStrip({ ...draft, currency: "EUR" });
   await settlePreview();
 
-  await waitFor(() => expect(screen.getByText("$0 USD")).toBeTruthy());
+  await waitFor(() => expect(screen.getAllByText("$0").length).toBeGreaterThan(0));
+  expect(screen.getAllByText("USD").length).toBeGreaterThan(0);
   expect(mockPreview).toHaveBeenCalledWith(
     expect.objectContaining({ currency: "EUR", user_id: "athlete-1" }),
     expect.objectContaining({ authenticatedUserId: "account-1" }),

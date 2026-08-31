@@ -6,6 +6,7 @@ import {
   deriveDraftDates,
   detailsSchema,
   emptyPrizeRounds,
+  expenseInputModeChanges,
   normalizeTournamentDraft,
   persistedTournamentDraft,
   prizesSchema,
@@ -74,6 +75,9 @@ describe("tournamentToDraft", () => {
         currency: "USD",
         entry_fee: 100,
         flight_cost: 200,
+        expense_input_mode: "total",
+        food_total: 0,
+        local_transport_total: 0,
         daily_spending_cap: 75,
         prize_distribution_mode: "manual",
         prize_tier_id: null,
@@ -167,6 +171,8 @@ describe("tournamentToDraft", () => {
       entry_fee: 125,
       flight_cost: 240,
       accommodation_total: 360,
+      food_total: 120,
+      local_transport_total: 90,
       daily_spending_cap: 85,
       coaching_cost: 45,
       misc_cost: 15,
@@ -184,6 +190,8 @@ describe("tournamentToDraft", () => {
         entry_fee: 125,
         flight_cost: 240,
         accommodation_total: 360,
+        food_total: 120,
+        local_transport_total: 90,
         daily_spending_cap: 85,
         coaching_cost: 45,
         misc_cost: 15,
@@ -197,6 +205,8 @@ describe("tournamentToDraft", () => {
         entry_fee: 125,
         flight_cost: 240,
         accommodation_total: 360,
+        food_total: 120,
+        local_transport_total: 90,
         daily_spending_cap: 85,
         coaching_cost: 45,
         misc_cost: 15,
@@ -319,6 +329,35 @@ describe("tournamentToDraft", () => {
 });
 
 describe("accommodation money math", () => {
+  it("switches totals to daily inputs without changing canonical totals", () => {
+    const totalDraft = {
+      ...defaultTournamentDraft,
+      expense_input_mode: "total" as const,
+      duration_days: 3,
+      end_date: "2026-01-03",
+      accommodation_nights: 0,
+      accommodation_total: 300,
+      food_total: 100,
+      local_transport_total: 50,
+    };
+
+    const switched = deriveDraftDates({
+      ...totalDraft,
+      ...expenseInputModeChanges(totalDraft, "daily"),
+    });
+
+    expect(switched).toEqual(
+      expect.objectContaining({
+        accommodation_nightly: 300,
+        accommodation_total: 300,
+        food_daily: 33.33,
+        food_total: 100,
+        local_transport_total: 50,
+      }),
+    );
+    expect(deriveDraftDates(switched).food_total).toBe(100);
+  });
+
   it("uses the production total calculation and removes floating-point noise", () => {
     expect(calculateAccommodationTotal(33.33, 3, "USD")).toBe(99.99);
     expect(calculateAccommodationTotal(10.125, 1, "KWD")).toBe(10.125);
@@ -597,7 +636,7 @@ describe("normalizeTournamentDraft", () => {
 
     const persisted = persistedTournamentDraft(storedDraft);
 
-    expect(persisted.version).toBe(4);
+    expect(persisted.version).toBe(5);
     expect(normalizeTournamentDraft(persisted)).toEqual(storedDraft);
   });
 
@@ -610,7 +649,7 @@ describe("normalizeTournamentDraft", () => {
     };
 
     expect(
-      normalizeTournamentDraft({ version: 4, draft: storedDraft }).country_code,
+      normalizeTournamentDraft({ version: 5, draft: storedDraft }).country_code,
     ).toBe("US");
   });
 
@@ -621,7 +660,7 @@ describe("normalizeTournamentDraft", () => {
       country_code: " zz ",
     };
     const normalized = normalizeTournamentDraft({
-      version: 4,
+      version: 5,
       draft: storedDraft,
     });
 
@@ -638,7 +677,7 @@ describe("normalizeTournamentDraft", () => {
     };
 
     expect(
-      normalizeTournamentDraft({ version: 4, draft: storedDraft })
+      normalizeTournamentDraft({ version: 5, draft: storedDraft })
         .prize_tax_rate,
     ).toBe(30);
   });
@@ -664,12 +703,44 @@ describe("normalizeTournamentDraft", () => {
   ) {
     const {
       country_code: _countryCode,
+      expense_input_mode: _expenseInputMode,
+      food_daily: _foodDaily,
+      food_total: _foodTotal,
+      local_transport_daily: _localTransportDaily,
+      local_transport_total: _localTransportTotal,
       prize_rounds: _rounds,
       ...legacy
     } = defaultTournamentDraft;
 
     return { ...legacy, prize_rounds: legacyRounds(), ...overrides };
   }
+
+  it("migrates a v4 draft without inventing a legacy spending split", () => {
+    const {
+      expense_input_mode: _expenseInputMode,
+      food_daily: _foodDaily,
+      food_total: _foodTotal,
+      local_transport_daily: _localTransportDaily,
+      local_transport_total: _localTransportTotal,
+      ...version4Draft
+    } = defaultTournamentDraft;
+
+    const migrated = normalizeTournamentDraft({
+      version: 4,
+      draft: { ...version4Draft, daily_spending_cap: 45 },
+    });
+
+    expect(migrated).toEqual(
+      expect.objectContaining({
+        expense_input_mode: "total",
+        food_daily: 0,
+        food_total: 0,
+        local_transport_daily: 0,
+        local_transport_total: 0,
+        daily_spending_cap: 45,
+      }),
+    );
+  });
 
   it("preserves a v3 generated payout snapshot until the athlete selects again", () => {
     const storedDraft = legacySelectorDraft({
@@ -896,6 +967,81 @@ describe("toTournamentPayload", () => {
     expect(payload.prize_rounds).toEqual({ r2: 500 });
   });
 
+  it("sends the canonical totals maintained by daily input editors", () => {
+    const payload = toTournamentPayload(
+      {
+        ...defaultTournamentDraft,
+        expense_input_mode: "daily",
+        duration_days: 3,
+        food_daily: 20,
+        food_total: 60,
+        local_transport_daily: 12.5,
+        local_transport_total: 37.5,
+        accommodation_nightly: 80,
+        accommodation_nights: 2,
+        accommodation_total: 160,
+        daily_spending_cap: 99,
+      },
+      "athlete-1",
+    );
+
+    expect(payload).toEqual(
+      expect.objectContaining({
+        food_total: 60,
+        local_transport_total: 37.5,
+        accommodation_total: 160,
+        daily_spending_cap: 0,
+      }),
+    );
+    expect(payload).not.toHaveProperty("expense_input_mode");
+    expect(payload).not.toHaveProperty("food_daily");
+    expect(payload).not.toHaveProperty("local_transport_daily");
+  });
+
+  it("sends entered tournament totals without multiplying them", () => {
+    const payload = toTournamentPayload(
+      {
+        ...defaultTournamentDraft,
+        expense_input_mode: "total",
+        food_total: 135,
+        local_transport_total: 72,
+        accommodation_total: 440,
+      },
+      "athlete-1",
+    );
+
+    expect(payload).toEqual(
+      expect.objectContaining({
+        food_total: 135,
+        local_transport_total: 72,
+        accommodation_total: 440,
+        daily_spending_cap: 0,
+      }),
+    );
+  });
+
+  it("keeps an edit's unsplit legacy amount separate from category totals", () => {
+    const payload = toTournamentPayload(
+      {
+        ...defaultTournamentDraft,
+        editId: "tournament-1",
+        expense_input_mode: "total",
+        food_total: 100,
+        local_transport_total: 50,
+        daily_spending_cap: 25,
+      },
+      "athlete-1",
+    );
+
+    expect(payload).toEqual(
+      expect.objectContaining({
+        food_total: 100,
+        local_transport_total: 50,
+        daily_spending_cap: 25,
+      }),
+    );
+  });
+
   it("sends only entered prize rounds through create and update", async () => {
     const saved = tournament();
     const writer = {
@@ -967,6 +1113,7 @@ describe("wizard schemas", () => {
     expect(
       travelSchema.safeParse({
         flight_cost: 0,
+        expense_input_mode: "daily",
         accommodation_nightly: 0,
         accommodation_nights: 0,
         accommodation_total: 0,
@@ -975,6 +1122,7 @@ describe("wizard schemas", () => {
     expect(
       travelSchema.safeParse({
         flight_cost: -1,
+        expense_input_mode: "daily",
         accommodation_nightly: 0,
         accommodation_nights: 0,
         accommodation_total: 0,
@@ -983,6 +1131,7 @@ describe("wizard schemas", () => {
     expect(
       travelSchema.safeParse({
         flight_cost: 0,
+        expense_input_mode: "daily",
         accommodation_nightly: 100,
         accommodation_nights: 1.5,
         accommodation_total: 150,

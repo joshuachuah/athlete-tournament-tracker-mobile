@@ -49,11 +49,11 @@ const editorTitles: Record<ProjectionEditor, { title: string; description: strin
   },
   travel: {
     title: "Travel and stay",
-    description: "Add flights and calculate accommodation from nightly cost.",
+    description: "Add flights and enter accommodation by night or as a total.",
   },
   "daily-spending": {
-    title: "Daily spending cap",
-    description: "Set a maximum day-to-day tournament spend.",
+    title: "Food and local transport",
+    description: "Enter daily estimates or totals for the whole tournament.",
   },
   coaching: {
     title: "Coaching / physio",

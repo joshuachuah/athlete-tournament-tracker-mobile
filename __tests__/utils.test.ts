@@ -3,6 +3,7 @@ import {
   dateOnlyYear,
   formatDate,
   formatMoney,
+  formatMoneyParts,
   isoToday,
   parseMoneyInput,
   parseDateOnly,
@@ -62,7 +63,14 @@ describe("money formatting", () => {
     expect(formatMoney(4800, "USD")).toBe("$4,800 USD");
     expect(formatMoney(99.99, "USD")).toBe("$99.99 USD");
     expect(formatMoney(99.99, "JPY")).toBe("¥100 JPY");
-    expect(formatMoney(10.125, "KWD")).toBe("KWD\u00a010.125 KWD");
+    expect(formatMoney(10.125, "KWD")).toBe("10.125 KWD");
+  });
+
+  it("splits amount and code without repeating a code Intl already printed", () => {
+    expect(formatMoneyParts(4800, "USD")).toEqual({ amount: "$4,800", code: "USD" });
+    expect(formatMoneyParts(4954.69, "myr")).toEqual({ amount: "4,954.69", code: "MYR" });
+    expect(formatMoneyParts(0, "MYR")).toEqual({ amount: "0", code: "MYR" });
+    expect(formatMoney(90.63, "MYR")).toBe("90.63 MYR");
   });
 });
 
