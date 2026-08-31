@@ -284,7 +284,7 @@ export function ScenarioStrip({
                   <Text
                     style={{
                       color: colors.brandMutedForeground,
-                      fontSize: 11,
+                      fontSize: 12,
                       fontWeight: "700",
                       letterSpacing: 0.4,
                     }}

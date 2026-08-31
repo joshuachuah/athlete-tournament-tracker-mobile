@@ -237,7 +237,7 @@ export default function DashboardScreen() {
                     : "—"}
                 </Text>
                 <Text
-                  style={{ color: colors.brandMutedForeground, fontSize: 11 }}
+                  style={{ color: colors.brandMutedForeground, fontSize: 12 }}
                   selectable
                 >
                   {stats.projectedCount} projected

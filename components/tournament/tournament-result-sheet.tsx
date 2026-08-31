@@ -249,7 +249,13 @@ export function TournamentResultSheet({
   const waitingForDebounce = serializedInput !== debouncedInput;
   const rounds = availableRounds();
 
-  const preview = useQuery({
+  const {
+    data: previewData,
+    error: previewError,
+    isError: previewIsError,
+    isFetching: previewIsFetching,
+    refetch: refetchPreview,
+  } = useQuery({
     queryKey: [
       "tournament-result-preview",
       authenticatedUserId,
@@ -333,7 +339,7 @@ export function TournamentResultSheet({
   function save() {
     if (
       !confirmed ||
-      !preview.data ||
+      !previewData ||
       waitingForDebounce ||
       saveMutation.isPending ||
       removeMutation.isPending
@@ -373,7 +379,7 @@ export function TournamentResultSheet({
     );
   }
 
-  const previewLoading = waitingForDebounce || preview.isFetching;
+  const previewLoading = waitingForDebounce || previewIsFetching;
   const mutationPending = saveMutation.isPending || removeMutation.isPending;
   const legacyDailySpendingTotal =
     tournament.daily_spending_cap * tournament.duration_days;
@@ -562,19 +568,19 @@ export function TournamentResultSheet({
             </View>
 
             {previewLoading ? <LoadingState label="Calculating final result" /> : null}
-            {preview.isError && !previewLoading ? (
+            {previewIsError && !previewLoading ? (
               <ErrorState
                 message={errorMessage(
-                  preview.error,
+                  previewError,
                   "Couldn't calculate the final result.",
                 )}
-                onRetry={() => preview.refetch()}
+                onRetry={() => refetchPreview()}
               />
             ) : null}
-            {preview.data && !previewLoading ? (
+            {previewData && !previewLoading ? (
               <View
                 accessible
-                accessibilityLabel={`Result preview, ${preview.data.net_result > 0 ? "profit" : preview.data.net_result < 0 ? "loss" : "break-even"}, ${formatMoney(preview.data.net_result, preview.data.home_currency)}. Income ${formatMoney(preview.data.total_income, preview.data.home_currency)}. Expenses ${formatMoney(preview.data.total_expenses, preview.data.home_currency)}.`}
+                accessibilityLabel={`Result preview, ${previewData.net_result > 0 ? "profit" : previewData.net_result < 0 ? "loss" : "break-even"}, ${formatMoney(previewData.net_result, previewData.home_currency)}. Income ${formatMoney(previewData.total_income, previewData.home_currency)}. Expenses ${formatMoney(previewData.total_expenses, previewData.home_currency)}.`}
                 style={styles.preview}
               >
                 <Text style={styles.previewLabel}>Result preview</Text>
@@ -583,9 +589,9 @@ export function TournamentResultSheet({
                     styles.previewAmount,
                     {
                       color:
-                        preview.data.net_result > 0
+                        previewData.net_result > 0
                           ? colors.profit
-                          : preview.data.net_result < 0
+                          : previewData.net_result < 0
                             ? colors.loss
                             : colors.foreground,
                     },
@@ -593,12 +599,12 @@ export function TournamentResultSheet({
                   selectable
                 >
                   {formatMoney(
-                    preview.data.net_result,
-                    preview.data.home_currency,
+                    previewData.net_result,
+                    previewData.home_currency,
                   )}
                 </Text>
                 <Text style={styles.sectionDescription} selectable>
-                  Income {formatMoney(preview.data.total_income, preview.data.home_currency)} · Expenses {formatMoney(preview.data.total_expenses, preview.data.home_currency)}
+                  Income {formatMoney(previewData.total_income, previewData.home_currency)} · Expenses {formatMoney(previewData.total_expenses, previewData.home_currency)}
                 </Text>
               </View>
             ) : null}
@@ -691,7 +697,7 @@ export function TournamentResultSheet({
               disabled={
                 !confirmed ||
                 !legacySpendingReady ||
-                !preview.data ||
+                !previewData ||
                 previewLoading ||
                 mutationPending
               }
