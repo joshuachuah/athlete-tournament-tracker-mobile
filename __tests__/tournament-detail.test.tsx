@@ -192,6 +192,7 @@ describe("TournamentDetailScreen deletion", () => {
 
     await waitFor(() => {
       expect(screen.getByText("No break-even")).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "View original projection" })).toBeNull();
       expect(screen.queryByText("Projection unavailable")).toBeNull();
     });
     screen.unmount();
@@ -249,10 +250,28 @@ describe("TournamentDetailScreen deletion", () => {
 
     expect(await screen.findAllByText("Final loss")).toHaveLength(2);
     expect(screen.getByText("−$450")).toBeTruthy();
-    expect(screen.getAllByText("Out in QF")).toHaveLength(2);
+    expect(screen.getAllByText("Out in QF")).toHaveLength(1);
     expect(screen.getByText("Final outcome")).toBeTruthy();
     expect(screen.getByText(/^Completed /)).toBeTruthy();
-    expect(screen.getByText("Original projection")).toBeTruthy();
+    expect(screen.queryByText("Break-even round")).toBeNull();
+    expect(screen.queryByText("Expense breakdown")).toBeNull();
+    expect(screen.queryByText("Outcome scenarios")).toBeNull();
+    expect(screen.queryByText("Income and expenses")).toBeNull();
+    const disclosure = screen.getByRole("button", { name: "View original projection" });
+    expect(disclosure.props.accessibilityState).toEqual({ expanded: false });
+    fireEvent.press(disclosure);
+    expect(screen.getByText("Saved before the tournament")).toBeTruthy();
+    expect(screen.getByText("Break-even round")).toBeTruthy();
+    expect(screen.getByText("Expense breakdown")).toBeTruthy();
+    expect(screen.getByText("Outcome scenarios")).toBeTruthy();
+    expect(screen.getByText("Income and expenses")).toBeTruthy();
+    expect(screen.getByText("−$450")).toBeTruthy();
+    expect(screen.getByText("after $825 USD costs")).toBeTruthy();
+    const collapse = screen.getByRole("button", { name: "Hide original projection" });
+    expect(collapse.props.accessibilityState).toEqual({ expanded: true });
+    fireEvent.press(collapse);
+    expect(screen.queryByText("Expense breakdown")).toBeNull();
+    expect(screen.getByText("Final outcome")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Edit result" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Edit projection" })).toBeNull();
   });

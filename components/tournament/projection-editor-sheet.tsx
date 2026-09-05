@@ -1,9 +1,6 @@
 import { X } from "lucide-react-native";
 import { useState } from "react";
 import {
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,7 +12,6 @@ import type { ProjectionEditor } from "@/components/tournament/impact-ledger";
 import { ProjectionEditorFields } from "@/components/tournament/projection-editor-fields";
 import { Button } from "@/components/ui/button";
 import { colors, spacing } from "@/constants/theme";
-import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { useTournamentPreview } from "@/hooks/use-tournament-preview";
 import {
   calculateAccommodationTotal,
@@ -31,6 +27,10 @@ import {
 import { zodErrorMap } from "@/lib/zod-errors";
 
 const styles = StyleSheet.create({
+  editorScroll: {
+    flexGrow: 0,
+    flexShrink: 1,
+  },
   editorContent: {
     gap: spacing.lg,
     padding: spacing.xl,
@@ -81,7 +81,7 @@ function schemaForEditor(editor: ProjectionEditor) {
   return spendingSchema;
 }
 
-export function ProjectionEditorSheet({
+export function ProjectionEditorContent({
   draft,
   editor,
   authenticatedUserId = "",
@@ -103,7 +103,6 @@ export function ProjectionEditorSheet({
     prize_rounds: { ...draft.prize_rounds },
   }));
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const reducedMotion = useReducedMotion();
   const heading = editorTitles[editor];
   const { data: prizePreview, isLoadingPreview: prizePreviewLoading } =
     useTournamentPreview({
@@ -178,92 +177,69 @@ export function ProjectionEditorSheet({
   }
 
   return (
-    <Modal
-      animationType={reducedMotion ? "none" : "slide"}
-      onRequestClose={onClose}
-      presentationStyle="overFullScreen"
-      transparent
-      visible
-    >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ flex: 1, justifyContent: "flex-end" }}
+    <View style={{ flexShrink: 1 }}>
+      <View
+        collapsable={false}
+        style={{
+          flexDirection: "row",
+          alignItems: "flex-start",
+          gap: spacing.md,
+          paddingHorizontal: spacing.xl,
+          paddingTop: spacing.xs,
+          paddingBottom: spacing.md,
+        }}
       >
+        <View style={{ flex: 1, gap: spacing.xs }}>
+          <Text style={{ color: colors.foreground, fontSize: 24, fontWeight: "900" }}>
+            {heading.title}
+          </Text>
+          <Text style={{ color: colors.mutedForeground, lineHeight: 20 }}>
+            {heading.description}
+          </Text>
+        </View>
         <Pressable
           accessibilityLabel={`Close ${heading.title} editor`}
           accessibilityRole="button"
+          hitSlop={10}
           onPress={onClose}
-          style={{ flex: 1, backgroundColor: "rgba(14, 16, 18, 0.34)" }}
-        />
-        <View
-          accessibilityViewIsModal
-          style={{
-            maxHeight: "88%",
-            borderTopLeftRadius: 24,
-            borderTopRightRadius: 24,
-            backgroundColor: colors.surface,
-          }}
+          style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
         >
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "flex-start",
-              gap: spacing.md,
-              paddingHorizontal: spacing.xl,
-              paddingTop: spacing.xl,
-              paddingBottom: spacing.md,
-            }}
-          >
-            <View style={{ flex: 1, gap: spacing.xs }}>
-              <Text style={{ color: colors.foreground, fontSize: 24, fontWeight: "900" }}>
-                {heading.title}
-              </Text>
-              <Text style={{ color: colors.mutedForeground, lineHeight: 20 }}>
-                {heading.description}
-              </Text>
-            </View>
-            <Pressable
-              accessibilityLabel={`Close ${heading.title} editor`}
-              accessibilityRole="button"
-              hitSlop={10}
-              onPress={onClose}
-              style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
-            >
-              <X color={colors.foreground} size={24} />
-            </Pressable>
-          </View>
+          <X color={colors.foreground} size={24} />
+        </Pressable>
+      </View>
 
-          <ScrollView
-            keyboardDismissMode="on-drag"
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={styles.editorContent}
-          >
-            <ProjectionEditorFields
-              editor={editor}
-              errors={errors}
-              onUpdate={update}
-              onUpdateAccommodation={updateAccommodation}
-              prizePreview={prizePreview}
-              prizePreviewLoading={prizePreviewLoading}
-              workingDraft={workingDraft}
-            />
-          </ScrollView>
+      <ScrollView
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+        // Size to the fields so short editors keep their buttons close.
+        // Only shrink (and scroll) when the form is taller than the sheet.
+        style={styles.editorScroll}
+        contentContainerStyle={styles.editorContent}
+      >
+        <ProjectionEditorFields
+          editor={editor}
+          errors={errors}
+          onUpdate={update}
+          onUpdateAccommodation={updateAccommodation}
+          prizePreview={prizePreview}
+          prizePreviewLoading={prizePreviewLoading}
+          workingDraft={workingDraft}
+        />
+      </ScrollView>
 
-          <View
-            style={{
-              gap: spacing.sm,
-              padding: spacing.lg,
-              paddingBottom: spacing.xl,
-              borderTopWidth: 1,
-              borderTopColor: colors.border,
-              backgroundColor: colors.surface,
-            }}
-          >
-            <Button label={`Apply ${heading.title.toLowerCase()}`} onPress={apply} />
-            <Button label="Cancel" variant="ghost" onPress={onClose} />
-          </View>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
+      <View
+        style={{
+          gap: spacing.sm,
+          padding: spacing.lg,
+          paddingBottom: spacing.xl,
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+          backgroundColor: colors.surface,
+        }}
+      >
+        <Button label={`Apply ${heading.title.toLowerCase()}`} onPress={apply} />
+        <Button label="Cancel" variant="ghost" onPress={onClose} />
+      </View>
+    </View>
   );
 }

@@ -13,12 +13,11 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { AssumptionPicker } from "@/components/tournament/assumption-picker";
 import {
   ImpactLedger,
   type ProjectionEditor,
 } from "@/components/tournament/impact-ledger";
-import { ProjectionEditorSheet } from "@/components/tournament/projection-editor-sheet";
+import { ProjectionSheet, type ProjectionSheetScreen } from "@/components/tournament/projection-sheet";
 import { ScenarioStrip } from "@/components/tournament/scenario-strip";
 import { TournamentIdentitySearch } from "@/components/tournament/tournament-identity-search";
 import { Button } from "@/components/ui/button";
@@ -38,8 +37,7 @@ import {
 const IOS_NATIVE_TAB_BAR_CLEARANCE = spacing.xxl * 2;
 
 type BuilderState = {
-  activeEditor: ProjectionEditor | null;
-  assumptionPickerOpen: boolean;
+  sheet: ProjectionSheetScreen | null;
   formDraft: TournamentDraft;
   identityResetVersion: number;
   isReplacingIdentity: boolean;
@@ -53,8 +51,7 @@ function createBuilderState(
   offerResume: boolean,
 ): BuilderState {
   return {
-    activeEditor: null,
-    assumptionPickerOpen: false,
+    sheet: null,
     formDraft: initialDraft,
     identityResetVersion: 0,
     isReplacingIdentity: false,
@@ -154,8 +151,7 @@ export function TournamentProjectionBuilder({
     createBuilderState(initialDraft, Boolean(resume)),
   );
   const {
-    activeEditor,
-    assumptionPickerOpen,
+    sheet,
     formDraft,
     identityResetVersion,
     isReplacingIdentity,
@@ -235,7 +231,13 @@ export function TournamentProjectionBuilder({
     });
   }
 
+  // Keep the current sheet session until its native dismissal has completed.
+  function openSheet(next: ProjectionSheetScreen) {
+    if (!sheet) updateBuilderState({ sheet: next });
+  }
+
   function handlePrimaryAction() {
+    if (sheet) return;
     if (!identityResolved || !formDraft.name.trim()) {
       updateBuilderState({
         stage: "identity",
@@ -251,7 +253,7 @@ export function TournamentProjectionBuilder({
     const invalidEditor = firstInvalidEditor(formDraft);
     if (invalidEditor) {
       updateBuilderState({
-        activeEditor: invalidEditor,
+        sheet: { kind: "editor", editor: invalidEditor },
         submissionSummary: "Complete the highlighted section before saving.",
       });
       return;
@@ -263,221 +265,206 @@ export function TournamentProjectionBuilder({
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <ScrollView
-        testID="projection-builder-scroll"
-        accessibilityElementsHidden={loading}
-        contentInsetAdjustmentBehavior="automatic"
-        keyboardDismissMode="interactive"
-        keyboardShouldPersistTaps="handled"
-        importantForAccessibility={loading ? "no-hide-descendants" : "auto"}
-        pointerEvents={loading ? "none" : "auto"}
-        contentInset={{ bottom: actionAreaBottomPadding }}
-        scrollIndicatorInsets={{ bottom: actionAreaBottomPadding }}
-        contentContainerStyle={{
-          gap: stage === "projection" ? spacing.xxl : spacing.xl,
-          padding: spacing.xl,
-          paddingBottom: 0,
-        }}
-      >
-        {stage === "resume" && resume ? (
-          <View style={{ gap: spacing.xl }}>
-            <View style={{ gap: spacing.xs }}>
-              <Text style={{ color: colors.foreground, fontSize: 26, fontWeight: "900" }}>
-                Continue your draft?
-              </Text>
-              <Text style={{ color: colors.mutedForeground, lineHeight: 20 }}>
-                {formDraft.name}
-              </Text>
-            </View>
-            <View style={{ gap: spacing.sm }}>
-              <Button
-                label="Continue draft"
-                onPress={() =>
-                  updateBuilderState({ stage: "projection", submissionSummary: null })
-                }
-              />
-              <Button
-                label="Start another tournament"
-                variant="ghost"
-                onPress={() => {
-                  Alert.alert(
-                    "Start another tournament?",
-                    "This clears the local create draft for this tournament.",
-                    [
-                      { text: "Cancel", style: "cancel" },
-                      {
-                        text: "Start another",
-                        style: "destructive",
-                        onPress: () => {
-                          onClearSubmitError?.();
-                          updateBuilderState({ submissionSummary: null });
-                          resume.onStartAnotherTournament();
-                        },
-                      },
-                    ],
-                  );
-                }}
-              />
-            </View>
-          </View>
-        ) : stage === "identity" ? (
-          <TournamentIdentitySearch
-            key={`identity:${formDraft.name}:${identityResetVersion}`}
-            draft={formDraft}
-            inputRef={identityInputRef}
-            isReplacingIdentity={isReplacingIdentity}
-            onSelectDraft={selectDraft}
-            sport={sport}
-          />
-        ) : (
-          <>
-            <View style={{ gap: spacing.sm }}>
+    <ProjectionSheet
+      authenticatedUserId={authenticatedUserId}
+      draft={formDraft}
+      screen={sheet}
+      homeCurrency={homeCurrency}
+      onApply={(nextDraft) => {
+        updateDraft(nextDraft);
+        if (sheet?.kind === "editor" && sheet.editor === "details") {
+          updateBuilderState({
+            identityResolved: Boolean(nextDraft.name.trim()),
+            isReplacingIdentity: !nextDraft.name.trim(),
+            identityResetVersion: identityResetVersion + 1,
+          });
+        }
+      }}
+      onDismiss={() => updateBuilderState({ sheet: null })}
+      onSelect={(editor) =>
+        updateBuilderState({ sheet: { kind: "editor", editor } })
+      }
+      profileId={profileId}
+    >
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <ScrollView
+          testID="projection-builder-scroll"
+          accessibilityElementsHidden={loading}
+          contentInsetAdjustmentBehavior="automatic"
+          keyboardDismissMode="interactive"
+          keyboardShouldPersistTaps="handled"
+          importantForAccessibility={loading ? "no-hide-descendants" : "auto"}
+          pointerEvents={loading ? "none" : "auto"}
+          contentInset={{ bottom: actionAreaBottomPadding }}
+          scrollIndicatorInsets={{ bottom: actionAreaBottomPadding }}
+          contentContainerStyle={{
+            gap: stage === "projection" ? spacing.xxl : spacing.xl,
+            padding: spacing.xl,
+            paddingBottom: 0,
+          }}
+        >
+          {stage === "resume" && resume ? (
+            <View style={{ gap: spacing.xl }}>
               <View style={{ gap: spacing.xs }}>
-                <Text
-                  style={{
-                    color: colors.mutedForeground,
-                    fontSize: 13,
-                    fontWeight: "700",
-                  }}
-                >
-                  Tournament projection
-                </Text>
-                <Text
-                  style={{ color: colors.foreground, fontSize: 26, fontWeight: "900" }}
-                >
-                  {formDraft.name}
+                <Text style={{ color: colors.foreground, fontSize: 26, fontWeight: "900" }}>
+                  Continue your draft?
                 </Text>
                 <Text style={{ color: colors.mutedForeground, lineHeight: 20 }}>
-                  {[formDraft.location.trim(), formDraft.country.trim()]
-                    .filter(Boolean)
-                    .join(", ") || "Add the details needed to calculate outcomes."}
+                  {formDraft.name}
                 </Text>
               </View>
-              {!formDraft.editId ? (
-                <Pressable
-                  accessibilityRole="button"
+              <View style={{ gap: spacing.sm }}>
+                <Button
+                  label="Continue draft"
+                  onPress={() =>
+                    updateBuilderState({ stage: "projection", submissionSummary: null })
+                  }
+                />
+                <Button
+                  label="Start another tournament"
+                  variant="ghost"
                   onPress={() => {
-                    updateBuilderState({
-                      identityResolved: false,
-                      isReplacingIdentity: true,
-                      identityResetVersion: identityResetVersion + 1,
-                      stage: "identity",
-                      submissionSummary: null,
-                    });
+                    Alert.alert(
+                      "Start another tournament?",
+                      "This clears the local create draft for this tournament.",
+                      [
+                        { text: "Cancel", style: "cancel" },
+                        {
+                          text: "Start another",
+                          style: "destructive",
+                          onPress: () => {
+                            onClearSubmitError?.();
+                            updateBuilderState({ submissionSummary: null });
+                            resume.onStartAnotherTournament();
+                          },
+                        },
+                      ],
+                    );
                   }}
-                  style={({ pressed }) => ({
-                    minHeight: 44,
-                    alignSelf: "flex-start",
-                    justifyContent: "center",
-                    opacity: pressed ? 0.6 : 1,
-                  })}
-                >
-                  <Text style={{ color: colors.accent, fontWeight: "800" }}>
-                    Change tournament
+                />
+              </View>
+            </View>
+          ) : stage === "identity" ? (
+            <TournamentIdentitySearch
+              key={`identity:${formDraft.name}:${identityResetVersion}`}
+              draft={formDraft}
+              inputRef={identityInputRef}
+              isReplacingIdentity={isReplacingIdentity}
+              onSelectDraft={selectDraft}
+              sport={sport}
+            />
+          ) : (
+            <>
+              <View style={{ gap: spacing.sm }}>
+                <View style={{ gap: spacing.xs }}>
+                  <Text
+                    style={{
+                      color: colors.mutedForeground,
+                      fontSize: 13,
+                      fontWeight: "700",
+                    }}
+                  >
+                    Tournament projection
                   </Text>
-                </Pressable>
+                  <Text
+                    style={{ color: colors.foreground, fontSize: 26, fontWeight: "900" }}
+                  >
+                    {formDraft.name}
+                  </Text>
+                  <Text style={{ color: colors.mutedForeground, lineHeight: 20 }}>
+                    {[formDraft.location.trim(), formDraft.country.trim()]
+                      .filter(Boolean)
+                      .join(", ") || "Add the details needed to calculate outcomes."}
+                  </Text>
+                </View>
+                {!formDraft.editId ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => {
+                      updateBuilderState({
+                        identityResolved: false,
+                        isReplacingIdentity: true,
+                        identityResetVersion: identityResetVersion + 1,
+                        stage: "identity",
+                        submissionSummary: null,
+                      });
+                    }}
+                    style={({ pressed }) => ({
+                      minHeight: 44,
+                      alignSelf: "flex-start",
+                      justifyContent: "center",
+                      opacity: pressed ? 0.6 : 1,
+                    })}
+                  >
+                    <Text style={{ color: colors.accent, fontWeight: "800" }}>
+                      Change tournament
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
+
+              <ScenarioStrip
+                authenticatedUserId={authenticatedUserId}
+                draft={formDraft}
+                homeCurrency={homeCurrency}
+                identityResolved={identityResolved}
+                profileId={profileId}
+              />
+
+              <ImpactLedger
+                draft={formDraft}
+                estimatedWithholdingRate={
+                  builderPreview?.estimated_withholding_rate
+                }
+                onAddAssumption={() =>
+                  openSheet({ kind: "picker" })
+                }
+                onOpenEditor={(editor) =>
+                  openSheet({ kind: "editor", editor })
+                }
+                prizeRoundsAfterEstimatedWithholding={
+                  builderPreview?.prize_rounds_after_estimated_withholding
+                }
+              />
+            </>
+          )}
+
+          {stage === "projection" ? (
+            <View
+              testID="projection-action-area"
+              style={{
+                gap: spacing.sm,
+                paddingBottom:
+                  Platform.OS === "android" ? actionAreaBottomPadding : 0,
+              }}
+            >
+              {submissionSummary ? (
+                <Text accessibilityLiveRegion="polite" style={{ color: colors.loss, lineHeight: 19 }}>
+                  {submissionSummary}
+                </Text>
+              ) : null}
+              {submitError ? (
+                <Text accessibilityLiveRegion="polite" style={{ color: colors.loss, lineHeight: 19 }}>
+                  {submitError}
+                </Text>
+              ) : null}
+              <Button
+                testID="projection-primary-action"
+                label={actionLabel(formDraft, identityResolved)}
+                loading={loading}
+                onPress={handlePrimaryAction}
+              />
+              {loading ? (
+                <Text accessibilityLiveRegion="polite" style={{ color: colors.mutedForeground, textAlign: "center" }}>
+                  Saving projection. Editing is temporarily disabled.
+                </Text>
               ) : null}
             </View>
+          ) : null}
+        </ScrollView>
 
-            <ScenarioStrip
-              authenticatedUserId={authenticatedUserId}
-              draft={formDraft}
-              homeCurrency={homeCurrency}
-              identityResolved={identityResolved}
-              profileId={profileId}
-            />
 
-            <ImpactLedger
-              draft={formDraft}
-              estimatedWithholdingRate={
-                builderPreview?.estimated_withholding_rate
-              }
-              onAddAssumption={() =>
-                updateBuilderState({ assumptionPickerOpen: true })
-              }
-              onOpenEditor={(activeEditor) =>
-                updateBuilderState({ activeEditor })
-              }
-              prizeRoundsAfterEstimatedWithholding={
-                builderPreview?.prize_rounds_after_estimated_withholding
-              }
-            />
-          </>
-        )}
-
-        {stage === "projection" ? (
-          <View
-            testID="projection-action-area"
-            style={{
-              gap: spacing.sm,
-              paddingBottom:
-                Platform.OS === "android" ? actionAreaBottomPadding : 0,
-            }}
-          >
-            {submissionSummary ? (
-              <Text accessibilityLiveRegion="polite" style={{ color: colors.loss, lineHeight: 19 }}>
-                {submissionSummary}
-              </Text>
-            ) : null}
-            {submitError ? (
-              <Text accessibilityLiveRegion="polite" style={{ color: colors.loss, lineHeight: 19 }}>
-                {submitError}
-              </Text>
-            ) : null}
-            <Button
-              testID="projection-primary-action"
-              label={actionLabel(formDraft, identityResolved)}
-              loading={loading}
-              onPress={handlePrimaryAction}
-            />
-            {loading ? (
-              <Text accessibilityLiveRegion="polite" style={{ color: colors.mutedForeground, textAlign: "center" }}>
-                Saving projection. Editing is temporarily disabled.
-              </Text>
-            ) : null}
-          </View>
-        ) : null}
-      </ScrollView>
-
-      {activeEditor ? (
-        <ProjectionEditorSheet
-          authenticatedUserId={authenticatedUserId}
-          draft={formDraft}
-          editor={activeEditor}
-          homeCurrency={homeCurrency}
-          onApply={(nextDraft) => {
-            updateDraft(nextDraft);
-            if (activeEditor === "details") {
-              updateBuilderState({
-                activeEditor: null,
-                identityResolved: Boolean(nextDraft.name.trim()),
-                isReplacingIdentity: !nextDraft.name.trim(),
-                identityResetVersion: identityResetVersion + 1,
-              });
-              return;
-            }
-            updateBuilderState({ activeEditor: null });
-          }}
-          onClose={() => updateBuilderState({ activeEditor: null })}
-          profileId={profileId}
-        />
-      ) : null}
-
-      {assumptionPickerOpen ? (
-        <AssumptionPicker
-          draft={formDraft}
-          onClose={() =>
-            updateBuilderState({ assumptionPickerOpen: false })
-          }
-          onSelect={(editor) => {
-            updateBuilderState({
-              activeEditor: editor,
-              assumptionPickerOpen: false,
-            });
-          }}
-        />
-      ) : null}
-    </View>
+      </View>
+    </ProjectionSheet>
   );
 }

@@ -168,9 +168,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "flex-end",
   },
+  // Absolute so the tint also sits behind the sheet's rounded corners.
   backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(14, 24, 18, 0.34)",
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.backdrop,
   },
   sheet: {
     maxHeight: "82%",

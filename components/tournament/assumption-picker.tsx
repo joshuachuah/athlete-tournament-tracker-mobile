@@ -1,10 +1,7 @@
 import { Check, ChevronRight, X } from "lucide-react-native";
 import { useState } from "react";
 import {
-  KeyboardAvoidingView,
   FlatList,
-  Modal,
-  Platform,
   Pressable,
   Text,
   View,
@@ -14,7 +11,6 @@ import { Input } from "@/components/ui/input";
 import { colors, radii, spacing } from "@/constants/theme";
 import type { TournamentDraft } from "@/lib/tournament-draft";
 import type { AssumptionEditor } from "@/components/tournament/impact-ledger";
-import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
 const assumptions: {
   editor: AssumptionEditor;
@@ -77,7 +73,6 @@ export function AssumptionPicker({
   onSelect: (editor: AssumptionEditor) => void;
 }) {
   const [query, setQuery] = useState("");
-  const reducedMotion = useReducedMotion();
   const filtered = assumptions.filter((assumption) =>
     `${assumption.title} ${assumption.description}`
       .toLowerCase()
@@ -85,115 +80,92 @@ export function AssumptionPicker({
   );
 
   return (
-    <Modal
-      animationType={reducedMotion ? "none" : "slide"}
-      onRequestClose={onClose}
-      presentationStyle="overFullScreen"
-      transparent
-      visible
+    <View
+      style={{
+        flexShrink: 1,
+        gap: spacing.lg,
+        paddingHorizontal: spacing.xl,
+        paddingBottom: spacing.xxl,
+      }}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ flex: 1, justifyContent: "flex-end" }}
-      >
+      <View collapsable={false} style={{ flexDirection: "row", alignItems: "flex-start", gap: spacing.md }}>
+        <View style={{ flex: 1, gap: spacing.xs }}>
+          <Text style={{ color: colors.foreground, fontSize: 24, fontWeight: "900" }}>
+            Add an assumption
+          </Text>
+          <Text style={{ color: colors.mutedForeground, lineHeight: 20 }}>
+            Every option maps to a field saved with this projection.
+          </Text>
+        </View>
         <Pressable
           accessibilityLabel="Close assumption picker"
           accessibilityRole="button"
+          hitSlop={10}
           onPress={onClose}
-          style={{ flex: 1, backgroundColor: "rgba(14, 16, 18, 0.34)" }}
-        />
-        <View
-          accessibilityViewIsModal
-          style={{
-            maxHeight: "82%",
-            gap: spacing.lg,
-            padding: spacing.xl,
-            paddingBottom: spacing.xxl,
-            borderTopLeftRadius: 24,
-            borderTopRightRadius: 24,
-            backgroundColor: colors.surface,
-          }}
+          style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
         >
-          <View style={{ flexDirection: "row", alignItems: "flex-start", gap: spacing.md }}>
-            <View style={{ flex: 1, gap: spacing.xs }}>
-              <Text style={{ color: colors.foreground, fontSize: 24, fontWeight: "900" }}>
-                Add an assumption
-              </Text>
-              <Text style={{ color: colors.mutedForeground, lineHeight: 20 }}>
-                Every option maps to a field saved with this projection.
-              </Text>
-            </View>
+          <X color={colors.foreground} size={24} />
+        </Pressable>
+      </View>
+
+      <Input
+        label="Search assumptions"
+        value={query}
+        onChangeText={setQuery}
+        autoCorrect={false}
+        placeholder="Try sponsorship or coaching"
+      />
+
+      <FlatList
+        style={{ flexGrow: 0, flexShrink: 1 }}
+        data={filtered}
+        keyExtractor={(assumption) => assumption.editor}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ gap: spacing.sm }}
+        renderItem={({ item: assumption }) => {
+          const active = isActive(assumption.editor, draft);
+          return (
             <Pressable
-              accessibilityLabel="Close assumption picker"
+              accessibilityLabel={`${assumption.title}. ${assumption.description}${active ? ". Already added" : ""}`}
               accessibilityRole="button"
-              hitSlop={10}
-              onPress={onClose}
-              style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}
+              onPress={() => onSelect(assumption.editor)}
+              style={({ pressed }) => ({
+                minHeight: 68,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: spacing.md,
+                padding: spacing.md,
+                borderWidth: 1,
+                borderColor: active ? colors.accent : colors.border,
+                borderRadius: radii.md,
+                backgroundColor: active ? colors.accentSoft : colors.surface,
+                opacity: pressed ? 0.65 : 1,
+              })}
             >
-              <X color={colors.foreground} size={24} />
-            </Pressable>
-          </View>
-
-          <Input
-            label="Search assumptions"
-            value={query}
-            onChangeText={setQuery}
-            autoFocus
-            autoCorrect={false}
-            placeholder="Try sponsorship or coaching"
-          />
-
-          <FlatList
-            data={filtered}
-            keyExtractor={(assumption) => assumption.editor}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{ gap: spacing.sm }}
-            renderItem={({ item: assumption }) => {
-              const active = isActive(assumption.editor, draft);
-              return (
-                <Pressable
-                  accessibilityLabel={`${assumption.title}. ${assumption.description}${active ? ". Already added" : ""}`}
-                  accessibilityRole="button"
-                  onPress={() => onSelect(assumption.editor)}
-                  style={({ pressed }) => ({
-                    minHeight: 68,
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: spacing.md,
-                    padding: spacing.md,
-                    borderWidth: 1,
-                    borderColor: active ? colors.accent : colors.border,
-                    borderRadius: radii.md,
-                    backgroundColor: active ? colors.accentSoft : colors.surface,
-                    opacity: pressed ? 0.65 : 1,
-                  })}
-                >
-                  <View style={{ flex: 1, gap: 3 }}>
-                    <Text style={{ color: colors.foreground, fontWeight: "800" }}>
-                      {assumption.title}
-                    </Text>
-                    <Text style={{ color: colors.mutedForeground, lineHeight: 18 }}>
-                      {assumption.description}
-                    </Text>
-                  </View>
-                  {active ? <Check color={colors.accent} size={20} /> : null}
-                  <ChevronRight color={colors.mutedForeground} size={20} />
-                </Pressable>
-              );
-            }}
-            ListEmptyComponent={
-              <View style={{ paddingVertical: spacing.xl, gap: spacing.xs }}>
-                <Text style={{ color: colors.foreground, fontWeight: "800", textAlign: "center" }}>
-                  No supported assumptions found
+              <View style={{ flex: 1, gap: 3 }}>
+                <Text style={{ color: colors.foreground, fontWeight: "800" }}>
+                  {assumption.title}
                 </Text>
-                <Text style={{ color: colors.mutedForeground, textAlign: "center", lineHeight: 20 }}>
-                  Try another term. Custom assumptions are not added unless they can be saved.
+                <Text style={{ color: colors.mutedForeground, lineHeight: 18 }}>
+                  {assumption.description}
                 </Text>
               </View>
-            }
-          />
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
+              {active ? <Check color={colors.accent} size={20} /> : null}
+              <ChevronRight color={colors.mutedForeground} size={20} />
+            </Pressable>
+          );
+        }}
+        ListEmptyComponent={
+          <View style={{ paddingVertical: spacing.xl, gap: spacing.xs }}>
+            <Text style={{ color: colors.foreground, fontWeight: "800", textAlign: "center" }}>
+              No supported assumptions found
+            </Text>
+            <Text style={{ color: colors.mutedForeground, textAlign: "center", lineHeight: 20 }}>
+              Try another term. Custom assumptions are not added unless they can be saved.
+            </Text>
+          </View>
+        }
+      />
+    </View>
   );
 }

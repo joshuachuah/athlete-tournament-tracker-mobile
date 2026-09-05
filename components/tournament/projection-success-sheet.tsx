@@ -1,5 +1,5 @@
 import { Check, X } from "lucide-react-native";
-import { Modal, Pressable, Text, View } from "react-native";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Button } from "@/components/ui/button";
 import { colors, radii, spacing } from "@/constants/theme";
@@ -49,7 +49,7 @@ export function ProjectionSuccessSheet({
           accessibilityLabel={`Dismiss ${resultVerb} projection`}
           accessibilityRole="button"
           onPress={onDismiss}
-          style={{ flex: 1, backgroundColor: "rgba(14, 16, 18, 0.34)" }}
+          style={styles.backdrop}
         />
         <View
           accessibilityViewIsModal
@@ -152,3 +152,10 @@ export function ProjectionSuccessSheet({
     </Modal>
   );
 }
+
+const styles = StyleSheet.create({
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.backdrop,
+  },
+});
