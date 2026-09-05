@@ -41,7 +41,7 @@ export default function TournamentDetailScreen() {
 
 function TournamentDetailContent() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { profile, session } = useAuth();
+  const { isCurrentUser, profile, session } = useAuth();
   const tournamentId = typeof id === "string" ? id : "";
   const [resultEditorOpen, setResultEditorOpen] = useState(false);
   const [projectionExpanded, setProjectionExpanded] = useState(false);
@@ -64,7 +64,7 @@ function TournamentDetailContent() {
         authenticatedUserId: variables.userId,
       }),
     onSuccess: (_result, variables) => {
-      if (session?.user.id !== variables.userId) {
+      if (!isCurrentUser(variables.userId)) {
         return;
       }
 

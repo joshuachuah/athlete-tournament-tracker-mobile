@@ -200,4 +200,57 @@ describe("useTournamentPreview", () => {
       expect(result.current.lastData?.estimated_withholding_rate).toBe(20),
     );
   });
+
+  it("retains only this owner's last result after a failed update and clears it when disabled", async () => {
+    mockPreview
+      .mockResolvedValueOnce(previewResult(10))
+      .mockRejectedValue(new Error("Preview unavailable"));
+    const draft = previewDraft();
+    const { result, rerender } = renderHook(
+      ({ rate, enabled }: { rate: number; enabled: boolean }) =>
+        useTournamentPreview({
+          authenticatedUserId: "account-1",
+          draft: { ...draft, prize_tax_rate: rate },
+          enabled,
+          homeCurrency: "USD",
+          profileId: "athlete-1",
+        }),
+      { initialProps: { rate: 10, enabled: true }, wrapper: createWrapper() },
+    );
+    await waitFor(() => expect(result.current.data?.estimated_withholding_rate).toBe(10));
+    rerender({ rate: 20, enabled: true });
+    await act(async () => { await jest.advanceTimersByTimeAsync(350); });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.data).toBeUndefined();
+    expect(result.current.lastData?.estimated_withholding_rate).toBe(10);
+
+    rerender({ rate: 20, enabled: false });
+    expect(result.current.lastData).toBeUndefined();
+    rerender({ rate: 20, enabled: true });
+    expect(result.current.lastData).toBeUndefined();
+  });
+
+  it.each(["authenticatedUserId", "profileId"] as const)(
+    "does not expose retained data after %s changes",
+    async (changedField) => {
+      mockPreview
+        .mockResolvedValueOnce(previewResult(10))
+        .mockImplementation(() => new Promise(() => {}));
+      const draft = previewDraft();
+      const initialProps = { authenticatedUserId: "account-1", profileId: "athlete-1" };
+      const { result, rerender } = renderHook(
+        (owner: typeof initialProps) => useTournamentPreview({
+          ...owner, draft, enabled: true, homeCurrency: "USD",
+        }),
+        { initialProps, wrapper: createWrapper() },
+      );
+      await waitFor(() => expect(result.current.lastData?.estimated_withholding_rate).toBe(10));
+      rerender({ ...initialProps, [changedField]: "replacement" });
+      expect(result.current.data).toBeUndefined();
+      expect(result.current.lastData).toBeUndefined();
+      await act(async () => { await jest.advanceTimersByTimeAsync(350); });
+      expect(result.current.lastData).toBeUndefined();
+      await waitFor(() => expect(mockPreview).toHaveBeenCalledTimes(2));
+    },
+  );
 });

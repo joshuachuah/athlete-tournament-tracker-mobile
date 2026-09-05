@@ -6,7 +6,6 @@ import {
 } from "@testing-library/react-native";
 import {
   notifyManager,
-  QueryClient,
   QueryClientProvider,
 } from "@tanstack/react-query";
 import type { PropsWithChildren, ReactElement } from "react";
@@ -14,12 +13,12 @@ import { Alert } from "react-native";
 
 import TournamentDetailScreen from "@/app/tournaments/[id]";
 import DetailsStep from "@/app/tournaments/new/details";
+import { queryClient } from "@/lib/query-client";
 import type { TournamentWithPnL } from "@/types";
 
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
 const mockResetDraft = jest.fn();
-const mockInvalidateQueries = jest.fn();
 const mockGetTournament = jest.fn();
 const mockCreateTournament = jest.fn();
 const mockUpdateTournament = jest.fn();
@@ -156,12 +155,6 @@ jest.mock("@/lib/api", () => ({
   },
 }));
 
-jest.mock("@/lib/query-client", () => ({
-  queryClient: {
-    invalidateQueries: (...args: unknown[]) => mockInvalidateQueries(...args),
-  },
-}));
-
 const tournament: TournamentWithPnL = {
   id: "tournament-1",
   user_id: "profile-a",
@@ -227,16 +220,9 @@ async function settleMutation(settle: () => void) {
 }
 
 function renderWithClient(element: ReactElement) {
-  const client = new QueryClient({
-    defaultOptions: {
-      mutations: { gcTime: Infinity, retry: false },
-      queries: { gcTime: Infinity, retry: false },
-    },
-  });
-
   function Wrapper({ children }: PropsWithChildren) {
     return (
-      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
   }
 
@@ -283,6 +269,13 @@ async function switchAccount(screen: ReturnType<typeof render>, element: ReactEl
 
 beforeEach(() => {
   jest.clearAllMocks();
+  queryClient.clear();
+  queryClient.setDefaultOptions({
+    mutations: { gcTime: Infinity, retry: false },
+    queries: { gcTime: Infinity, retry: false, staleTime: 60_000 },
+  });
+  jest.spyOn(queryClient, "invalidateQueries");
+  jest.spyOn(queryClient, "setQueryData");
   mockParams = {};
   mockAuthState = authState("account-a", "profile-a", "account-a-token");
   jest.spyOn(Alert, "alert").mockImplementation(jest.fn());
@@ -329,8 +322,9 @@ describe.each(["create", "update"] as const)(
       await switchAccount(screen, <DetailsStep />);
       await settleMutation(() => request.resolve(tournament));
 
-      expect(mockInvalidateQueries).not.toHaveBeenCalled();
+      expect(queryClient.invalidateQueries).not.toHaveBeenCalled();
       expect(mockResetDraft).not.toHaveBeenCalled();
+      expect(queryClient.setQueryData).not.toHaveBeenCalled();
       expect(mockReplace).not.toHaveBeenCalled();
     });
 
@@ -349,8 +343,9 @@ describe.each(["create", "update"] as const)(
       );
 
       expect(screen.queryByText(`${kind} failed for A`)).toBeNull();
-      expect(mockInvalidateQueries).not.toHaveBeenCalled();
+      expect(queryClient.invalidateQueries).not.toHaveBeenCalled();
       expect(mockResetDraft).not.toHaveBeenCalled();
+      expect(queryClient.setQueryData).not.toHaveBeenCalled();
       expect(mockReplace).not.toHaveBeenCalled();
     });
   },
@@ -369,7 +364,7 @@ describe("delete tournament auth isolation", () => {
     await switchAccount(screen, <TournamentDetailScreen />);
     await settleMutation(() => request.resolve({ success: true }));
 
-    expect(mockInvalidateQueries).not.toHaveBeenCalled();
+    expect(queryClient.invalidateQueries).not.toHaveBeenCalled();
     expect(mockReplace).not.toHaveBeenCalled();
   });
 
@@ -384,7 +379,7 @@ describe("delete tournament auth isolation", () => {
     );
 
     expect(screen.queryByText("delete failed for A")).toBeNull();
-    expect(mockInvalidateQueries).not.toHaveBeenCalled();
+    expect(queryClient.invalidateQueries).not.toHaveBeenCalled();
     expect(mockReplace).not.toHaveBeenCalled();
   });
 });
@@ -410,12 +405,11 @@ it("allows same-user token refresh while a tournament save is pending", async ()
     expect.objectContaining({ user_id: "profile-a" }),
     { authenticatedUserId: "account-a" },
   );
-  expect(mockInvalidateQueries).toHaveBeenCalledWith({
+  expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
     queryKey: ["tournaments", "profile-a"],
   });
-  expect(mockInvalidateQueries).toHaveBeenCalledWith({
-    queryKey: ["tournament", tournament.id],
-  });
+  expect(queryClient.getQueryData(["tournament", tournament.id])).toEqual(tournament);
+  expect(queryClient.getQueryState(["tournament", tournament.id])?.isInvalidated).toBe(false);
   expect(mockResetDraft).toHaveBeenCalledTimes(1);
   expect(mockReplace).toHaveBeenCalledWith(`/tournaments/${tournament.id}`);
   expect(mockReplace).toHaveBeenCalledTimes(1);
@@ -434,4 +428,46 @@ it("locks builder editing while a save mutation is pending", async () => {
   await settleMutation(() => request.resolve(tournament));
   expect(mockResetDraft).toHaveBeenCalledTimes(1);
   expect(mockReplace).not.toHaveBeenCalled();
+});
+
+it.each(["create", "update"] as const)(
+  "opens the saved %s response without fetching tournament details again",
+  async (kind) => {
+    const saved = { ...tournament, name: "Saved tournament" };
+    const mutation = kind === "create" ? mockCreateTournament : mockUpdateTournament;
+    mutation.mockResolvedValue(saved);
+    const screen = await renderSaveScreen(kind);
+    const readsBeforeSave = mockGetTournament.mock.calls.length;
+
+    fireEvent.press(screen.getByTestId("submit-tournament"));
+    await screen.findByTestId("view-saved-projection");
+    mockParams = { id: saved.id };
+    screen.rerender(<TournamentDetailScreen />);
+
+    expect(await screen.findByText(saved.name)).toBeTruthy();
+    expect(mockGetTournament).toHaveBeenCalledTimes(readsBeforeSave);
+    expect(queryClient.getQueryData(["tournament", saved.id])).toEqual(saved);
+    expect(mockResetDraft).toHaveBeenCalledTimes(1);
+    expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ["tournaments", "profile-a"],
+    });
+  },
+);
+
+it("does not cache a saved projection if the account changes during query cancellation", async () => {
+  const cancellation = deferred<void>();
+  const cancelQueries = jest.spyOn(queryClient, "cancelQueries")
+    .mockReturnValueOnce(cancellation.promise);
+  mockCreateTournament.mockResolvedValue(tournament);
+  const screen = await renderSaveScreen("create");
+  fireEvent.press(screen.getByTestId("submit-tournament"));
+  await waitFor(() => expect(cancelQueries).toHaveBeenCalledTimes(1));
+
+  await switchAccount(screen, <DetailsStep />);
+  await settleMutation(() => cancellation.resolve());
+
+  expect(queryClient.setQueryData).not.toHaveBeenCalled();
+  expect(queryClient.invalidateQueries).not.toHaveBeenCalled();
+  expect(mockResetDraft).not.toHaveBeenCalled();
+  expect(screen.queryByTestId("view-saved-projection")).toBeNull();
 });
