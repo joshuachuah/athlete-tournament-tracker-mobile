@@ -39,6 +39,9 @@ type ResultMutationVariables = {
 type RemoveMutationVariables = Omit<ResultMutationVariables, "input">;
 
 const styles = StyleSheet.create({
+  keyboardContainer: {
+    flex: 1,
+  },
   sheet: {
     flex: 1,
     backgroundColor: colors.surface,
@@ -405,7 +408,7 @@ export function TournamentResultSheet({
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ flex: 1 }}
+        style={styles.keyboardContainer}
       >
         <View accessibilityViewIsModal style={styles.sheet}>
           <SheetGrabber />

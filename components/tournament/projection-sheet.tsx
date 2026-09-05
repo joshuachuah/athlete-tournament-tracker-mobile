@@ -1,6 +1,7 @@
 import { createContext, use, useEffect, useId, useLayoutEffect, useRef, useState, type ComponentProps, type PropsWithChildren, type ReactNode } from "react";
 import { Keyboard, StyleSheet, View, useWindowDimensions } from "react-native";
 import { Redirect, router, Stack } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AssumptionPicker } from "@/components/tournament/assumption-picker";
@@ -25,7 +26,7 @@ type Session = Omit<ProjectionSheetProps, "children" | "screen"> & {
 };
 type SheetContextValue = {
   session: Session | null;
-  open: (session: Session) => void;
+  open: (session: Session) => boolean;
   finish: (id: string) => void;
 };
 const SheetContext = createContext<SheetContextValue | null>(null);
@@ -36,10 +37,11 @@ export function ProjectionSheetProvider({ children }: PropsWithChildren) {
   const current = useRef<Session | null>(null);
 
   function open(next: Session) {
-    if (current.current) return;
+    if (current.current) return false;
     current.current = next;
     setSession(next);
     router.push("/projection-sheet");
+    return true;
   }
 
   function finish(id: string) {
@@ -72,7 +74,7 @@ export function ProjectionSheet({ children, screen, ...props }: ProjectionSheetP
     if (!screen || presented.current) return;
     const sessionId = `${id}:${++sequence.current}`;
     presented.current = sessionId;
-    open({
+    const accepted = open({
       ...latest.current,
       id: sessionId,
       screen,
@@ -83,6 +85,10 @@ export function ProjectionSheet({ children, screen, ...props }: ProjectionSheetP
         latest.current.onDismiss();
       },
     });
+    if (!accepted) {
+      presented.current = null;
+      latest.current.onDismiss();
+    }
   }, [screen, id, open]);
 
   useEffect(() => () => {
@@ -93,9 +99,18 @@ export function ProjectionSheet({ children, screen, ...props }: ProjectionSheetP
 
 export function ProjectionSheetRoute() {
   const { session, finish } = useSheetContext();
+  const navigation = useNavigation();
+  const [ownedSession] = useState(Boolean(session));
   const id = session?.id;
   useEffect(() => () => { if (id) finish(id); }, [finish, id]);
-  if (!session) return <Redirect href="/" />;
+  useEffect(() => {
+    // Owner removal ends this modal. A concurrent redirect may already have
+    // focused another route, which must not be popped by this cleanup.
+    if (!session && ownedSession && navigation.isFocused() && navigation.canGoBack()) {
+      navigation.goBack();
+    }
+  }, [session, ownedSession, navigation]);
+  if (!session) return ownedSession ? null : <Redirect href="/" />;
   return <SheetContent key={session.id} session={session} />;
 }
 

@@ -12,6 +12,14 @@ import { createDefaultTournamentDraft } from "@/lib/tournament-draft";
 
 const mockPush = jest.fn();
 const mockBack = jest.fn();
+const mockNavigation = {
+  isFocused: jest.fn(() => true),
+  canGoBack: jest.fn(() => true),
+  goBack: () => mockBack(),
+};
+jest.mock("@react-navigation/native", () => ({
+  useNavigation: () => mockNavigation,
+}));
 jest.mock("expo-router", () => {
   const { Text } = jest.requireActual<typeof import("react-native")>("react-native");
   return {
@@ -34,7 +42,7 @@ jest.mock("@/hooks/use-tournament-preview", () => ({
 
 const initialDraft = createDefaultTournamentDraft(new Date(2026, 0, 1));
 
-function Owner({ onDismiss }: { onDismiss: () => void }) {
+function Owner({ onDismiss, name = "coaching" }: { onDismiss: () => void; name?: string }) {
   const [screen, setScreen] = useState<ProjectionSheetScreen | null>(null);
   return (
     <ProjectionSheet
@@ -48,7 +56,7 @@ function Owner({ onDismiss }: { onDismiss: () => void }) {
       }}
     >
       <Button
-        title="Open coaching"
+        title={`Open ${name}`}
         onPress={() => setScreen({ kind: "editor", editor: "coaching" })}
       />
     </ProjectionSheet>
@@ -69,9 +77,49 @@ function Navigator({ children }: PropsWithChildren) {
   );
 }
 
-beforeEach(() => jest.clearAllMocks());
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockNavigation.isFocused.mockReturnValue(true);
+  mockNavigation.canGoBack.mockReturnValue(true);
+});
 
 describe("projection sheet ownership", () => {
+  it("lets a rejected owner retry after the active owner's sheet closes", () => {
+    const firstDismiss = jest.fn();
+    const secondDismiss = jest.fn();
+    const screen = render(
+      <>
+        <Owner name="first" onDismiss={firstDismiss} />
+        <Owner name="second" onDismiss={secondDismiss} />
+      </>,
+      { wrapper: Navigator },
+    );
+    fireEvent.press(screen.getByText("Open first"));
+    fireEvent.press(screen.getByText("Open second"));
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(secondDismiss).toHaveBeenCalledTimes(1);
+    expect(firstDismiss).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByText("Cancel"));
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    fireEvent.press(screen.getByText("Open second"));
+    expect(mockPush).toHaveBeenCalledTimes(2);
+    expect(screen.getByLabelText("Coaching / physio (USD)")).toBeTruthy();
+    fireEvent.press(screen.getByText("Cancel"));
+    expect(mockBack).toHaveBeenCalledTimes(2);
+    expect(secondDismiss).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not pop another route after navigation has already moved away", () => {
+    const screen = render(<Owner onDismiss={jest.fn()} />, { wrapper: Navigator });
+    fireEvent.press(screen.getByText("Open coaching"));
+    mockNavigation.isFocused.mockReturnValue(false);
+    screen.rerender(<Text>Signed out</Text>);
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText("Coaching / physio (USD)")).toBeNull();
+    expect(screen.queryByText("Redirect to /")).toBeNull();
+  });
+
   it("redirects a direct route visit when no builder owns a session", () => {
     const screen = render(
       <ProjectionSheetProvider>
@@ -94,7 +142,8 @@ describe("projection sheet ownership", () => {
     // A keyed builder disappears when its account or create/edit identity changes.
     screen.rerender(<Text>Owner removed</Text>);
     expect(screen.queryByLabelText("Coaching / physio (USD)")).toBeNull();
-    expect(screen.getByText("Redirect to /")).toBeTruthy();
+    expect(screen.queryByText("Redirect to /")).toBeNull();
+    expect(mockBack).toHaveBeenCalledTimes(1);
     expect(onDismiss).toHaveBeenCalledTimes(1);
 
     const nextDismiss = jest.fn();
@@ -107,6 +156,7 @@ describe("projection sheet ownership", () => {
     expect(nextDismiss).not.toHaveBeenCalled();
 
     fireEvent.press(screen.getByText("Cancel"));
+    expect(mockBack).toHaveBeenCalledTimes(2);
     expect(nextDismiss).toHaveBeenCalledTimes(1);
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });

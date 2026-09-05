@@ -49,7 +49,7 @@ export function ProjectionSuccessSheet({
           accessibilityLabel={`Dismiss ${resultVerb} projection`}
           accessibilityRole="button"
           onPress={onDismiss}
-          style={[StyleSheet.absoluteFill, { backgroundColor: colors.backdrop }]}
+          style={styles.backdrop}
         />
         <View
           accessibilityViewIsModal
@@ -152,3 +152,10 @@ export function ProjectionSuccessSheet({
     </Modal>
   );
 }
+
+const styles = StyleSheet.create({
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.backdrop,
+  },
+});
