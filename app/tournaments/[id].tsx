@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Alert, ScrollView, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
+import { ChevronDown, ChevronUp } from "lucide-react-native";
 import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +44,7 @@ function TournamentDetailContent() {
   const { profile, session } = useAuth();
   const tournamentId = typeof id === "string" ? id : "";
   const [resultEditorOpen, setResultEditorOpen] = useState(false);
+  const [projectionExpanded, setProjectionExpanded] = useState(false);
 
   const {
     data,
@@ -111,6 +113,7 @@ function TournamentDetailContent() {
 
   const realistic = data ? getScenario(data, "realistic") : undefined;
   const hasProjection = data ? data.pnl.scenarios.length > 0 : false;
+  const completed = Boolean(data?.result && data.actual_pnl);
   const finalNet = data?.actual_pnl?.net_result;
   const finalLabel =
     finalNet === undefined
@@ -202,90 +205,118 @@ function TournamentDetailContent() {
             />
           ) : null}
 
-          {data.actual_pnl ? (
-            <View style={{ gap: spacing.xs }}>
-              <Text
-                style={{ color: colors.foreground, fontSize: 22, fontWeight: "800" }}
-                selectable
-              >
-                Original projection
+          {completed ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: projectionExpanded }}
+              onPress={() => setProjectionExpanded((expanded) => !expanded)}
+              style={({ pressed }) => [
+                styles.projectionToggle,
+                pressed && styles.projectionTogglePressed,
+              ]}
+            >
+              <Text style={styles.projectionToggleLabel}>
+                {projectionExpanded
+                  ? "Hide original projection"
+                  : "View original projection"}
               </Text>
-              <Text style={{ color: colors.mutedForeground, lineHeight: 20 }} selectable>
-                These are the assumptions saved before the tournament.
-              </Text>
-            </View>
+              {projectionExpanded ? (
+                <ChevronUp
+                  size={18}
+                  color={colors.brand}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                />
+              ) : (
+                <ChevronDown
+                  size={18}
+                  color={colors.brand}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                />
+              )}
+            </Pressable>
           ) : null}
 
-          <Card>
-            <Text
-              style={{ color: colors.foreground, fontSize: 20, fontWeight: "800" }}
-              selectable
-            >
-              Break-even round
-            </Text>
-            <Text
-              style={{
-                color: colors.accent,
-                fontSize: 28,
-                fontWeight: "900",
-              }}
-              selectable
-            >
-              {data.pnl.break_even_round
-                ? roundLabels[data.pnl.break_even_round]
-                : hasProjection
-                  ? "No break-even"
-                  : "Projection unavailable"}
-            </Text>
-            <Text style={{ color: colors.mutedForeground, lineHeight: 20 }} selectable>
-              This is the minimum round needed to avoid losing money.
-            </Text>
-          </Card>
+          {!completed || projectionExpanded ? (
+            <>
+              {completed ? (
+                <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>
+                  Saved before the tournament
+                </Text>
+              ) : null}
+              <Card>
+                <Text
+                  style={{ color: colors.foreground, fontSize: 20, fontWeight: "800" }}
+                  selectable
+                >
+                  Break-even round
+                </Text>
+                <Text
+                  style={{
+                    color: colors.accent,
+                    fontSize: 28,
+                    fontWeight: "900",
+                  }}
+                  selectable
+                >
+                  {data.pnl.break_even_round
+                    ? roundLabels[data.pnl.break_even_round]
+                    : hasProjection
+                      ? "No break-even"
+                      : "Projection unavailable"}
+                </Text>
+                <Text style={{ color: colors.mutedForeground, lineHeight: 20 }} selectable>
+                  This is the minimum round needed to avoid losing money.
+                </Text>
+              </Card>
 
-          <ExpenseBreakdown tournament={data} />
+              <ExpenseBreakdown tournament={data} />
 
-          <OutcomeCard
-            status={{ kind: "saved" }}
-            body={
-              data.pnl.scenarios.length === 0
-                ? {
-                    kind: "message",
-                    children: (
-                      <Text style={{ color: colors.mutedForeground }} selectable>
-                        Projection unavailable
-                      </Text>
-                    ),
-                  }
-                : {
-                    kind: "projection",
-                    pnl: data.pnl,
-                    homeCurrency: data.home_currency,
-                  }
-            }
-          />
-
-          <Card>
-            <Text
-              style={{ color: colors.foreground, fontSize: 18, fontWeight: "800" }}
-              selectable
-            >
-              Income and expenses
-            </Text>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.xl }}>
-              <MoneyPair
-                label="Total income"
-                amount={data.pnl.total_income_base}
-                fromCurrency={data.home_currency}
-                toCurrency={data.currency}
+              <OutcomeCard
+                status={{ kind: "saved" }}
+                body={
+                  data.pnl.scenarios.length === 0
+                    ? {
+                        kind: "message",
+                        children: (
+                          <Text style={{ color: colors.mutedForeground }} selectable>
+                            Projection unavailable
+                          </Text>
+                        ),
+                      }
+                    : {
+                        kind: "projection",
+                        pnl: data.pnl,
+                        homeCurrency: data.home_currency,
+                      }
+                }
               />
-              <MoneyPair
-                label="Total expenses"
-                amount={data.pnl.total_expenses}
-                fromCurrency={data.home_currency}
-                toCurrency={data.currency}
-              />
-            </View>
-          </Card>
+
+              <Card>
+                <Text
+                  style={{ color: colors.foreground, fontSize: 18, fontWeight: "800" }}
+                  selectable
+                >
+                  Income and expenses
+                </Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.xl }}>
+                  <MoneyPair
+                    label="Total income"
+                    amount={data.pnl.total_income_base}
+                    fromCurrency={data.home_currency}
+                    toCurrency={data.currency}
+                  />
+                  <MoneyPair
+                    label="Total expenses"
+                    amount={data.pnl.total_expenses}
+                    fromCurrency={data.home_currency}
+                    toCurrency={data.currency}
+                  />
+                </View>
+              </Card>
+            </>
+          ) : null}
 
           <Button
             label={data.result ? "Edit result" : "Record result"}
@@ -328,3 +359,22 @@ function TournamentDetailContent() {
     </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  projectionToggle: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.xs,
+    gap: spacing.md,
+  },
+  projectionTogglePressed: {
+    opacity: 0.7,
+  },
+  projectionToggleLabel: {
+    color: colors.brand,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+});

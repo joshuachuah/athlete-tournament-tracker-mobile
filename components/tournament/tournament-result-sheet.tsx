@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Button } from "@/components/ui/button";
+import { SheetGrabber } from "@/components/ui/sheet-grabber";
 import { ErrorState, LoadingState } from "@/components/ui/state";
 import { MoneyInput } from "@/components/ui/money-input";
 import { colors, radii, spacing } from "@/constants/theme";
@@ -38,14 +39,8 @@ type ResultMutationVariables = {
 type RemoveMutationVariables = Omit<ResultMutationVariables, "input">;
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: colors.backdrop,
-  },
   sheet: {
-    maxHeight: "92%",
-    borderTopLeftRadius: radii.lg,
-    borderTopRightRadius: radii.lg,
+    flex: 1,
     backgroundColor: colors.surface,
   },
   header: {
@@ -53,7 +48,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: spacing.md,
     paddingHorizontal: spacing.xl,
-    paddingTop: spacing.xl,
+    paddingTop: spacing.xs,
     paddingBottom: spacing.md,
   },
   headerCopy: {
@@ -398,24 +393,22 @@ export function TournamentResultSheet({
         : null;
 
   return (
+    // pageSheet lets iOS draw the card: rounded corners, dimmed parent,
+    // swipe-down to dismiss. onDismiss keeps our state in sync when the user swipes.
     <Modal
+      allowSwipeDismissal
       animationType={reducedMotion ? "none" : "slide"}
+      onDismiss={onClose}
       onRequestClose={onClose}
-      presentationStyle="overFullScreen"
-      transparent
+      presentationStyle="pageSheet"
       visible
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ flex: 1, justifyContent: "flex-end" }}
+        style={{ flex: 1 }}
       >
-        <Pressable
-          accessibilityLabel="Close result editor"
-          accessibilityRole="button"
-          onPress={onClose}
-          style={styles.backdrop}
-        />
         <View accessibilityViewIsModal style={styles.sheet}>
+          <SheetGrabber />
           <View style={styles.header}>
             <View style={styles.headerCopy}>
               <Text accessibilityRole="header" style={styles.title}>
@@ -571,6 +564,7 @@ export function TournamentResultSheet({
             {previewLoading ? <LoadingState label="Calculating final result" /> : null}
             {previewIsError && !previewLoading ? (
               <ErrorState
+                textAlign="center"
                 message={errorMessage(
                   previewError,
                   "Couldn't calculate the final result.",

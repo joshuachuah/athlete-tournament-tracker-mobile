@@ -5,7 +5,7 @@ import { Alert, ScrollView } from "react-native";
 
 import { PrizeDistributionSelector } from "@/components/tournament/prize-distribution-selector";
 import { ProjectionEditorFields } from "@/components/tournament/projection-editor-fields";
-import { ProjectionEditorSheet } from "@/components/tournament/projection-editor-sheet";
+import { ProjectionEditorContent } from "@/components/tournament/projection-editor-sheet";
 import {
   createDefaultTournamentDraft,
   type TournamentDraft,
@@ -369,7 +369,7 @@ describe("PrizeDistributionSelector", () => {
         },
       };
       const screen = renderWithClient(
-        <ProjectionEditorSheet
+        <ProjectionEditorContent
           editor="details"
           draft={draft}
           onApply={onApply}
@@ -420,7 +420,7 @@ describe("PrizeDistributionSelector", () => {
       },
     };
     const screen = renderWithClient(
-      <ProjectionEditorSheet
+      <ProjectionEditorContent
         editor="details"
         draft={draft}
         onApply={onApply}
@@ -464,7 +464,7 @@ describe("PrizeDistributionSelector", () => {
       },
     };
     const screen = renderWithClient(
-      <ProjectionEditorSheet
+      <ProjectionEditorContent
         editor="details"
         draft={draft}
         onApply={onApply}
@@ -631,10 +631,10 @@ describe("PrizeDistributionSelector", () => {
   });
 });
 
-describe("ProjectionEditorSheet", () => {
+describe("ProjectionEditorContent", () => {
   it("dismisses the keyboard on drag without interactive frame tracking", () => {
     const screen = renderWithClient(
-      <ProjectionEditorSheet
+      <ProjectionEditorContent
         editor="prize"
         draft={createDefaultTournamentDraft()}
         onApply={() => undefined}

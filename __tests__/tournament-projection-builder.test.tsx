@@ -1,6 +1,7 @@
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
+import { ProjectionSheetProvider, ProjectionSheetRoute } from "@/components/tournament/projection-sheet";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { PropsWithChildren, ReactElement } from "react";
+import { useLayoutEffect, useState, type PropsWithChildren, type ReactElement } from "react";
 import { AccessibilityInfo, Alert } from "react-native";
 import { useNavigation, usePreventRemove } from "@react-navigation/native";
 
@@ -46,8 +47,11 @@ jest.mock("@react-navigation/native", () => ({
   usePreventRemove: jest.fn(),
 }));
 
+const mockPushSheet = jest.fn();
+const mockBackSheet = jest.fn();
 jest.mock("expo-router", () => ({
-  router: { replace: jest.fn() },
+  router: { replace: jest.fn(), push: (...args: unknown[]) => mockPushSheet(...args), back: () => mockBackSheet() },
+  Stack: { Screen: () => null },
 }));
 
 jest.mock("@/context/auth", () => ({
@@ -125,6 +129,20 @@ const savedTournament: TournamentWithPnL = {
   },
 };
 
+function SheetTestNavigator({ children }: PropsWithChildren) {
+  const [visible, setVisible] = useState(false);
+  useLayoutEffect(() => {
+    mockPushSheet.mockImplementation(() => setVisible(true));
+    mockBackSheet.mockImplementation(() => setVisible(false));
+  }, []);
+  return (
+    <ProjectionSheetProvider>
+      {children}
+      {visible ? <ProjectionSheetRoute /> : null}
+    </ProjectionSheetProvider>
+  );
+}
+
 function renderWithClient(element: ReactElement) {
   const client = new QueryClient({
     defaultOptions: {
@@ -133,7 +151,7 @@ function renderWithClient(element: ReactElement) {
     },
   });
   function Wrapper({ children }: PropsWithChildren) {
-    return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+    return <QueryClientProvider client={client}><SheetTestNavigator>{children}</SheetTestNavigator></QueryClientProvider>;
   }
   return render(element, { wrapper: Wrapper });
 }
@@ -168,6 +186,8 @@ async function advance(ms: number) {
 
 beforeEach(() => {
   jest.useFakeTimers();
+  mockPushSheet.mockClear();
+  mockBackSheet.mockClear();
   localStorage.clear();
   mockSearch.mockReset().mockResolvedValue([]);
   mockGetTournament.mockReset();
@@ -221,6 +241,12 @@ describe("TournamentProjectionBuilder", () => {
         .paddingBottom,
     ).toBe(0);
     expect(screen.getByTestId("projection-action-area")).toBeTruthy();
+  });
+
+  it("preserves the bottom clearance when editing a tournament", () => {
+    const { screen } = renderBuilder(tournamentToDraft(savedTournament));
+
+    expect(screen.getByTestId("projection-builder-scroll").props.contentInset.bottom).toBe(64);
   });
 
   it("selects a known tournament inline and prefills its identity", async () => {
@@ -563,6 +589,58 @@ describe("TournamentProjectionBuilder", () => {
     fireEvent.press(screen.getByText("Apply travel and stay"));
 
     expect(screen.getByText("−$250 USD")).toBeTruthy();
+  });
+
+  it.each([
+    ["Food and local transport", "Food per day (USD)"],
+    ["Coaching / physio", "Coaching / physio (USD)"],
+    ["Miscellaneous cost", "Miscellaneous (USD)"],
+    ["Sponsorship", "Sponsorship allocated (USD)"],
+    ["Subsidy", "Subsidy applies"],
+  ])("keeps the native sheet open when selecting %s", (title, field) => {
+    const { screen } = renderBuilder(validDraft);
+    fireEvent.press(screen.getByText("Add optional assumption"));
+    const modal = screen.UNSAFE_getByType(ProjectionSheetRoute);
+
+    fireEvent.press(screen.getByText(title));
+
+    expect(screen.UNSAFE_getByType(ProjectionSheetRoute)).toBe(modal);
+    expect(mockPushSheet).toHaveBeenCalledTimes(1);
+    expect(mockBackSheet).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText("Search assumptions")).toBeNull();
+    expect(screen.getByLabelText(field)).toBeTruthy();
+    expect(screen.getByText(`Apply ${title.toLowerCase()}`)).toBeTruthy();
+  });
+
+  it("discards edits after native dismissal and allows reopening", () => {
+    const { screen } = renderBuilder(validDraft);
+    fireEvent.press(screen.getByText("Add optional assumption"));
+    fireEvent.press(screen.getByText("Coaching / physio"));
+    fireEvent.changeText(screen.getByLabelText("Coaching / physio (USD)"), "123");
+    // Native swipe dismissal removes the route, running the same cleanup as Back.
+    act(() => mockBackSheet());
+    fireEvent.press(screen.getByText("Add optional assumption"));
+    fireEvent.press(screen.getByText("Coaching / physio"));
+    expect(screen.getByLabelText("Coaching / physio (USD)").props.value).toBe("");
+    expect(mockPushSheet).toHaveBeenCalledTimes(2);
+  });
+
+  it("discards cancelled assumption edits and reloads applied values on reopen", () => {
+    const { screen } = renderBuilder(validDraft);
+    fireEvent.press(screen.getByText("Add optional assumption"));
+    fireEvent.press(screen.getByText("Coaching / physio"));
+    fireEvent.changeText(screen.getByLabelText("Coaching / physio (USD)"), "123");
+    fireEvent.press(screen.getByText("Cancel"));
+
+    fireEvent.press(screen.getByText("Add optional assumption"));
+    fireEvent.press(screen.getByRole("button", { name: /^Coaching \/ physio\. Coaching/ }));
+    expect(screen.getByLabelText("Coaching / physio (USD)").props.value).toBe("");
+    fireEvent.changeText(screen.getByLabelText("Coaching / physio (USD)"), "75");
+    fireEvent.press(screen.getByText("Apply coaching / physio"));
+
+    fireEvent.press(screen.getByText("Add optional assumption"));
+    fireEvent.press(screen.getByRole("button", { name: /^Coaching \/ physio\. Coaching/ }));
+    expect(screen.getByLabelText("Coaching / physio (USD)").props.value).toBe("75");
   });
 
   it("maps the universal assumption picker to persisted sponsorship", () => {
