@@ -1,4 +1,4 @@
-import { notifyManager, QueryClientProvider } from "@tanstack/react-query";
+import { notifyManager, QueryClientProvider, QueryObserver } from "@tanstack/react-query";
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
 import type { PropsWithChildren } from "react";
 import { Alert } from "react-native";
@@ -160,12 +160,27 @@ describe("TournamentResultSheet", () => {
     );
   });
 
-  it("requires confirmation, saves the server-previewed input, and invalidates both result consumers", async () => {
+  it.each([false, true])("caches the confirmed result without refetching details, with an older read pending=%s", async (olderReadPending) => {
     const saved = { ...tournament, actual_pnl: actualPnl };
     const onClose = jest.fn();
     mockUpsertResult.mockResolvedValue(saved);
     const detailInvalidation = jest.spyOn(queryClient, "invalidateQueries");
+    const readDetail = jest.fn().mockResolvedValue(tournament);
     const { screen } = renderSheet(onClose);
+    const detail = new QueryObserver(queryClient, {
+      queryKey: ["tournament", tournament.id],
+      queryFn: readDetail,
+    });
+    const unsubscribe = detail.subscribe(() => {});
+    await waitFor(() => expect(readDetail).toHaveBeenCalledTimes(1));
+    let resolveOlderRead: ((value: TournamentWithPnL) => void) | undefined;
+    if (olderReadPending) {
+      readDetail.mockImplementationOnce(() => new Promise((resolve) => {
+        resolveOlderRead = resolve;
+      }));
+      void detail.refetch();
+      await waitFor(() => expect(readDetail).toHaveBeenCalledTimes(2));
+    }
 
     await screen.findByText("-$200 USD");
     expect(screen.getByRole("button", { name: "Record result" }).props.accessibilityState.disabled).toBe(true);
@@ -188,10 +203,10 @@ describe("TournamentResultSheet", () => {
       }),
       { authenticatedUserId: "user-1" },
     );
-    expect(detailInvalidation).toHaveBeenCalledWith({
-      queryKey: ["tournament", tournament.id],
-      exact: true,
-    });
+    await act(async () => { resolveOlderRead?.(tournament); });
+    expect(queryClient.getQueryData(["tournament", tournament.id])).toEqual(saved);
+    expect(readDetail).toHaveBeenCalledTimes(olderReadPending ? 2 : 1);
+    unsubscribe();
     expect(detailInvalidation).toHaveBeenCalledWith({
       queryKey: ["tournaments", "profile-1"],
     });
@@ -319,11 +334,15 @@ describe("TournamentResultSheet", () => {
       },
       actual_pnl: actualPnl,
     };
-    mockRemoveResult.mockResolvedValue({
-      ...tournament,
-      result: null,
-      actual_pnl: null,
+    const removed = { ...tournament, result: null, actual_pnl: null };
+    mockRemoveResult.mockResolvedValue(removed);
+    const readDetail = jest.fn().mockResolvedValue(completed);
+    const detail = new QueryObserver(queryClient, {
+      queryKey: ["tournament", tournament.id],
+      queryFn: readDetail,
     });
+    const unsubscribe = detail.subscribe(() => {});
+    await waitFor(() => expect(readDetail).toHaveBeenCalledTimes(1));
     const onClose = jest.fn();
     const screen = render(
       <TournamentResultSheet
@@ -348,6 +367,9 @@ describe("TournamentResultSheet", () => {
     expect(mockRemoveResult).toHaveBeenCalledWith(tournament.id, {
       authenticatedUserId: "user-1",
     });
+    expect(queryClient.getQueryData(["tournament", tournament.id])).toEqual(removed);
+    expect(readDetail).toHaveBeenCalledTimes(1);
+    unsubscribe();
   });
 
   it("requires older unsplit daily spending to be accounted for explicitly", async () => {

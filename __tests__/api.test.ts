@@ -351,10 +351,10 @@ describe("api client", () => {
     expect(jest.getTimerCount()).toBe(0);
   });
 
-  it("preserves timeout mapping while parsing an HTTP error body", async () => {
+  it.each([true, false])("preserves timeout mapping while parsing a body with ok=%s", async (ok) => {
     fetchMock.mockImplementation((_url, options) => {
       return Promise.resolve({
-        ok: false,
+        ok,
         status: 503,
         statusText: "Service Unavailable",
         json: () =>
@@ -378,7 +378,7 @@ describe("api client", () => {
     expect(jest.getTimerCount()).toBe(0);
   });
 
-  it("preserves caller abort mapping while parsing an HTTP error body", async () => {
+  it.each([true, false])("preserves caller abort mapping while parsing a body with ok=%s", async (ok) => {
     const callerController = new AbortController();
     const jsonMock = jest.fn(
       (signal?: AbortSignal | null) =>
@@ -390,7 +390,7 @@ describe("api client", () => {
     );
     fetchMock.mockImplementation((_url, options) => {
       return Promise.resolve({
-        ok: false,
+        ok,
         status: 503,
         statusText: "Service Unavailable",
         json: () => jsonMock(options?.signal),

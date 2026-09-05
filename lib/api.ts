@@ -129,7 +129,7 @@ async function request<T>(path: string, options?: RequestOptions): Promise<T> {
       );
     }
 
-    return response.json();
+    return await response.json();
   } catch (error) {
     if (abortCause === "timeout") {
       throw new ApiError("Request timed out", 0, "TIMEOUT");

@@ -13,7 +13,6 @@ import { TournamentDraftProvider } from "@/context/tournament-draft";
 import { api } from "@/lib/api";
 import { draftStorage, tournamentDraftStorageKey } from "@/lib/storage";
 import {
-  completeTournamentSaveData,
   createDefaultTournamentDraft,
   persistedTournamentDraft,
   saveTournamentDraft,
@@ -1345,14 +1344,4 @@ describe("save completion helpers", () => {
     );
   });
 
-  it("invalidates list/detail and resets immediately after confirmed save", () => {
-    const completion = {
-      invalidate: jest.fn(),
-      resetDraft: jest.fn(),
-    };
-    completeTournamentSaveData("tournament-1", "athlete-1", completion);
-    expect(completion.invalidate).toHaveBeenNthCalledWith(1, ["tournaments", "athlete-1"]);
-    expect(completion.invalidate).toHaveBeenNthCalledWith(2, ["tournament", "tournament-1"]);
-    expect(completion.resetDraft).toHaveBeenCalledTimes(1);
-  });
 });

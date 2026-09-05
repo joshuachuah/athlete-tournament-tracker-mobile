@@ -1,5 +1,5 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { api } from "@/lib/api";
@@ -26,10 +26,11 @@ export function useTournamentPreview({
     : "";
   const debouncedPayload = useDebouncedValue(serializedPayload, 350);
   const waitingForDebounce = enabled && serializedPayload !== debouncedPayload;
-  const query = useQuery({
+  const previewOwner = `${authenticatedUserId}:${profileId}:${homeCurrency.toUpperCase()}`;
+  const { data, error, isError, isFetching, refetch } = useQuery({
     queryKey: [
       "tournament-pnl-preview",
-      homeCurrency.toUpperCase(),
+      previewOwner,
       debouncedPayload,
     ],
     queryFn: ({ signal }) =>
@@ -38,50 +39,40 @@ export function useTournamentPreview({
         authenticatedUserId,
       }),
     enabled: enabled && Boolean(debouncedPayload) && !waitingForDebounce,
-    placeholderData: keepPreviousData,
     retry: false,
   });
 
-  const isLoadingPreview = waitingForDebounce || query.isFetching;
-  const previewOwner = `${authenticatedUserId}:${profileId}:${homeCurrency.toUpperCase()}`;
-  const lastSuccessfulPreview = useRef<
-    | {
-        data: NonNullable<typeof query.data>;
-        owner: string;
-      }
-    | undefined
+  const isLoadingPreview = waitingForDebounce || isFetching;
+  const [lastSuccessfulPreview, setLastSuccessfulPreview] = useState<
+    { data: typeof data; owner: string } | undefined
   >(undefined);
 
-  useEffect(() => {
-    if (!enabled) {
-      lastSuccessfulPreview.current = undefined;
-      return;
-    }
+  // Remember the last result for this owner across input changes and failures.
+  // Update during this render so disabling or changing owners clears it before
+  // children render, without an effect or render-time ref reads.
+  if (!enabled) {
+    if (lastSuccessfulPreview) setLastSuccessfulPreview(undefined);
+  } else if (
+    lastSuccessfulPreview?.owner !== previewOwner ||
+    (data !== undefined && data !== lastSuccessfulPreview.data)
+  ) {
+    setLastSuccessfulPreview({ data, owner: previewOwner });
+  }
 
-    if (query.data && !query.isPlaceholderData) {
-      lastSuccessfulPreview.current = { data: query.data, owner: previewOwner };
-    }
-  }, [enabled, previewOwner, query.data, query.isPlaceholderData]);
-
-  const queryDataForOwner =
-    query.isPlaceholderData &&
-    lastSuccessfulPreview.current?.owner !== previewOwner
-      ? undefined
-      : query.data;
   const lastData = enabled
-    ? (queryDataForOwner ??
-      (lastSuccessfulPreview.current?.owner === previewOwner
-        ? lastSuccessfulPreview.current.data
+    ? (data ??
+      (lastSuccessfulPreview?.owner === previewOwner
+        ? lastSuccessfulPreview.data
         : undefined))
     : undefined;
 
   return {
-    ...query,
-    data: !enabled || isLoadingPreview ? undefined : query.data,
-    // Keep the previous result available for the outcome card while a new
-    // preview loads. `data` stays hidden so other preview labels never use a
-    // stale withholding rate against edited inputs.
+    data: !enabled || isLoadingPreview ? undefined : data,
+    // Only the outcome card may show a retained result while inputs change.
     lastData,
+    error,
+    isError,
     isLoadingPreview,
+    refetch,
   };
 }

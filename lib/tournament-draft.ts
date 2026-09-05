@@ -829,18 +829,3 @@ export function saveTournamentDraft(
 
   return options ? writer.create(payload, options) : writer.create(payload);
 }
-
-type TournamentSaveDataCompletion = {
-  invalidate: (queryKey: readonly unknown[]) => void;
-  resetDraft: () => void;
-};
-
-export function completeTournamentSaveData(
-  tournamentId: string,
-  athleteId: string | undefined,
-  completion: TournamentSaveDataCompletion,
-): void {
-  completion.invalidate(["tournaments", athleteId]);
-  completion.invalidate(["tournament", tournamentId]);
-  completion.resetDraft();
-}

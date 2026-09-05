@@ -12,7 +12,6 @@ import { api } from "@/lib/api";
 import { errorMessage } from "@/lib/errors";
 import { queryClient } from "@/lib/query-client";
 import {
-  completeTournamentSaveData,
   resumableDraft,
   saveTournamentDraft,
   tournamentDraftFromPrefill,
@@ -81,14 +80,22 @@ export function TournamentBuilderContainer({
       saveTournamentDraft(variables.draft, variables.profileId, api.tournaments, {
         authenticatedUserId: variables.userId,
       }),
-    onSuccess: (saved, variables) => {
+    onSuccess: async (saved, variables) => {
       if (!isCurrentUser(variables.userId)) return;
+      await queryClient.cancelQueries({
+        queryKey: ["tournament", saved.id],
+        exact: true,
+      });
+      // The account can change while cancellation settles.
+      if (!isCurrentUser(variables.userId)) return;
+
       if (completedSaveDataId.current !== saved.id) {
         completedSaveDataId.current = saved.id;
-        completeTournamentSaveData(saved.id, variables.profileId, {
-          invalidate: (queryKey) => queryClient.invalidateQueries({ queryKey }),
-          resetDraft,
+        queryClient.setQueryData(["tournament", saved.id], saved);
+        queryClient.invalidateQueries({
+          queryKey: ["tournaments", variables.profileId],
         });
+        resetDraft();
       }
       setSavedProjection({
         mode: variables.draft.editId ? "edit" : "create",

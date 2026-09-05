@@ -276,17 +276,21 @@ export function TournamentResultSheet({
       api.tournaments.upsertResult(variables.tournamentId, variables.input, {
         authenticatedUserId: variables.userId,
       }),
-    onSuccess: (saved, variables) => {
+    onSuccess: async (saved, variables) => {
+      if (!isCurrentUser(variables.userId)) return;
+
+      // Cancel older reads before storing the authoritative mutation response.
+      await queryClient.cancelQueries({
+        queryKey: ["tournament", variables.tournamentId],
+        exact: true,
+      });
+      // The account can change while cancellation settles.
       if (!isCurrentUser(variables.userId)) return;
 
       queryClient.setQueryData(
         ["tournament", variables.tournamentId],
         saved,
       );
-      queryClient.invalidateQueries({
-        queryKey: ["tournament", variables.tournamentId],
-        exact: true,
-      });
       queryClient.invalidateQueries({
         queryKey: ["tournaments", variables.profileId],
       });
@@ -299,17 +303,21 @@ export function TournamentResultSheet({
       api.tournaments.removeResult(variables.tournamentId, {
         authenticatedUserId: variables.userId,
       }),
-    onSuccess: (saved, variables) => {
+    onSuccess: async (saved, variables) => {
+      if (!isCurrentUser(variables.userId)) return;
+
+      // Cancel older reads before storing the authoritative mutation response.
+      await queryClient.cancelQueries({
+        queryKey: ["tournament", variables.tournamentId],
+        exact: true,
+      });
+      // The account can change while cancellation settles.
       if (!isCurrentUser(variables.userId)) return;
 
       queryClient.setQueryData(
         ["tournament", variables.tournamentId],
         saved,
       );
-      queryClient.invalidateQueries({
-        queryKey: ["tournament", variables.tournamentId],
-        exact: true,
-      });
       queryClient.invalidateQueries({
         queryKey: ["tournaments", variables.profileId],
       });
